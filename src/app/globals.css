@@ -1,0 +1,226 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-oswald);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Custom industrial theme colors */
+  --color-amber-50: #FFFBEB;
+  --color-amber-100: #FEF3C7;
+  --color-amber-200: #FDE68A;
+  --color-amber-300: #FCD34D;
+  --color-amber-400: #FBBF24;
+  --color-amber-500: #F59E0B;
+  --color-amber-600: #D97706;
+  --color-amber-700: #B45309;
+  --color-amber-800: #92400E;
+  --color-amber-900: #78350F;
+
+  --color-surface: #141414;
+  --color-surface-elevated: #1C1C1C;
+  --color-surface-overlay: #222222;
+
+  --color-status-compliant: #22C55E;
+  --color-status-warning: #F59E0B;
+  --color-status-deficient: #EF4444;
+  --color-status-review: #8B5CF6;
+}
+
+/* Always dark mode - industrial theme */
+:root {
+  --background: #0A0A0A;
+  --foreground: #E5E5E5;
+  --card: #141414;
+  --card-foreground: #E5E5E5;
+  --popover: #1C1C1C;
+  --popover-foreground: #E5E5E5;
+  --primary: #F59E0B;
+  --primary-foreground: #0A0A0A;
+  --secondary: #1C1C1C;
+  --secondary-foreground: #A3A3A3;
+  --muted: #1C1C1C;
+  --muted-foreground: #737373;
+  --accent: #292524;
+  --accent-foreground: #F59E0B;
+  --destructive: #EF4444;
+  --border: #2A2A2A;
+  --input: #2A2A2A;
+  --ring: #F59E0B;
+  --chart-1: #F59E0B;
+  --chart-2: #22C55E;
+  --chart-3: #3B82F6;
+  --chart-4: #8B5CF6;
+  --chart-5: #EF4444;
+  --radius: 0.5rem;
+  --sidebar: #0A0A0A;
+  --sidebar-foreground: #A3A3A3;
+  --sidebar-primary: #F59E0B;
+  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-accent: #1C1C1C;
+  --sidebar-accent-foreground: #E5E5E5;
+  --sidebar-border: #2A2A2A;
+  --sidebar-ring: #F59E0B;
+}
+
+/* No light mode - force dark always */
+.dark {
+  --background: #0A0A0A;
+  --foreground: #E5E5E5;
+  --card: #141414;
+  --card-foreground: #E5E5E5;
+  --popover: #1C1C1C;
+  --popover-foreground: #E5E5E5;
+  --primary: #F59E0B;
+  --primary-foreground: #0A0A0A;
+  --secondary: #1C1C1C;
+  --secondary-foreground: #A3A3A3;
+  --muted: #1C1C1C;
+  --muted-foreground: #737373;
+  --accent: #292524;
+  --accent-foreground: #F59E0B;
+  --destructive: #EF4444;
+  --border: #2A2A2A;
+  --input: #2A2A2A;
+  --ring: #F59E0B;
+  --chart-1: #F59E0B;
+  --chart-2: #22C55E;
+  --chart-3: #3B82F6;
+  --chart-4: #8B5CF6;
+  --chart-5: #EF4444;
+  --sidebar: #0A0A0A;
+  --sidebar-foreground: #A3A3A3;
+  --sidebar-primary: #F59E0B;
+  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-accent: #1C1C1C;
+  --sidebar-accent-foreground: #E5E5E5;
+  --sidebar-border: #2A2A2A;
+  --sidebar-ring: #F59E0B;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Industrial texture overlay */
+.texture-concrete {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3A3A3A;
+}
+
+/* Mapbox overrides for dark theme */
+.mapboxgl-popup-content {
+  background: #1C1C1C !important;
+  color: #E5E5E5 !important;
+  border: 1px solid #2A2A2A !important;
+  border-radius: 0.5rem !important;
+  padding: 12px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: #1C1C1C !important;
+}
+
+.mapboxgl-ctrl-group {
+  background: #1C1C1C !important;
+  border: 1px solid #2A2A2A !important;
+}
+
+.mapboxgl-ctrl-group button {
+  filter: invert(1);
+}
+
+/* Glow effect for amber elements */
+.glow-amber {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+}
+
+/* Pulsing animation for alerts */
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-amber {
+  animation: pulse-amber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Countdown timer red pulse */
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+  50% { opacity: 0.8; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+}
+
+.animate-pulse-red {
+  animation: pulse-red 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
