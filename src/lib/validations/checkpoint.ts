@@ -12,7 +12,10 @@ export const checkpointCreate = z.object({
   name: z.string().min(1).max(500),
   bmpType: z.string().min(1).max(200),
   status: z.string().optional(),
-  priority: z.number().optional(),
+  // DB column is `priority TEXT NOT NULL CHECK (priority IN ('high','medium','low'))`.
+  // Schema previously typed this as z.number() which mismatched both the
+  // DB and the runtime Priority union.
+  priority: z.enum(['high', 'medium', 'low']).optional(),
   zone: z.string().optional(),
   description: z.string().max(5000).optional(),
   cgpSection: z.string().optional(),

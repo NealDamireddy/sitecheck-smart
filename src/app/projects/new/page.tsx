@@ -309,8 +309,23 @@ export default function NewProjectPage() {
       // doesn't roll back the project. The static demo data renders
       // anyway as a fallback in CheckpointDetail, so the QSP can keep
       // going; failed rows just won't accept photo uploads until re-added.
+      //
+      // Defaults below cover NOT NULL / CHECK columns the SWPPP extraction
+      // doesn't fill: priority, zone, install_date. Claude returns zone
+      // most of the time but we still coerce to a valid CHECK value.
+      const ALLOWED_ZONES = new Set([
+        'north',
+        'south',
+        'east',
+        'west',
+        'central',
+      ]);
+      const today = new Date().toISOString().slice(0, 10);
+
       const checkpointErrors: string[] = [];
       for (const cp of extractedCheckpoints) {
+        const safeZone =
+          cp.zone && ALLOWED_ZONES.has(cp.zone) ? cp.zone : 'central';
         const cpRes = await fetch('/api/checkpoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -319,12 +334,14 @@ export default function NewProjectPage() {
             projectId: id,
             name: cp.name,
             bmpType: cp.bmpType,
-            description: cp.description,
-            cgpSection: cp.cgpSection,
-            zone: cp.zone,
-            lat: cp.lat,
-            lng: cp.lng,
+            description: cp.description || cp.name,
+            cgpSection: cp.cgpSection || 'TBD',
+            zone: safeZone,
+            lat: cp.lat ?? 0,
+            lng: cp.lng ?? 0,
             status: 'needs-review',
+            priority: 'medium',
+            installDate: today,
           }),
         });
         if (!cpRes.ok) {
