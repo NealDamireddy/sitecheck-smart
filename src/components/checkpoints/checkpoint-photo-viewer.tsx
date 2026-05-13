@@ -150,6 +150,11 @@ export function CheckpointPhotoViewer({
             ref={fileInputRef}
             type="file"
             accept={ACCEPT}
+            // `capture="environment"` tells mobile browsers to launch the
+            // rear camera directly instead of the file picker. Desktop
+            // browsers ignore it and fall back to a file chooser, so this
+            // costs us nothing in the laptop flow.
+            capture="environment"
             onChange={onFile}
             className="hidden"
           />

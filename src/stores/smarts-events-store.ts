@@ -33,6 +33,22 @@ interface SmartsEventsStore {
   fetchForProject: (projectId: string, status?: SmartsEventStatus) => Promise<void>;
   fetchById: (eventId: string) => Promise<void>;
   simulate: (projectId: string, mode: SimulateMode) => Promise<SmartsEvent | null>;
+  /**
+   * Manual create — used by the events list "New Event" form for QSPs
+   * logging an actual NOAA-detected storm. Distinct from `simulate`:
+   * source defaults to 'noaa' on the server, and the caller provides
+   * the status + timing rather than picking from two demo modes.
+   */
+  create: (
+    projectId: string,
+    input: {
+      status: SmartsEventStatus;
+      startedAt?: string;
+      endedAt?: string;
+      precipitationInches?: number;
+      notes?: string;
+    },
+  ) => Promise<SmartsEvent | null>;
   update: (
     eventId: string,
     projectId: string,
@@ -107,6 +123,35 @@ export const useSmartsEventsStore = create<SmartsEventsStore>((set, get) => ({
         body: JSON.stringify({ projectId, mode }),
       });
       if (!res.ok) throw new Error(`Simulate failed (${res.status})`);
+      const event = (await res.json()) as SmartsEvent;
+      set((state) => {
+        const current = state.byProject[projectId] ?? [];
+        return {
+          byProject: {
+            ...state.byProject,
+            [projectId]: [event, ...current.filter((e) => e.id !== event.id)],
+          },
+          byId: { ...state.byId, [event.id]: event },
+        };
+      });
+      return event;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Unknown error' });
+      return null;
+    }
+  },
+
+  create: async (projectId, input) => {
+    try {
+      const res = await fetch('/api/smarts-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, ...input }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || `Create failed (${res.status})`);
+      }
       const event = (await res.json()) as SmartsEvent;
       set((state) => {
         const current = state.byProject[projectId] ?? [];
