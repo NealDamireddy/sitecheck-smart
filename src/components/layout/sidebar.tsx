@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -58,20 +59,30 @@ export function Sidebar() {
     router.refresh();
   };
 
+  // currentProjectId is read from localStorage on first client render but
+  // is empty on the server. Defer adding the project-scoped SMARTS link
+  // until after mount so SSR and hydration agree on the link count and
+  // href. (Without this guard, server emits href="/projects//events" and
+  // the client hydrates with the real id — a React hydration mismatch.)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Project-scoped SMARTS entry inserted between Inspections and Reports.
   // baseNavItems order after the Sites insert:
   //   0 Dashboard, 1 Sites, 2 SWPPP, 3 Missions, 4 Checkpoints,
   //   5 Inspections, 6 Reports, 7 Weather
-  const smartsItem = {
-    href: `/projects/${currentProjectId}/events`,
-    icon: Droplets,
-    label: 'SMARTS',
-  };
-  const itemsWithSmarts = [
-    ...baseNavItems.slice(0, 6),
-    smartsItem,
-    ...baseNavItems.slice(6),
-  ];
+  const itemsWithSmarts =
+    mounted && currentProjectId
+      ? [
+          ...baseNavItems.slice(0, 6),
+          {
+            href: `/projects/${currentProjectId}/events`,
+            icon: Droplets,
+            label: 'SMARTS',
+          },
+          ...baseNavItems.slice(6),
+        ]
+      : baseNavItems;
 
   // For linear projects, splice Crossings + No-Fly Zones in after Missions
   // (idx 3 in baseNavItems) and before Checkpoints/Inspections.
