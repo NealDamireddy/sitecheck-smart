@@ -21,3 +21,7 @@ export * from './report';
 export * from './review';
 export * from './telemetry';
 export * from './analyze';
+export * from './smarts-event';
+export * from './monitoring-location';
+export * from './sample';
+export * from './parameter-result';
