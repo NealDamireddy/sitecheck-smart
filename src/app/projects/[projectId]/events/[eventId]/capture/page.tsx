@@ -33,6 +33,7 @@ import {
 import { EMPTY_SAMPLES, useSamplesStore } from '@/stores/samples-store';
 import { useSmartsEventsStore } from '@/stores/smarts-events-store';
 import { useProjectStore } from '@/stores/project-store';
+import { isNalExceedance } from '@/lib/smarts/nal-thresholds';
 import { cn } from '@/lib/utils';
 import type {
   MonitoringLocation,
@@ -45,10 +46,9 @@ import type {
 // ──────────────────────────────────────────────────────
 // Constants + small helpers
 // ──────────────────────────────────────────────────────
-
-const NAL_PH_MIN = 6;
-const NAL_PH_MAX = 9;
-const NAL_TURBIDITY_NTU = 250;
+//
+// NAL thresholds + isNalExceedance() live in @/lib/smarts/nal-thresholds —
+// single source of truth shared with the review page.
 
 const DEFAULT_UNITS: Record<ParameterName, string> = {
   pH: 'su',
@@ -73,20 +73,6 @@ function eventStatusStyles(status: SmartsEventStatus | undefined): string {
     default:
       return 'border-slate-700 bg-slate-800/40 text-slate-300';
   }
-}
-
-function isNalExceedance(prs: ParameterResult[] | undefined): boolean {
-  if (!prs || prs.length === 0) return false;
-  for (const p of prs) {
-    if (p.result == null) continue;
-    if (p.parameter === 'pH' && (p.result < NAL_PH_MIN || p.result > NAL_PH_MAX)) {
-      return true;
-    }
-    if (p.parameter === 'Turbidity' && p.result > NAL_TURBIDITY_NTU) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function sampleSummaryLine(sample: Sample): string {
@@ -422,6 +408,12 @@ export default function CapturePage({
     [locations]
   );
 
+  // All active locations have a sample → green "Review & Sync" CTA at top.
+  const allSampled = useMemo(() => {
+    if (activeLocations.length === 0) return false;
+    return activeLocations.every((l) => sampleByLocation[l.id] != null);
+  }, [activeLocations, sampleByLocation]);
+
   const initialLoading =
     (eventLoading && !event) ||
     (locationsLoading && locations.length === 0) ||
@@ -484,6 +476,18 @@ export default function CapturePage({
 
         {/* Body */}
         <div className="flex-1 space-y-3 p-4">
+          {!initialLoading && allSampled && (
+            <Link
+              href={`/projects/${projectId}/events/${eventId}/review`}
+              className="block"
+            >
+              <Button className="min-h-[48px] w-full bg-emerald-600 text-emerald-50 hover:bg-emerald-700">
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Review &amp; Sync — all {activeLocations.length} locations
+                sampled
+              </Button>
+            </Link>
+          )}
           {initialLoading ? (
             <div className="flex items-center justify-center p-12 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
