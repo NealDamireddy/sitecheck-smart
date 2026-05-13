@@ -11,19 +11,25 @@ import {
   ClipboardCheck,
   FileBarChart,
   CloudRain,
+  Droplets,
   RotateCcw,
   Waypoints,
   ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 import { useProjectStore } from '@/stores/project-store';
 
 const baseNavItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
+  { href: '/sites', icon: Building2, label: 'Sites' },
   { href: '/swppp', icon: FileText, label: 'SWPPP Intelligence' },
   { href: '/missions', icon: Plane, label: 'Drone Missions' },
   { href: '/checkpoints', icon: CheckCircle, label: 'Checkpoints' },
   { href: '/inspections', icon: ClipboardCheck, label: 'Inspections' },
+  // SMARTS entry is inserted here at render time — its href is
+  // project-scoped (depends on useProjectStore.currentProjectId) so it
+  // can't live in this static array.
   { href: '/reports', icon: FileBarChart, label: 'Reports' },
   { href: '/weather', icon: CloudRain, label: 'Weather' },
 ];
@@ -31,15 +37,34 @@ const baseNavItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const project = useProjectStore((s) => s.currentProject());
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
+
+  // Project-scoped SMARTS entry inserted between Inspections and Reports.
+  // baseNavItems order after the Sites insert:
+  //   0 Dashboard, 1 Sites, 2 SWPPP, 3 Missions, 4 Checkpoints,
+  //   5 Inspections, 6 Reports, 7 Weather
+  const smartsItem = {
+    href: `/projects/${currentProjectId}/events`,
+    icon: Droplets,
+    label: 'SMARTS',
+  };
+  const itemsWithSmarts = [
+    ...baseNavItems.slice(0, 6),
+    smartsItem,
+    ...baseNavItems.slice(6),
+  ];
+
+  // For linear projects, splice Crossings + No-Fly Zones in after Missions
+  // (idx 3 in baseNavItems) and before Checkpoints/Inspections.
   const navItems =
     project?.projectType === 'linear'
       ? [
-          ...baseNavItems.slice(0, 4),
+          ...itemsWithSmarts.slice(0, 4),
           { href: '/crossings', icon: Waypoints, label: 'Crossings' },
           { href: '/nofly-zones', icon: ShieldAlert, label: 'No-Fly Zones' },
-          ...baseNavItems.slice(4), // Inspections, Reports, Weather
+          ...itemsWithSmarts.slice(4),
         ]
-      : baseNavItems;
+      : itemsWithSmarts;
 
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-16 flex-col border-r border-border bg-[#0A0A0A] transition-all duration-300 hover:w-56 sm:flex group/sidebar">

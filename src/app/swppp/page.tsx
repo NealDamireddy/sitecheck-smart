@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, ArrowRight } from 'lucide-react';
 import { SectionHeader } from '@/components/shared/section-header';
 import { ConfidenceIndicator } from '@/components/swppp/confidence-indicator';
 import { CheckpointListPanel } from '@/components/swppp/checkpoint-list-panel';
@@ -33,8 +34,15 @@ const CheckpointMapPanel = dynamic(
   }
 );
 
+/**
+ * sessionStorage key for handing extracted siteInfo to /projects/new.
+ * Must match the constant in app/projects/new/page.tsx.
+ */
+const SWPPP_PREFILL_KEY = 'sitecheck-swppp-prefill';
+
 export default function SwpppPage() {
   const { isApp } = useAppMode();
+  const router = useRouter();
 
   const {
     processingStep,
@@ -43,7 +51,18 @@ export default function SwpppPage() {
     reset,
     selectedPages,
     setSelectedPages,
+    siteInfo,
   } = useSwpppStore();
+
+  const handleCreateSite = useCallback(() => {
+    if (!siteInfo) return;
+    try {
+      sessionStorage.setItem(SWPPP_PREFILL_KEY, JSON.stringify(siteInfo));
+    } catch {
+      // sessionStorage unavailable — wizard will just start blank.
+    }
+    router.push('/projects/new?source=swppp');
+  }, [siteInfo, router]);
 
   const checkpoints = useCheckpointStore((s) => s.checkpoints);
   const fetchCheckpoints = useCheckpointStore((s) => s.fetchCheckpoints);
@@ -100,6 +119,29 @@ export default function SwpppPage() {
         {/* Phase 3: Results panels */}
         {isComplete && (
           <>
+            {/* Site-creation CTA: chains the SWPPP upload into the New Site
+                wizard, pre-filling basic info from the extracted siteInfo. */}
+            {siteInfo && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 sm:p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-200">
+                      Create a site from this SWPPP
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Auto-fills project name, address, acreage, and risk
+                      level. You&apos;ll add monitoring locations on the next
+                      screen.
+                    </p>
+                  </div>
+                  <Button onClick={handleCreateSite} className="sm:ml-3">
+                    Create Site
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Selective page filter + Mission generation */}
             <DocumentPageSelector
               selectedPages={selectedPages}

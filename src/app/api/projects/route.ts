@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
-    const { supabase } = auth;
+    const { supabase, user } = auth;
     const body = projectCreate.parse(await request.json());
 
     // Validate required fields
@@ -140,8 +140,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // projects.org_id is NOT NULL (migration 008). Resolve from the
+    // authenticated user's first org membership; if they belong to none,
+    // there's no org to scope this project to.
+    const { data: membership, error: membershipError } = await supabase
+      .from('org_memberships')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (membershipError) {
+      return NextResponse.json(
+        { error: `Failed to resolve organization: ${membershipError.message}` },
+        { status: 500 }
+      );
+    }
+    if (!membership?.org_id) {
+      return NextResponse.json(
+        { error: 'No organization membership found for this user' },
+        { status: 403 }
+      );
+    }
+
     const projectRow = {
       id: body.id,
+      org_id: membership.org_id,
       name: body.name,
       address: body.address || '',
       permit_number: body.permitNumber || '',

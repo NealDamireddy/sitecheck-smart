@@ -1,15 +1,31 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { ProjectTypeSelector } from '@/components/projects/project-type-selector';
 import { GeoJsonUpload } from '@/components/projects/geojson-upload';
 import { SegmentBuilder } from '@/components/projects/segment-builder';
+import {
+  MonitoringLocationsBuilder,
+  type MonitoringLocationDraft,
+} from '@/components/projects/monitoring-locations-builder';
 import { centerlineLengthFeet, formatLinearLength } from '@/lib/format';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectType, ProjectSegment, Project } from '@/types/project';
+
+/** sessionStorage key used by /swppp to hand off extracted site info. */
+const SWPPP_PREFILL_KEY = 'sitecheck-swppp-prefill';
+
+interface SwpppPrefill {
+  projectName?: string;
+  address?: string;
+  totalAcres?: number;
+  riskLevel?: string;
+  centerLat?: number;
+  centerLng?: number;
+}
 
 const CorridorDrawMap = dynamic(
   () => import('@/components/projects/corridor-draw-map').then((m) => ({ default: m.CorridorDrawMap })),
@@ -22,11 +38,13 @@ const STEPS = [
   { id: 'corridor', label: 'Corridor' },
   { id: 'segments', label: 'Segments' },
   { id: 'row', label: 'ROW' },
+  { id: 'monitoring', label: 'Monitoring' },
   { id: 'review', label: 'Review' },
 ];
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fetchProjects = useProjectStore((s) => s.fetchProjects);
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -38,6 +56,7 @@ export default function NewProjectPage() {
   const [permitNumber, setPermitNumber] = useState('');
   const [wdid, setWdid] = useState('');
   const [riskLevel, setRiskLevel] = useState<1 | 2 | 3>(2);
+  const [acreage, setAcreage] = useState<number>(0);
   const [qspName, setQspName] = useState('');
   const [qspLicense, setQspLicense] = useState('');
   const [qspCompany, setQspCompany] = useState('');
@@ -56,9 +75,48 @@ export default function NewProjectPage() {
   const [rowWidthFeet, setRowWidthFeet] = useState(100);
   const [easementDescription, setEasementDescription] = useState('');
 
+  // Monitoring locations (sampling points). Required for SMARTS capture.
+  const [monitoringLocations, setMonitoringLocations] = useState<
+    MonitoringLocationDraft[]
+  >([]);
+
+  // Center coords — populated either from SWPPP prefill (bounded sites) or
+  // from the first centerline vertex (linear). Used to seed lat/lng on
+  // newly added monitoring locations.
+  const [prefillCenter, setPrefillCenter] = useState<
+    { lat: number; lng: number } | null
+  >(null);
+
   // Submission
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Read SWPPP-extracted prefill (if any) on mount. The /swppp page stashes
+  // siteInfo in sessionStorage before routing here with ?source=swppp.
+  useEffect(() => {
+    if (searchParams.get('source') !== 'swppp') return;
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = sessionStorage.getItem(SWPPP_PREFILL_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SwpppPrefill;
+      if (parsed.projectName) setName(parsed.projectName);
+      if (parsed.address) setAddress(parsed.address);
+      if (parsed.totalAcres) setAcreage(parsed.totalAcres);
+      if (parsed.riskLevel) {
+        const m = parsed.riskLevel.match(/[1-3]/);
+        if (m) setRiskLevel(Number(m[0]) as 1 | 2 | 3);
+      }
+      if (parsed.centerLat != null && parsed.centerLng != null) {
+        setPrefillCenter({ lat: parsed.centerLat, lng: parsed.centerLng });
+      }
+      // SWPPP-sourced sites are bounded by default — corridor isn't extracted.
+      setProjectType('bounded-site');
+      sessionStorage.removeItem(SWPPP_PREFILL_KEY);
+    } catch {
+      // Bad JSON — silently ignore and let the user fill manually.
+    }
+  }, [searchParams]);
 
   // Derived
   const corridorLengthFeet = useMemo(() => centerlineLengthFeet(centerline), [centerline]);
@@ -66,6 +124,14 @@ export default function NewProjectPage() {
 
   const visibleSteps = projectType === 'linear' ? STEPS : STEPS.filter((s) => s.id !== 'corridor' && s.id !== 'segments' && s.id !== 'row');
   const step = visibleSteps[currentStep];
+
+  // Center coord for seeding new monitoring locations: SWPPP prefill wins,
+  // else first centerline vertex (linear), else nothing.
+  const monitoringCenter = prefillCenter
+    ? prefillCenter
+    : centerline.length > 0
+      ? { lat: centerline[0][1], lng: centerline[0][0] }
+      : null;
 
   const canProceed = (): boolean => {
     switch (step?.id) {
@@ -79,6 +145,11 @@ export default function NewProjectPage() {
         return true; // optional
       case 'row':
         return true; // optional
+      case 'monitoring':
+        // Each row must have name + drainage area filled.
+        return monitoringLocations.every(
+          (loc) => loc.name.trim().length > 0 && loc.drainageArea.trim().length > 0,
+        );
       case 'review':
         return true;
       default:
@@ -115,11 +186,13 @@ export default function NewProjectPage() {
         status: 'active',
         startDate: new Date().toISOString().slice(0, 10),
         estimatedCompletion: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-        acreage: 0,
+        acreage,
         coordinates:
           centerline.length > 0
             ? { lng: centerline[0][0], lat: centerline[0][1] }
-            : { lat: 36.78, lng: -119.42 },
+            : prefillCenter
+              ? { lat: prefillCenter.lat, lng: prefillCenter.lng }
+              : { lat: 36.78, lng: -119.42 },
         bounds:
           centerline.length > 0
             ? [
@@ -167,7 +240,45 @@ export default function NewProjectPage() {
         throw new Error(errBody.error || `Failed to create project: ${res.status}`);
       }
 
+      // Chain monitoring-location creates. We intentionally do NOT roll the
+      // project back if a location fails — the project itself is valid; a
+      // failed location just gets reported and the QSP can re-add it from
+      // a future "manage locations" screen.
+      const locationErrors: string[] = [];
+      for (const loc of monitoringLocations) {
+        const locRes = await fetch('/api/monitoring-locations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: id,
+            name: loc.name.trim(),
+            drainageArea: loc.drainageArea.trim(),
+            dischargePointType: loc.dischargePointType,
+            isAts: loc.isAts,
+            isPassiveTreatment: loc.isPassiveTreatment,
+            description: loc.description?.trim() || undefined,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            status: 'active',
+          }),
+        });
+        if (!locRes.ok) {
+          const errBody = await locRes.json().catch(() => ({}));
+          locationErrors.push(
+            `${loc.name}: ${errBody.error || `HTTP ${locRes.status}`}`,
+          );
+        }
+      }
+
       await fetchProjects();
+      if (locationErrors.length > 0) {
+        // Surface partial failure to the user rather than silently routing.
+        setError(
+          `Project created, but ${locationErrors.length} monitoring location(s) failed: ${locationErrors.join('; ')}`,
+        );
+        setSubmitting(false);
+        return;
+      }
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
@@ -287,6 +398,16 @@ export default function NewProjectPage() {
                   <option value={2}>Risk Level 2</option>
                   <option value={3}>Risk Level 3</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Acreage</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={acreage}
+                  onChange={(e) => setAcreage(Number(e.target.value) || 0)}
+                  className="w-full rounded border border-border bg-elevated px-3 py-2 text-sm font-mono focus:border-amber-500/50 focus:outline-none"
+                />
               </div>
             </div>
 
@@ -440,6 +561,18 @@ export default function NewProjectPage() {
           </div>
         )}
 
+        {step?.id === 'monitoring' && (
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold">Monitoring Locations</h2>
+            <MonitoringLocationsBuilder
+              locations={monitoringLocations}
+              onChange={setMonitoringLocations}
+              centerLat={monitoringCenter?.lat}
+              centerLng={monitoringCenter?.lng}
+            />
+          </div>
+        )}
+
         {step?.id === 'review' && (
           <div className="space-y-4">
             <h2 className="text-base font-semibold">Review & submit</h2>
@@ -451,8 +584,13 @@ export default function NewProjectPage() {
               <ReviewItem label="Permit #" value={permitNumber || '—'} mono />
               <ReviewItem label="WDID" value={wdid || '—'} mono />
               <ReviewItem label="Risk Level" value={`RL-${riskLevel}`} />
+              <ReviewItem label="Acreage" value={acreage ? `${acreage} ac` : '—'} mono />
               <ReviewItem label="QSP" value={qspName || '—'} />
               <ReviewItem label="QSP License" value={qspLicense || '—'} mono />
+              <ReviewItem
+                label="Monitoring locations"
+                value={String(monitoringLocations.length)}
+              />
 
               {projectType === 'linear' && (
                 <>
