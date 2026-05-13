@@ -15,8 +15,9 @@ import { centerlineLengthFeet, formatLinearLength } from '@/lib/format';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectType, ProjectSegment, Project } from '@/types/project';
 
-/** sessionStorage key used by /swppp to hand off extracted site info. */
+/** sessionStorage keys used by /swppp to hand off extracted SWPPP data. */
 const SWPPP_PREFILL_KEY = 'sitecheck-swppp-prefill';
+const SWPPP_CHECKPOINTS_KEY = 'sitecheck-swppp-checkpoints';
 
 interface SwpppPrefill {
   projectName?: string;
@@ -25,6 +26,18 @@ interface SwpppPrefill {
   riskLevel?: string;
   centerLat?: number;
   centerLng?: number;
+}
+
+/** Shape of the checkpoints handed over from /swppp. */
+interface ExtractedCheckpointDraft {
+  id: string;
+  name: string;
+  bmpType: string;
+  description?: string;
+  cgpSection?: string;
+  zone?: string;
+  lat?: number;
+  lng?: number;
 }
 
 const CorridorDrawMap = dynamic(
@@ -80,6 +93,13 @@ export default function NewProjectPage() {
     MonitoringLocationDraft[]
   >([]);
 
+  // Checkpoints extracted by Claude on the /swppp screen, persisted as
+  // real DB rows after the project is created so the BMP detail pages
+  // and photo upload route have rows to attach data to.
+  const [extractedCheckpoints, setExtractedCheckpoints] = useState<
+    ExtractedCheckpointDraft[]
+  >([]);
+
   // Center coords — populated either from SWPPP prefill (bounded sites) or
   // from the first centerline vertex (linear). Used to seed lat/lng on
   // newly added monitoring locations.
@@ -115,6 +135,20 @@ export default function NewProjectPage() {
       sessionStorage.removeItem(SWPPP_PREFILL_KEY);
     } catch {
       // Bad JSON — silently ignore and let the user fill manually.
+    }
+
+    // Pull extracted checkpoints (if any) for later persistence.
+    try {
+      const rawCps = sessionStorage.getItem(SWPPP_CHECKPOINTS_KEY);
+      if (rawCps) {
+        const parsed = JSON.parse(rawCps);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setExtractedCheckpoints(parsed as ExtractedCheckpointDraft[]);
+        }
+        sessionStorage.removeItem(SWPPP_CHECKPOINTS_KEY);
+      }
+    } catch {
+      // Bad JSON — drop them.
     }
   }, [searchParams]);
 
@@ -270,12 +304,51 @@ export default function NewProjectPage() {
         }
       }
 
+      // Chain checkpoint creates from the SWPPP extraction. Same partial-
+      // failure stance as monitoring locations — a failed checkpoint
+      // doesn't roll back the project. The static demo data renders
+      // anyway as a fallback in CheckpointDetail, so the QSP can keep
+      // going; failed rows just won't accept photo uploads until re-added.
+      const checkpointErrors: string[] = [];
+      for (const cp of extractedCheckpoints) {
+        const cpRes = await fetch('/api/checkpoints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: cp.id,
+            projectId: id,
+            name: cp.name,
+            bmpType: cp.bmpType,
+            description: cp.description,
+            cgpSection: cp.cgpSection,
+            zone: cp.zone,
+            lat: cp.lat,
+            lng: cp.lng,
+            status: 'needs-review',
+          }),
+        });
+        if (!cpRes.ok) {
+          const errBody = await cpRes.json().catch(() => ({}));
+          checkpointErrors.push(
+            `${cp.id}: ${errBody.error || `HTTP ${cpRes.status}`}`,
+          );
+        }
+      }
+
       await fetchProjects();
+      const partial: string[] = [];
       if (locationErrors.length > 0) {
-        // Surface partial failure to the user rather than silently routing.
-        setError(
-          `Project created, but ${locationErrors.length} monitoring location(s) failed: ${locationErrors.join('; ')}`,
+        partial.push(
+          `${locationErrors.length} monitoring location(s) failed: ${locationErrors.join('; ')}`,
         );
+      }
+      if (checkpointErrors.length > 0) {
+        partial.push(
+          `${checkpointErrors.length} checkpoint(s) failed: ${checkpointErrors.join('; ')}`,
+        );
+      }
+      if (partial.length > 0) {
+        setError(`Project created, but ${partial.join(' · ')}`);
         setSubmitting(false);
         return;
       }
@@ -591,6 +664,12 @@ export default function NewProjectPage() {
                 label="Monitoring locations"
                 value={String(monitoringLocations.length)}
               />
+              {extractedCheckpoints.length > 0 && (
+                <ReviewItem
+                  label="Checkpoints from SWPPP"
+                  value={String(extractedCheckpoints.length)}
+                />
+              )}
 
               {projectType === 'linear' && (
                 <>

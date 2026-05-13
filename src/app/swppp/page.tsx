@@ -35,10 +35,11 @@ const CheckpointMapPanel = dynamic(
 );
 
 /**
- * sessionStorage key for handing extracted siteInfo to /projects/new.
- * Must match the constant in app/projects/new/page.tsx.
+ * sessionStorage keys for handing SWPPP extraction output to /projects/new.
+ * Must match the constants in app/projects/new/page.tsx.
  */
 const SWPPP_PREFILL_KEY = 'sitecheck-swppp-prefill';
+const SWPPP_CHECKPOINTS_KEY = 'sitecheck-swppp-checkpoints';
 
 export default function SwpppPage() {
   const { isApp } = useAppMode();
@@ -58,11 +59,23 @@ export default function SwpppPage() {
     if (!siteInfo) return;
     try {
       sessionStorage.setItem(SWPPP_PREFILL_KEY, JSON.stringify(siteInfo));
+      // Also stash the extracted BMPs so the wizard can persist them as
+      // real checkpoint rows after creating the project. Without this,
+      // /checkpoints renders static demo data only and the photo-upload
+      // route 404s ("Checkpoint not found") because no DB row exists.
+      if (extractedCheckpoints.length > 0) {
+        sessionStorage.setItem(
+          SWPPP_CHECKPOINTS_KEY,
+          JSON.stringify(extractedCheckpoints),
+        );
+      } else {
+        sessionStorage.removeItem(SWPPP_CHECKPOINTS_KEY);
+      }
     } catch {
       // sessionStorage unavailable — wizard will just start blank.
     }
     router.push('/projects/new?source=swppp');
-  }, [siteInfo, router]);
+  }, [siteInfo, extractedCheckpoints, router]);
 
   const checkpoints = useCheckpointStore((s) => s.checkpoints);
   const fetchCheckpoints = useCheckpointStore((s) => s.fetchCheckpoints);
