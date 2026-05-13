@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
 const nextConfig: NextConfig = {
-  // Pin the workspace root so Next.js doesn't walk up to /Users/<you>/
-  // and pick the stray package-lock.json sitting there. Without this,
-  // Turbopack mis-infers the project root and every route 404s.
+  // Pin Turbopack's workspace root to the directory of this config file
+  // so it doesn't walk up the filesystem looking for the nearest lockfile.
+  // Use process.cwd() instead of __dirname — __dirname is unreliable in
+  // ESM-style next.config.ts under recent Next.js versions and can resolve
+  // to the project's parent directory, which then mis-anchors PostCSS /
+  // Tailwind's module resolution.
   turbopack: {
-    root: path.resolve(__dirname),
+    root: process.cwd(),
   },
 };
 
