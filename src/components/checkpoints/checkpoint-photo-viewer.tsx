@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, ChangeEvent } from 'react';
-import Image from 'next/image';
 import {
   Camera,
   Upload,
@@ -9,9 +8,12 @@ import {
   AlertTriangle,
   Plane,
   User,
+  Brain,
 } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from '@/lib/utils';
+import type { AIAnalysis } from '@/types/drone';
+import type { CheckpointStatus } from '@/types/checkpoint';
 
 type View = 'drone' | 'qsp';
 
@@ -22,6 +24,13 @@ interface Props {
   qspUploadedAt?: string | null;
   /** Called with the freshly-uploaded URL + timestamp after a successful POST. */
   onUploaded?: (next: { qspPhotoUrl: string; qspPhotoUploadedAt: string }) => void;
+  /** Called with the freshly-generated Claude analysis after auto-analyze. */
+  onAnalyzed?: (analysis: AIAnalysis) => void;
+}
+
+interface AnalyzeResponse extends AIAnalysis {
+  id?: string;
+  createdAt?: string;
 }
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic';
@@ -32,11 +41,13 @@ export function CheckpointPhotoViewer({
   qspUrl,
   qspUploadedAt,
   onUploaded,
+  onAnalyzed,
 }: Props) {
   // Default to the QSP photo if one exists — field photos win over drone
   // by recency, which is what the QSP usually wants to see.
   const [view, setView] = useState<View>(qspUrl ? 'qsp' : 'drone');
   const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localQspUrl, setLocalQspUrl] = useState<string | null>(qspUrl ?? null);
   const [localQspAt, setLocalQspAt] = useState<string | null>(qspUploadedAt ?? null);
@@ -73,8 +84,45 @@ export function CheckpointPhotoViewer({
       onUploaded?.(body);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
       setUploading(false);
+      return;
+    }
+    setUploading(false);
+
+    // Chain Claude vision analysis. A failure here doesn't roll back the
+    // upload — the photo stays on the checkpoint, the QSP just won't see
+    // a fresh analysis in the AI tab until they retry.
+    setAnalyzing(true);
+    try {
+      const analyzeRes = await fetch(
+        `/api/checkpoints/${checkpointId}/analyze`,
+        { method: 'POST' },
+      );
+      const analyzeBody = (await analyzeRes.json()) as
+        | AnalyzeResponse
+        | { error: string };
+      if (!analyzeRes.ok || 'error' in analyzeBody) {
+        const message =
+          'error' in analyzeBody
+            ? analyzeBody.error
+            : `Analysis failed (${analyzeRes.status})`;
+        throw new Error(message);
+      }
+      onAnalyzed?.({
+        checkpointId: analyzeBody.checkpointId,
+        summary: analyzeBody.summary,
+        status: analyzeBody.status as CheckpointStatus,
+        confidence: analyzeBody.confidence,
+        details: analyzeBody.details,
+        cgpReference: analyzeBody.cgpReference,
+        recommendations: analyzeBody.recommendations,
+      });
+    } catch (err) {
+      setError(
+        `Photo uploaded but analysis failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -161,22 +209,31 @@ export function CheckpointPhotoViewer({
           <button
             type="button"
             onClick={onChooseFile}
-            disabled={uploading}
+            disabled={uploading || analyzing}
             className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
           >
-            {uploading ? (
+            {uploading || analyzing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Upload className="h-3.5 w-3.5" />
             )}
             {uploading
               ? 'Uploading…'
-              : localQspUrl
-                ? 'Replace photo'
-                : 'Upload photo'}
+              : analyzing
+                ? 'Analyzing…'
+                : localQspUrl
+                  ? 'Replace photo'
+                  : 'Upload photo'}
           </button>
         </div>
       </div>
+
+      {analyzing && (
+        <div className="flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
+          <Brain className="h-3 w-3" />
+          Generating compliance analysis from this photo…
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] text-red-300">

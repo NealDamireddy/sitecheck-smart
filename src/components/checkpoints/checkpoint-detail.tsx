@@ -180,6 +180,7 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
                   : prev,
               )
             }
+            onAnalyzed={(next) => setAnalysis(next)}
           />
 
           {/* Tabs */}
