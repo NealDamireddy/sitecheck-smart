@@ -8,3 +8,7 @@ export * from './activity';
 export * from './report';
 export * from './deficiency';
 export * from './swppp';
+export * from './smarts-event';
+export * from './monitoring-location';
+export * from './sample';
+export * from './parameter-result';
