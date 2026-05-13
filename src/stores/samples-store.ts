@@ -15,9 +15,28 @@
  */
 
 import { create } from 'zustand';
-import type { Sample } from '@/types';
+import type { Sample, ParameterResult } from '@/types';
 
 export const EMPTY_SAMPLES: Sample[] = [];
+
+/**
+ * Input shape for parameter results in a create payload — mirrors the
+ * `parameterResultInput` private schema in src/lib/validations/sample.ts
+ * and the body the POST /api/samples handler accepts. Distinct from the
+ * full `ParameterResult` type, which is the hydrated DB row including
+ * id, projectId, sampleId, createdAt, updatedAt that the server
+ * populates.
+ */
+export interface ParameterResultInput {
+  parameter: ParameterResult['parameter'];
+  qualifier?: ParameterResult['qualifier'];
+  result?: number | null;
+  units: string;
+  analyticalMethod: string;
+  mdl?: number | null;
+  rl?: number | null;
+  analyzedBy?: ParameterResult['analyzedBy'];
+}
 
 interface SamplesStore {
   byEvent: Record<string, Sample[]>;
@@ -26,11 +45,12 @@ interface SamplesStore {
 
   fetchForEvent: (smartsEventId: string) => Promise<void>;
   create: (
-    payload: Partial<Sample> & {
+    payload: Omit<Partial<Sample>, 'parameterResults'> & {
       projectId: string;
       smartsEventId: string;
       monitoringLocationId: string;
       qspName: string;
+      parameterResults?: ParameterResultInput[];
     },
   ) => Promise<Sample | null>;
   update: (
