@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   CloudRain,
+  Copy,
   Loader2,
 } from 'lucide-react';
 
@@ -45,6 +46,7 @@ import {
   isNalExceedance,
   isParameterNal,
 } from '@/lib/smarts/nal-thresholds';
+import { buildSmartsWalkthrough } from '@/lib/smarts/walkthrough';
 import { cn } from '@/lib/utils';
 import type {
   MonitoringLocation,
@@ -109,6 +111,10 @@ export default function ReviewPage({
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
 
+  // Local state for "Copy walkthrough" — inline state-swap pattern
+  // (no shared toast component in @/components/ui).
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+
   useEffect(() => {
     fetchEvent(eventId);
     fetchLocations(projectId);
@@ -172,6 +178,26 @@ export default function ReviewPage({
         err instanceof Error ? err.message : 'Failed to mark event ended';
       setEndError(msg);
       setEnding(false);
+    }
+  }
+
+  async function handleCopyWalkthrough() {
+    if (!event) return;
+    try {
+      const text = buildSmartsWalkthrough({
+        event,
+        projectName: project?.name ?? projectId,
+        wdid: project?.wdid ?? null,
+        monitoringLocations: locations,
+        samples,
+      });
+      await navigator.clipboard.writeText(text);
+      setCopyState('copied');
+      window.setTimeout(() => setCopyState('idle'), 2000);
+    } catch (err) {
+      console.warn('Copy walkthrough failed:', err);
+      setCopyState('error');
+      window.setTimeout(() => setCopyState('idle'), 3000);
     }
   }
 
@@ -382,7 +408,9 @@ export default function ReviewPage({
                 })
               )}
 
-              {/* Bottom actions */}
+              {/* Bottom actions — Back (outline, secondary), Copy (ghost,
+                  tertiary), Mark ended (emerald, primary). On phones they
+                  stack vertically. */}
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Link
                   href={`/projects/${projectId}/events/${eventId}/capture`}
@@ -396,6 +424,29 @@ export default function ReviewPage({
                     Back to capture
                   </Button>
                 </Link>
+                <Button
+                  variant="ghost"
+                  onClick={handleCopyWalkthrough}
+                  disabled={!event}
+                  className="min-h-[48px] flex-1"
+                >
+                  {copyState === 'copied' ? (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-400" />
+                      Copied ✓
+                    </>
+                  ) : copyState === 'error' ? (
+                    <>
+                      <AlertTriangle className="mr-2 h-4 w-4 text-red-400" />
+                      Copy failed
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy walkthrough
+                    </>
+                  )}
+                </Button>
                 <Button
                   onClick={handleMarkEnded}
                   disabled={ending || isEnded}

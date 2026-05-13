@@ -45,42 +45,10 @@
  */
 
 import ExcelJS from 'exceljs';
-import type { MonitoringLocation, Sample, SmartsEvent } from '@/types';
+import type { MonitoringLocation } from '@/types';
 import { isNalExceedance } from './nal-thresholds';
-
-// ──────────────────────────────────────────────────────
-// Normalization — stored value → SMARTS dropdown string
-// ──────────────────────────────────────────────────────
-
-function normalizeUnits(units: string): string {
-  if (units === 'su') return 'SU';
-  return units;
-}
-
-function normalizeMethod(method: string): string {
-  if (method === 'pH field') return 'pH_field';
-  if (method === 'Hach 2100Q') return 'EPA 180.1';
-  return method;
-}
-
-function normalizeQualifier(qualifier: string): string {
-  // SMARTS expects qualifier blank for normal measurements.
-  if (qualifier === '=') return '';
-  return qualifier;
-}
-
-function splitIsoDate(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  const HH = String(d.getHours()).padStart(2, '0');
-  const MM = String(d.getMinutes()).padStart(2, '0');
-  return {
-    date: `${mm}/${dd}/${yyyy}`,
-    time: `${HH}:${MM}`,
-  };
-}
+import { normalizeMethod, normalizeQualifier, normalizeUnits, splitIsoDate } from './normalize';
+import type { SmartsExportInput } from './types';
 
 function formatLong(iso: string): string {
   const { date, time } = splitIsoDate(iso);
@@ -91,30 +59,12 @@ function formatLong(iso: string): string {
 // Public API
 // ──────────────────────────────────────────────────────
 
-export interface SmartsExcelInput {
-  event: Pick<
-    SmartsEvent,
-    | 'id'
-    | 'projectId'
-    | 'status'
-    | 'source'
-    | 'forecastDetectedAt'
-    | 'startedAt'
-    | 'endedAt'
-    | 'precipitationInches'
-  >;
-  projectName: string;
-  wdid: string | null;
-  monitoringLocations: MonitoringLocation[];
-  samples: Sample[];
-}
-
 /**
  * Build the workbook and return its byte content as an ArrayBuffer.
  * Pass directly to NextResponse — no Node Buffer adapter required.
  */
 export async function buildSmartsExcelWorkbook(
-  input: SmartsExcelInput
+  input: SmartsExportInput
 ): Promise<ArrayBuffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'SiteCheck';
