@@ -42,6 +42,10 @@ export interface Checkpoint {
   lastInspectionDate: string;
   lastInspectionPhoto: string;
   previousPhoto?: string;
+  /** Most recent QSP-uploaded field photo (Supabase Storage URL). */
+  qspPhotoUrl?: string | null;
+  /** ISO timestamp of the most recent QSP photo upload. */
+  qspPhotoUploadedAt?: string | null;
   installDate: string;
   swpppPage: number;
   /** Linear referencing for corridor projects */

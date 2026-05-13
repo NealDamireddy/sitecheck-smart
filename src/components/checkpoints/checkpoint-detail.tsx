@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
-  Camera,
   MapPin,
   Calendar,
   FileText,
@@ -28,6 +27,7 @@ import { deficiencies as staticDeficiencies } from '@/data/deficiencies';
 import { formatDateTime, formatCoordinate } from '@/lib/format';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { AIAnalysisPanel } from '@/components/checkpoints/ai-analysis-panel';
+import { CheckpointPhotoViewer } from '@/components/checkpoints/checkpoint-photo-viewer';
 import { DeficiencyPanel } from '@/components/checkpoints/deficiency-panel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -162,15 +162,25 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column (2/3) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Drone image placeholder */}
-          <div className="relative aspect-video rounded-lg bg-background/50 border border-border flex items-center justify-center overflow-hidden">
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <Camera className="h-10 w-10 opacity-40" />
-              <span className="text-xs uppercase tracking-wider opacity-60">
-                Drone Image
-              </span>
-            </div>
-          </div>
+          {/* Photo viewer — toggles between drone view and QSP field photo,
+              with inline upload. */}
+          <CheckpointPhotoViewer
+            checkpointId={checkpoint.id}
+            droneUrl={checkpoint.lastInspectionPhoto}
+            qspUrl={checkpoint.qspPhotoUrl ?? null}
+            qspUploadedAt={checkpoint.qspPhotoUploadedAt ?? null}
+            onUploaded={(next) =>
+              setCheckpoint((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      qspPhotoUrl: next.qspPhotoUrl,
+                      qspPhotoUploadedAt: next.qspPhotoUploadedAt,
+                    }
+                  : prev,
+              )
+            }
+          />
 
           {/* Tabs */}
           <Tabs defaultValue="ai-analysis">

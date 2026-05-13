@@ -16,6 +16,15 @@ import { createAdminClient } from './server';
 
 export const MISSION_PHOTOS_BUCKET = 'mission-photos';
 
+/**
+ * QSP-uploaded field photos for individual BMP checkpoints. Distinct from
+ * drone imagery (which lives in `mission-photos`). Bucket prerequisites
+ * documented in migration 011.
+ *
+ * Path convention: `{projectId}/{checkpointId}/{timestamp}.{ext}`.
+ */
+export const CHECKPOINT_PHOTOS_BUCKET = 'checkpoint-photos';
+
 function isStorageConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -118,4 +127,34 @@ export async function rehostDemoPhoto(
   } catch {
     return localPublicUrl;
   }
+}
+
+/**
+ * Upload a QSP field photo to `checkpoint-photos`. Mirrors
+ * uploadMissionPhoto but targets the checkpoint bucket and returns the
+ * stored object path so the caller can persist it for later deletion.
+ */
+export async function uploadCheckpointPhoto(
+  path: string,
+  file: Blob,
+  contentType = 'image/jpeg'
+): Promise<{ url: string; path: string }> {
+  if (!isStorageConfigured()) {
+    throw new Error('Supabase Storage not configured');
+  }
+  const supabase = createAdminClient();
+  const { error } = await supabase.storage
+    .from(CHECKPOINT_PHOTOS_BUCKET)
+    .upload(path, file, {
+      contentType,
+      upsert: true,
+      cacheControl: '3600',
+    });
+  if (error) {
+    throw new Error(`checkpoint-photos upload failed: ${error.message}`);
+  }
+  const { data } = supabase.storage
+    .from(CHECKPOINT_PHOTOS_BUCKET)
+    .getPublicUrl(path);
+  return { url: data.publicUrl, path };
 }

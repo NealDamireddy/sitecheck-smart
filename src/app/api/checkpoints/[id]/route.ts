@@ -23,6 +23,8 @@ function transformCheckpoint(row: Record<string, unknown>) {
     lastInspectionDate: row.last_inspection_date,
     lastInspectionPhoto: row.last_inspection_photo,
     previousPhoto: row.previous_photo,
+    qspPhotoUrl: row.qsp_photo_url ?? null,
+    qspPhotoUploadedAt: row.qsp_photo_uploaded_at ?? null,
     installDate: row.install_date,
     swpppPage: row.swppp_page,
     createdAt: row.created_at,
