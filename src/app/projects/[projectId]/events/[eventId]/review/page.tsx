@@ -30,11 +30,13 @@ import {
   CloudRain,
   Copy,
   Loader2,
+  Send,
 } from 'lucide-react';
 
 import { PageTransition } from '@/components/shared/page-transition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SyncToSmartsDialog } from '@/components/smarts/sync-modal';
 import {
   EMPTY_MONITORING_LOCATIONS,
   useMonitoringLocationsStore,
@@ -89,7 +91,6 @@ export default function ReviewPage({
   const event = useSmartsEventsStore((s) => s.byId[eventId] ?? null);
   const fetchEvent = useSmartsEventsStore((s) => s.fetchById);
   const eventLoading = useSmartsEventsStore((s) => s.loadingIds.has(eventId));
-  const updateEvent = useSmartsEventsStore((s) => s.update);
 
   const locations = useMonitoringLocationsStore(
     (s) => s.byProject[projectId] ?? EMPTY_MONITORING_LOCATIONS
@@ -107,13 +108,12 @@ export default function ReviewPage({
     s.projects.find((p) => p.id === projectId)
   );
 
-  // Local state for "Mark event ended"
-  const [ending, setEnding] = useState(false);
-  const [endError, setEndError] = useState<string | null>(null);
-
   // Local state for "Copy walkthrough" — inline state-swap pattern
   // (no shared toast component in @/components/ui).
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+
+  // Sync-to-SMARTS modal
+  const [syncOpen, setSyncOpen] = useState(false);
 
   useEffect(() => {
     fetchEvent(eventId);
@@ -159,27 +159,7 @@ export default function ReviewPage({
     (locationsLoading && locations.length === 0) ||
     (samplesLoading && samples.length === 0);
 
-  const isEnded = event?.status === 'ended' || event?.status === 'completed';
-
-  async function handleMarkEnded() {
-    if (!event) return;
-    setEnding(true);
-    setEndError(null);
-    try {
-      await updateEvent(eventId, projectId, { status: 'ended' });
-      // If the store recorded an error (network failure etc.) surface it.
-      const storeError = useSmartsEventsStore.getState().error;
-      if (storeError) {
-        throw new Error(storeError);
-      }
-      router.push('/dashboard');
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to mark event ended';
-      setEndError(msg);
-      setEnding(false);
-    }
-  }
+  const isFiled = event?.status === 'completed';
 
   async function handleCopyWalkthrough() {
     if (!event) return;
@@ -448,40 +428,47 @@ export default function ReviewPage({
                   )}
                 </Button>
                 <Button
-                  onClick={handleMarkEnded}
-                  disabled={ending || isEnded}
+                  onClick={() => setSyncOpen(true)}
+                  disabled={isFiled}
                   className="min-h-[48px] flex-1 bg-emerald-600 text-emerald-50 hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  {ending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Marking ended…
-                    </>
-                  ) : isEnded ? (
+                  {isFiled ? (
                     <>
                       <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Event {event.status}
+                      Event filed
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Mark event ended
+                      <Send className="mr-2 h-4 w-4" />
+                      Sync to SMARTS
                     </>
                   )}
                 </Button>
               </div>
-
-              {endError && (
-                <div className="rounded-md border border-red-700 bg-red-900/40 p-3 text-xs text-red-200">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span className="break-words">{endError}</span>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
+
+        {/* Sync to SMARTS — structured manual-filing checklist. */}
+        {event && (
+          <SyncToSmartsDialog
+            eventId={eventId}
+            projectId={projectId}
+            open={syncOpen}
+            onClose={() => setSyncOpen(false)}
+            onCompleted={() => {
+              setSyncOpen(false);
+              router.push('/dashboard');
+            }}
+            walkthroughInput={{
+              event,
+              projectName: project?.name ?? projectId,
+              wdid: project?.wdid ?? null,
+              monitoringLocations: locations,
+              samples,
+            }}
+          />
+        )}
       </div>
     </PageTransition>
   );

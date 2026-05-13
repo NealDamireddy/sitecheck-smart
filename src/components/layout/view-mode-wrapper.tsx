@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { TopBar } from '@/components/layout/top-bar';
 import { AppPanel } from '@/components/layout/app-panel';
@@ -9,6 +9,8 @@ import { useViewModeStore } from '@/stores/view-mode-store';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 import { useDemoTourStore } from '@/stores/demo-tour-store';
 import { useDemoSession } from '@/hooks/use-demo-session';
+import { useProjectStore } from '@/stores/project-store';
+import { RainEventBanner } from '@/components/dashboard/rain-event-banner';
 import { OnboardingOverlay } from '@/components/onboarding/onboarding-overlay';
 import { DemoTourOverlay } from '@/components/onboarding/demo-tour-overlay';
 import { ONBOARDING_VERSION } from '@/components/onboarding/onboarding-steps';
@@ -23,6 +25,15 @@ export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
   const { hasCompleted, completedVersion } = useOnboardingStore();
   const demoTourActive = useDemoTourStore((s) => s.active);
   const { inDemo } = useDemoSession();
+  const loaded = useProjectStore((s) => s.loaded);
+  const fetchProjects = useProjectStore((s) => s.fetchProjects);
+
+  // Bootstrap the (RLS-scoped) project list once per session. /api/projects
+  // returns 401 for anonymous users; the store swallows that error so /login
+  // and /signup still render cleanly.
+  useEffect(() => {
+    if (!loaded) fetchProjects();
+  }, [loaded, fetchProjects]);
 
   // Suppress the standard 14-step onboarding overlay entirely when a demo
   // session is active — VCs get the demo tour instead, and we never want
@@ -51,6 +62,8 @@ export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
             <Sidebar />
             <div className="flex flex-1 flex-col sm:pl-16">
               <TopBar />
+              {/* Sticky qualifying-rain reminder shown above every page. */}
+              <RainEventBanner />
               <main className="flex-1 overflow-auto">{children}</main>
             </div>
           </motion.div>
@@ -64,6 +77,7 @@ export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
           >
             <AppPanel>
               <TopBar />
+              <RainEventBanner />
               <main className="flex-1 overflow-y-auto overflow-x-hidden">{children}</main>
               <MobileBottomNav />
             </AppPanel>

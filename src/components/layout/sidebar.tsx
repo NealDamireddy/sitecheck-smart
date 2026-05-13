@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Home,
@@ -16,9 +16,11 @@ import {
   Waypoints,
   ShieldAlert,
   Building2,
+  LogOut,
 } from 'lucide-react';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 import { useProjectStore } from '@/stores/project-store';
+import { createClient } from '@/lib/supabase/client';
 
 const baseNavItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -36,8 +38,25 @@ const baseNavItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const project = useProjectStore((s) => s.currentProject());
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    // Clear the persisted project pointer so the next user doesn't land
+    // on whatever site this one had selected.
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('sitecheck-current-project');
+      } catch {
+        // ignore
+      }
+    }
+    router.push('/login');
+    router.refresh();
+  };
 
   // Project-scoped SMARTS entry inserted between Inspections and Reports.
   // baseNavItems order after the Sites insert:
@@ -115,9 +134,21 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Version info + Restart Tour */}
-      <div className="border-t border-border p-3">
-        <div className="flex flex-col items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/sidebar:opacity-100">
+      {/* Footer: logout + Restart Tour + version */}
+      <div className="border-t border-border p-2">
+        {/* Logout — visible by default (icon), label appears on hover */}
+        <button
+          onClick={handleLogout}
+          className="mb-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"
+          aria-label="Log out"
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          <span className="whitespace-nowrap opacity-0 transition-opacity duration-300 group-hover/sidebar:opacity-100">
+            Log out
+          </span>
+        </button>
+
+        <div className="flex flex-col items-center gap-2 px-1 opacity-0 transition-opacity duration-300 group-hover/sidebar:opacity-100">
           <button
             onClick={() => useOnboardingStore.getState().resetOnboarding()}
             className="flex items-center gap-1.5 text-[10px] text-muted-foreground transition-colors hover:text-amber-500"

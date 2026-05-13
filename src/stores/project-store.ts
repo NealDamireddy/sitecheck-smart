@@ -1,16 +1,21 @@
 import { create } from 'zustand';
 import type { Project } from '@/types/project';
-import { project as riversideProject } from '@/data/project';
-import { linearProject } from '@/data/linear-project';
+
+/**
+ * Project list is sourced strictly from /api/projects, which is
+ * RLS-filtered by the caller's org membership. There is intentionally
+ * NO static fallback — that would leak demo projects to QSPs who shouldn't
+ * see them and undermine per-user site isolation.
+ */
 
 const STORAGE_KEY = 'sitecheck-current-project';
 
 function getPersistedProjectId(): string {
-  if (typeof window === 'undefined') return riversideProject.id;
+  if (typeof window === 'undefined') return '';
   try {
-    return localStorage.getItem(STORAGE_KEY) || riversideProject.id;
+    return localStorage.getItem(STORAGE_KEY) || '';
   } catch {
-    return riversideProject.id;
+    return '';
   }
 }
 
@@ -18,6 +23,8 @@ interface ProjectStore {
   projects: Project[];
   currentProjectId: string;
   loading: boolean;
+  /** True once fetchProjects has completed at least once. */
+  loaded: boolean;
   error: string | null;
   currentProject: () => Project | undefined;
   setCurrentProject: (id: string) => void;
@@ -25,9 +32,10 @@ interface ProjectStore {
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
-  projects: [riversideProject, linearProject],
+  projects: [],
   currentProjectId: getPersistedProjectId(),
   loading: false,
+  loaded: false,
   error: null,
 
   currentProject: () => {
@@ -53,15 +61,36 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const res = await fetch('/api/projects');
       if (!res.ok) throw new Error('Failed to fetch projects');
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        set({ projects: data, loading: false });
-      } else {
-        // Fall back to static data if API returns empty
-        set({ loading: false });
+      const projects: Project[] = Array.isArray(data) ? data : [];
+
+      // Auto-select the first project if the persisted id is no longer
+      // valid (e.g. user switched orgs, or first sign-in with no choice
+      // ever made). Leaves an empty store if the user has no sites.
+      const { currentProjectId } = get();
+      const stillValid = projects.some((p) => p.id === currentProjectId);
+      const nextId =
+        stillValid ? currentProjectId : projects[0]?.id ?? '';
+
+      set({
+        projects,
+        currentProjectId: nextId,
+        loading: false,
+        loaded: true,
+      });
+
+      if (typeof window !== 'undefined' && nextId) {
+        try {
+          localStorage.setItem(STORAGE_KEY, nextId);
+        } catch {
+          // ignore
+        }
       }
-    } catch {
-      // Keep static data on error
-      set({ loading: false });
+    } catch (err) {
+      set({
+        loading: false,
+        loaded: true,
+        error: err instanceof Error ? err.message : 'Failed to fetch projects',
+      });
     }
   },
 }));

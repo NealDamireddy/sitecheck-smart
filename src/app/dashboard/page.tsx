@@ -2,16 +2,31 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ProjectStatusHeader } from '@/components/dashboard/project-status-header';
-import { RainEventBanner } from '@/components/dashboard/rain-event-banner';
 import { MetricCard } from '@/components/dashboard/metric-card';
 import { ActivityFeed } from '@/components/dashboard/activity-feed';
-import { CheckCircle, TrendingUp, Calendar, AlertTriangle, Waypoints, ShieldCheck, Route } from 'lucide-react';
+import { InspectionPicker } from '@/components/dashboard/inspection-picker';
+import {
+  AlertTriangle,
+  Calendar,
+  CheckCircle,
+  CloudRain,
+  Droplets,
+  Loader2,
+  Route,
+  ShieldCheck,
+  TrendingUp,
+  Waypoints,
+} from 'lucide-react';
 import { PageTransition } from '@/components/shared/page-transition';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAppMode } from '@/hooks/use-app-mode';
 import { useProjectStore } from '@/stores/project-store';
+import { useSmartsEventsStore } from '@/stores/smarts-events-store';
 import { cn } from '@/lib/utils';
 import { checkpoints as staticCheckpoints } from '@/data/checkpoints';
 import { inspections as staticInspections } from '@/data/inspections';
@@ -77,9 +92,33 @@ function computeStaticMetrics(): DashboardMetrics {
 
 export default function DashboardPage() {
   const { isApp } = useAppMode();
+  const router = useRouter();
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
+  const currentProject = useProjectStore((s) => s.currentProject());
+  const simulateEvent = useSmartsEventsStore((s) => s.simulate);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [simulating, setSimulating] = useState<'forecast' | 'starting' | null>(
+    null
+  );
+  const [simulateError, setSimulateError] = useState<string | null>(null);
+
+  async function handleSimulate(mode: 'forecast' | 'starting') {
+    setSimulating(mode);
+    setSimulateError(null);
+    try {
+      const event = await simulateEvent(currentProjectId, mode);
+      if (!event) {
+        const storeErr = useSmartsEventsStore.getState().error;
+        throw new Error(storeErr ?? 'Simulate returned null');
+      }
+      router.push(`/projects/${currentProjectId}/events/${event.id}/capture`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to simulate event';
+      setSimulateError(msg);
+      setSimulating(null);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -116,11 +155,11 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Rain-event banner — auto-checks for QPE events on mount */}
-      <RainEventBanner />
-
       {/* Project Status Bar */}
       <ProjectStatusHeader compact={isApp} />
+
+      {/* Inspection-type dropdown — primary entry into the visit flow. */}
+      <InspectionPicker />
 
       {/* Metric Cards */}
       {loading ? (
@@ -174,6 +213,68 @@ export default function DashboardPage() {
           </Link>
         </div>
       )}
+
+      {/* SMARTS event simulation — demo controls, visually distinct from
+          production behavior via dashed border + DEMO badge. */}
+      <div className="rounded-lg border-2 border-dashed border-amber-700/50 bg-amber-950/10 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border border-amber-600 bg-amber-700/40 text-[9px] uppercase tracking-wider text-amber-100">
+                Demo
+              </Badge>
+              <h2 className="font-heading text-sm font-semibold text-slate-100">
+                SMARTS event simulation
+              </h2>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Persist a simulated rain event for{' '}
+              <span className="text-slate-300">
+                {currentProject?.name ?? 'this project'}
+              </span>
+              . Source is set to{' '}
+              <code className="rounded bg-slate-950/60 px-1 py-0.5 font-mono text-[10px] text-slate-200">
+                simulated
+              </code>{' '}
+              so it&apos;s distinguishable from real NOAA-detected events.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => handleSimulate('forecast')}
+            disabled={simulating !== null}
+            className="min-h-[44px] flex-1"
+          >
+            {simulating === 'forecast' ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <CloudRain className="mr-2 h-4 w-4" />
+            )}
+            Simulate forecast event
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleSimulate('starting')}
+            disabled={simulating !== null}
+            className="min-h-[44px] flex-1"
+          >
+            {simulating === 'starting' ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Droplets className="mr-2 h-4 w-4" />
+            )}
+            Simulate active event
+          </Button>
+        </div>
+        {simulateError && (
+          <div className="mt-2 rounded-md border border-red-700 bg-red-900/40 p-2 text-xs text-red-200">
+            <AlertTriangle className="mr-1 inline h-3 w-3" />
+            {simulateError}
+          </div>
+        )}
+      </div>
 
       {/* Linear-only metrics row */}
       {metrics?.isLinear && (
