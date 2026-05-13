@@ -30,12 +30,11 @@ const BASE_URL = 'https://api.weather.gov';
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
 const DEFAULT_USER_AGENT = 'SiteCheck Dev (dev@example.com)';
 
-export type NoaaState =
-  | 'clear'
-  | 'pre-storm'
-  | 'during-storm'
-  | 'post-storm'
-  | 'unknown';
+export type NoaaState = 'clear' | 'pre-storm' | 'during-storm' | 'unknown';
+// Workflow-state values like 'post-storm' belong on a separate type
+// derived from `smarts_events.status`, not from NOAA forecast data —
+// the forecast can't see past precipitation. Keeping NoaaState narrow
+// avoids unreachable `case 'post-storm':` branches at call sites.
 
 export interface NoaaHourlyPeriod {
   startTime: string;
@@ -224,10 +223,8 @@ function computeActiveNow(first: NoaaHourlyPeriod | undefined): boolean {
  *   - pre-storm:    any of next 24 hours has PoP > 70 (and not during-storm)
  *   - clear:        otherwise
  *
- * 'post-storm' is workflow state set elsewhere (by the dashboard banner
- * when the linked smarts_event has status='ended'). NOAA forecast data
- * alone can't tell us about past precipitation, so this function never
- * returns 'post-storm'.
+ * Workflow-state values like 'post-storm' are computed elsewhere from
+ * `smarts_events.status` — not in this file. See the type comment above.
  */
 function computeState(
   hourly: NoaaHourlyPeriod[],
