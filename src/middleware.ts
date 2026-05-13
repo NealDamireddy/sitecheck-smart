@@ -71,6 +71,13 @@ export async function middleware(request: NextRequest) {
       return supabaseResponse;
     }
 
+    // NOAA weather route is a stateless proxy to a public API — no DB
+    // writes, no user data. Whitelisted so the dashboard banner and
+    // demo-cookie sessions can reach it without a Supabase user.
+    if (pathname.startsWith('/api/weather/noaa')) {
+      return supabaseResponse;
+    }
+
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
