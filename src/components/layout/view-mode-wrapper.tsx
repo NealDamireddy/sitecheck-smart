@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { TopBar } from '@/components/layout/top-bar';
 import { AppPanel } from '@/components/layout/app-panel';
@@ -94,15 +94,20 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Home,
+  Building2,
   FileText,
   Plane,
   CheckCircle,
+  Droplets,
   FileBarChart,
   CloudRain,
 } from 'lucide-react';
 
+// Static entries. SMARTS is project-scoped so it's spliced in at render
+// time (see MobileBottomNav). Order mirrors the desktop sidebar.
 const mobileNavItems = [
   { href: '/dashboard', icon: Home, label: 'Home' },
+  { href: '/sites', icon: Building2, label: 'Sites' },
   { href: '/swppp', icon: FileText, label: 'SWPPP' },
   { href: '/missions', icon: Plane, label: 'Drone' },
   { href: '/checkpoints', icon: CheckCircle, label: 'BMPs' },
@@ -112,10 +117,33 @@ const mobileNavItems = [
 
 function MobileBottomNav() {
   const pathname = usePathname();
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
+
+  // currentProjectId is empty on the server / first client paint (it's
+  // read from localStorage). Defer the project-scoped SMARTS link until
+  // after mount so SSR and hydration agree — same guard as the desktop
+  // sidebar.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Splice SMARTS in after BMPs (idx 4), matching the desktop ordering
+  // (Inspections sits between in the sidebar; mobile omits Inspections).
+  const navItems =
+    mounted && currentProjectId
+      ? [
+          ...mobileNavItems.slice(0, 5),
+          {
+            href: `/projects/${currentProjectId}/events`,
+            icon: Droplets,
+            label: 'SMARTS',
+          },
+          ...mobileNavItems.slice(5),
+        ]
+      : mobileNavItems;
 
   return (
     <nav className="sticky bottom-0 z-30 flex items-center justify-around border-t border-border bg-[#0A0A0A]/95 px-1 py-2 backdrop-blur-md">
-      {mobileNavItems.map((item) => {
+      {navItems.map((item) => {
         const isActive =
           pathname === item.href || pathname?.startsWith(item.href + '/');
         const Icon = item.icon;
