@@ -12,6 +12,7 @@ import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime';
 import type { ActivityEvent } from '@/types/activity';
 import { ActivityType } from '@/types/activity';
 import { activityEvents as staticActivityEvents } from '@/data/activity-events';
+import { isDemoSession } from '@/lib/demo/start-demo';
 
 // Transform snake_case DB row from realtime to camelCase ActivityEvent
 function transformRealtimeActivity(row: Record<string, unknown>): ActivityEvent {
@@ -94,12 +95,13 @@ export function ActivityFeed() {
         return res.json();
       })
       .then((data) => {
-        setEvents(Array.isArray(data) ? data : staticActivityEvents);
+        const demoFallback = isDemoSession() ? staticActivityEvents : [];
+        setEvents(Array.isArray(data) ? data : demoFallback);
         setLoading(false);
       })
       .catch(() => {
-        // Fall back to static demo data on auth/network failure
-        setEvents(staticActivityEvents);
+        // Demo session → bundled demo events; real account → empty.
+        setEvents(isDemoSession() ? staticActivityEvents : []);
         setLoading(false);
       });
   }, [currentProjectId]);

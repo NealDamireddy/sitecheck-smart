@@ -2,7 +2,18 @@ import { create } from 'zustand';
 import { Checkpoint, BMPCategory, CheckpointStatus, Zone } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { checkpoints as staticCheckpoints } from '@/data/checkpoints';
+import { isDemoSession } from '@/lib/demo/start-demo';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+
+/**
+ * Static demo data only stands in for a real backend during a demo
+ * session. For a genuine authenticated account an empty API response
+ * means "this user has no checkpoints yet" — show nothing, not the
+ * bundled demo BMPs.
+ */
+function demoFallback(): Checkpoint[] {
+  return isDemoSession() ? staticCheckpoints : [];
+}
 
 interface CheckpointFilters {
   status: CheckpointStatus | 'all';
@@ -59,9 +70,10 @@ const defaultFilters: CheckpointFilters = {
 };
 
 export const useCheckpointStore = create<CheckpointStore>((set, get) => ({
-  // Seed with static demo data so the grid renders immediately while
-  // /api/checkpoints loads (and stays populated if the API returns 401/empty).
-  checkpoints: staticCheckpoints,
+  // Start empty for a deterministic SSR/hydration match. fetchCheckpoints
+  // (called from an effect, post-mount) fills in DB data, or the demo
+  // fallback when in a demo session.
+  checkpoints: [],
   selectedCheckpointId: null,
   filters: defaultFilters,
   loading: false,
@@ -98,14 +110,16 @@ export const useCheckpointStore = create<CheckpointStore>((set, get) => ({
       const res = await fetch(`/api/checkpoints?projectId=${projectId}`);
       if (!res.ok) throw new Error('Failed to fetch checkpoints');
       const data = await res.json();
-      // If the API returns nothing (e.g. unseeded DB), keep static demo data visible.
+      // Real account + empty result = genuinely no checkpoints. Only fall
+      // back to bundled demo data inside a demo session.
       set({
-        checkpoints: Array.isArray(data) && data.length > 0 ? data : staticCheckpoints,
+        checkpoints:
+          Array.isArray(data) && data.length > 0 ? data : demoFallback(),
         loading: false,
       });
     } catch {
-      // Fall back to static demo data when the API is unavailable (demo mode, offline, etc.)
-      set({ checkpoints: staticCheckpoints, loading: false, error: null });
+      // API unavailable (demo mode, offline). Demo fallback or empty.
+      set({ checkpoints: demoFallback(), loading: false, error: null });
     }
   },
   updateCheckpoint: async (id, data) => {

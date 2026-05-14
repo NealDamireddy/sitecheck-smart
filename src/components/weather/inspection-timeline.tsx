@@ -7,6 +7,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { INSPECTION_TYPE_LABELS } from '@/lib/constants';
 import type { InspectionType } from '@/types/drone';
 import { inspections as staticInspections } from '@/data/inspections';
+import { isDemoSession } from '@/lib/demo/start-demo';
 
 const typeColors: Record<InspectionType, { bg: string; border: string; text: string; dot: string }> = {
   routine: {
@@ -47,11 +48,12 @@ export function InspectionTimeline() {
         return res.json();
       })
       .then((data) => {
-        setInspections(Array.isArray(data) ? data : staticInspections);
+        const demoFallback = isDemoSession() ? staticInspections : [];
+        setInspections(Array.isArray(data) ? data : demoFallback);
         setLoading(false);
       })
       .catch(() => {
-        setInspections(staticInspections);
+        setInspections(isDemoSession() ? staticInspections : []);
         setLoading(false);
       });
   }, []);

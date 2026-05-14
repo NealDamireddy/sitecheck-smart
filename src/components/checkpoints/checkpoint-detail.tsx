@@ -24,6 +24,7 @@ import {
 import { checkpoints as staticCheckpoints } from '@/data/checkpoints';
 import { aiAnalyses as staticAnalyses } from '@/data/ai-analyses';
 import { deficiencies as staticDeficiencies } from '@/data/deficiencies';
+import { isDemoSession } from '@/lib/demo/start-demo';
 import { formatDateTime, formatCoordinate } from '@/lib/format';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { AIAnalysisPanel } from '@/components/checkpoints/ai-analysis-panel';
@@ -48,7 +49,15 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    function fallbackToStatic() {
+    // Demo session → fall back to bundled demo data when the API can't
+    // serve this checkpoint. Real account → surface "Not found" rather
+    // than masking it with a demo BMP that isn't theirs.
+    function handleApiFailure() {
+      if (!isDemoSession()) {
+        setError('Not found');
+        setLoading(false);
+        return;
+      }
       const cp = staticCheckpoints.find((c) => c.id === checkpointId);
       if (!cp) {
         setError('Not found');
@@ -84,8 +93,7 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
         setLoading(false);
       })
       .catch(() => {
-        // Fall back to static demo data when the API is unavailable (demo mode).
-        fallbackToStatic();
+        handleApiFailure();
       });
   }, [checkpointId]);
 

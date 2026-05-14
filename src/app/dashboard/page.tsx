@@ -28,6 +28,7 @@ import { useAppMode } from '@/hooks/use-app-mode';
 import { useProjectStore } from '@/stores/project-store';
 import { useSmartsEventsStore } from '@/stores/smarts-events-store';
 import { cn } from '@/lib/utils';
+import { isDemoSession } from '@/lib/demo/start-demo';
 import { checkpoints as staticCheckpoints } from '@/data/checkpoints';
 import { inspections as staticInspections } from '@/data/inspections';
 import { deficiencies as staticDeficiencies } from '@/data/deficiencies';
@@ -65,8 +66,8 @@ function formatInspectionType(type: string | null): string {
 }
 
 /**
- * Compute dashboard metrics from static demo data — used as a fallback
- * when /api/dashboard/metrics is unavailable (e.g. in demo mode).
+ * Compute dashboard metrics from static demo data — only used as a
+ * fallback inside a demo session (see fallbackMetrics).
  */
 function computeStaticMetrics(): DashboardMetrics {
   const total = staticCheckpoints.length;
@@ -88,6 +89,27 @@ function computeStaticMetrics(): DashboardMetrics {
     activeDeficiencies: staticDeficiencies.filter((d) => d.status === 'open').length,
     checkpointsByStatus: { compliant, deficient, needsReview },
   };
+}
+
+/** Zeroed metrics for a real account with no data yet. */
+function emptyMetrics(): DashboardMetrics {
+  return {
+    totalCheckpoints: 0,
+    complianceRate: 0,
+    daysSinceInspection: null,
+    lastInspectionType: null,
+    lastInspectionDate: null,
+    activeDeficiencies: 0,
+    checkpointsByStatus: { compliant: 0, deficient: 0, needsReview: 0 },
+  };
+}
+
+/**
+ * Metrics shown when /api/dashboard/metrics is unavailable: bundled demo
+ * numbers inside a demo session, zeros for a real authenticated account.
+ */
+function fallbackMetrics(): DashboardMetrics {
+  return isDemoSession() ? computeStaticMetrics() : emptyMetrics();
 }
 
 export default function DashboardPage() {
@@ -132,8 +154,8 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => {
-        // Fall back to static demo metrics when the API is unavailable
-        setMetrics(computeStaticMetrics());
+        // Demo session → bundled demo metrics; real account → zeros.
+        setMetrics(fallbackMetrics());
         setLoading(false);
       });
   }, [currentProjectId]);

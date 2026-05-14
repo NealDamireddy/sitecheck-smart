@@ -6,6 +6,7 @@ import {
   forecast as staticForecast,
   qpEvents as staticQpEvents,
 } from '@/data/weather';
+import { isDemoSession } from '@/lib/demo/start-demo';
 
 interface WeatherStore {
   forecast: WeatherDay[];
@@ -19,12 +20,12 @@ interface WeatherStore {
 }
 
 export const useWeatherStore = create<WeatherStore>((set, get) => ({
-  // Seed with static demo data so /weather (current conditions, 7-day chart,
-  // alerts, timeline) renders immediately and stays populated when the API
-  // is unavailable (e.g. demo mode).
-  forecast: staticForecast,
-  qpEvents: staticQpEvents,
-  current: staticCurrent,
+  // Start empty for a deterministic SSR/hydration match. fetchWeather
+  // (called from an effect, post-mount) fills in real data, or the demo
+  // fallback when in a demo session.
+  forecast: [],
+  qpEvents: [],
+  current: null,
   selectedDay: null,
   loading: false,
   error: null,
@@ -32,6 +33,9 @@ export const useWeatherStore = create<WeatherStore>((set, get) => ({
   fetchWeather: async () => {
     if (get().loading) return;
     set({ loading: true, error: null });
+    // Bundled demo weather only stands in for a backend during a demo
+    // session — it's pinned to the demo site's location.
+    const demo = isDemoSession();
     try {
       const [currentRes, forecastRes, qpeRes] = await Promise.all([
         fetch('/api/weather/current'),
@@ -50,17 +54,27 @@ export const useWeatherStore = create<WeatherStore>((set, get) => ({
       ]);
 
       set({
-        current: current ?? staticCurrent,
-        forecast: Array.isArray(forecast) && forecast.length > 0 ? forecast : staticForecast,
-        qpEvents: Array.isArray(qpEvents) && qpEvents.length > 0 ? qpEvents : staticQpEvents,
+        current: current ?? (demo ? staticCurrent : null),
+        forecast:
+          Array.isArray(forecast) && forecast.length > 0
+            ? forecast
+            : demo
+              ? staticForecast
+              : [],
+        qpEvents:
+          Array.isArray(qpEvents) && qpEvents.length > 0
+            ? qpEvents
+            : demo
+              ? staticQpEvents
+              : [],
         loading: false,
       });
     } catch {
-      // Fall back to static demo data when the API is unavailable.
+      // API unavailable (demo mode, offline). Demo fallback or empty.
       set({
-        current: staticCurrent,
-        forecast: staticForecast,
-        qpEvents: staticQpEvents,
+        current: demo ? staticCurrent : null,
+        forecast: demo ? staticForecast : [],
+        qpEvents: demo ? staticQpEvents : [],
         loading: false,
         error: null,
       });

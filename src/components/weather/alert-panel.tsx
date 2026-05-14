@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useWeatherStore } from '@/stores/weather-store';
 import type { WeatherDay } from '@/types/weather';
 import { deficiencies as staticDeficiencies } from '@/data/deficiencies';
+import { isDemoSession } from '@/lib/demo/start-demo';
 
 interface Alert {
   id: string;
@@ -117,10 +118,11 @@ export function AlertPanel() {
         return res.json();
       })
       .then((data) => {
-        setDeficiencies(Array.isArray(data) ? data : staticDeficiencies);
+        const demoFallback = isDemoSession() ? staticDeficiencies : [];
+        setDeficiencies(Array.isArray(data) ? data : demoFallback);
       })
       .catch(() => {
-        setDeficiencies(staticDeficiencies);
+        setDeficiencies(isDemoSession() ? staticDeficiencies : []);
       });
   }, [forecast.length, fetchWeather]);
 

@@ -2,8 +2,18 @@ import { create } from 'zustand';
 import type { DroneMission, DroneTelemetry, DroneTelemetrySample, QSPReviewDecision, QSPReviewEntry, ReportReadiness } from '@/types';
 import type { CheckpointStatus } from '@/types/checkpoint';
 import { droneMissions as staticMissions } from '@/data/drone-missions';
+import { isDemoSession } from '@/lib/demo/start-demo';
 
 const TELEMETRY_HISTORY_LIMIT = 60; // ~1 minute at 1 Hz
+
+/**
+ * Bundled demo missions only stand in for a backend during a demo
+ * session. Real authenticated accounts with no missions see an empty
+ * list, not the demo content.
+ */
+function demoMissionFallback(): DroneMission[] {
+  return isDemoSession() ? staticMissions : [];
+}
 
 // Block 4: stable-ref empty array for selectors that read actualFlightPathByMission
 const EMPTY_SAMPLES: readonly DroneTelemetrySample[] = Object.freeze([]);
@@ -56,10 +66,11 @@ interface DroneStore {
 }
 
 export const useDroneStore = create<DroneStore>((set, get) => ({
-  // Seed with static demo missions so /missions and /missions/[id] render
-  // immediately and stay populated when /api/missions is unavailable.
-  missions: staticMissions,
-  selectedMissionId: staticMissions.length > 0 ? staticMissions[0].id : null,
+  // Start empty for a deterministic SSR/hydration match. fetchMissions
+  // (called from an effect, post-mount) fills in DB data, or the demo
+  // fallback when in a demo session.
+  missions: [],
+  selectedMissionId: null,
   playbackState: 'idle',
   playbackSpeed: 1,
   currentWaypointIndex: 0,
@@ -97,18 +108,21 @@ export const useDroneStore = create<DroneStore>((set, get) => ({
       const res = await fetch(`/api/missions?projectId=${projectId}`);
       if (!res.ok) throw new Error('Failed to fetch missions');
       const data = await res.json();
-      // Keep static demo missions visible if the API has no data (unseeded DB).
-      const next = Array.isArray(data) && data.length > 0 ? data : staticMissions;
+      // Real account + empty result = genuinely no missions. Only fall
+      // back to bundled demo data inside a demo session.
+      const next =
+        Array.isArray(data) && data.length > 0 ? data : demoMissionFallback();
       set({
         missions: next,
         selectedMissionId: next.length > 0 ? next[0].id : null,
         loading: false,
       });
     } catch {
-      // Fall back to static demo missions when the API is unavailable.
+      // API unavailable (demo mode, offline). Demo fallback or empty.
+      const next = demoMissionFallback();
       set({
-        missions: staticMissions,
-        selectedMissionId: staticMissions.length > 0 ? staticMissions[0].id : null,
+        missions: next,
+        selectedMissionId: next.length > 0 ? next[0].id : null,
         loading: false,
         error: null,
       });
