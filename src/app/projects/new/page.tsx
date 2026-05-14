@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
@@ -55,7 +55,13 @@ const STEPS = [
   { id: 'review', label: 'Review' },
 ];
 
-export default function NewProjectPage() {
+/**
+ * useSearchParams() forces this component to opt out of static prerender,
+ * so it must sit under a Suspense boundary — Next.js fails the production
+ * build otherwise (the dev server doesn't catch it). The default export
+ * below provides that boundary; NewProjectWizard holds the actual UI.
+ */
+function NewProjectWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fetchProjects = useProjectStore((s) => s.fetchProjects);
@@ -757,5 +763,19 @@ function ReviewItem({ label, value, mono = false }: { label: string; value: stri
       </dt>
       <dd className={`mt-0.5 text-sm ${mono ? 'font-mono' : ''}`}>{value}</dd>
     </div>
+  );
+}
+
+export default function NewProjectPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-4xl p-4 sm:p-6">
+          <div className="h-[400px] animate-pulse rounded-lg bg-elevated" />
+        </div>
+      }
+    >
+      <NewProjectWizard />
+    </Suspense>
   );
 }
