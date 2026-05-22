@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { reportGenerate } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import {
+  getBmpCategoriesForRiskLevel,
+  SITE_OBSERVATION_CHECKS,
+  type CgpRiskLevel,
+} from '@/lib/cgp/risk-level-bmps';
 
 
 interface ReportSection {
@@ -13,44 +17,34 @@ interface ReportSection {
   editable: boolean;
 }
 
-// ─────────────────────────────────────────────
-// Block 5 helpers — fetch Block 4 mission data
-// ─────────────────────────────────────────────
-interface MissionRollupRow {
-  missionId: string;
-  missionName: string | null;
-  status: string | null;
-  completedAt: string | null;
-  totalFlightSeconds: number | null;
-  capturedWaypoints: number;
-  plannedWaypoints: number;
+/**
+ * Map the internal inspection.type enum onto the human-readable label
+ * QSPs (and the state regulator) use on submitted reports.
+ */
+function inspectionTypeLabel(type: string | null | undefined): string {
+  switch (type) {
+    case 'routine':
+      return 'Weekly';
+    case 'pre-storm':
+      return 'Pre Precipitation';
+    case 'post-storm':
+      return 'Post Precipitation';
+    case 'qpe':
+      return 'Daily Precipitation';
+    default:
+      return type ?? 'Routine';
+  }
 }
 
-interface AiAnalysisRow {
-  id: string;
-  mission_id: string;
-  waypoint_number: number;
-  checkpoint_id: string;
-  photo_url: string;
-  summary: string;
-  status: string;
-  confidence: number;
-  details: unknown;
-  cgp_reference: string;
-  recommendations: unknown;
-  created_at: string;
-}
-
-interface QspReviewRow {
-  id: string;
-  mission_id: string;
-  waypoint_number: number;
-  checkpoint_id: string;
-  decision: string;
-  override_status: string | null;
-  override_notes: string | null;
-  ai_analysis_id: string | null;
-  reviewed_at: string;
+function formatInspectionDateTime(dateIso: string | null | undefined): string {
+  if (!dateIso) return 'N/A';
+  const d = new Date(dateIso);
+  if (Number.isNaN(d.getTime())) return dateIso;
+  return `${d.toISOString().slice(0, 10)} at ${d.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).toLowerCase()}`;
 }
 
 // POST /api/reports/generate - Generate a report from live data
@@ -60,7 +54,10 @@ export async function POST(request: NextRequest) {
     if (auth.error) return auth.error;
     const { supabase } = auth;
     const body = reportGenerate.parse(await request.json());
-    const projectId = body.projectId || DEFAULT_PROJECT_ID;
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+    const projectId = body.projectId;
     const inspectionId = body.inspectionId;
     const segmentId = body.segmentId as string | undefined;
 
@@ -114,102 +111,11 @@ export async function POST(request: NextRequest) {
 
     const inspection = inspections?.[0] || null;
 
-    // ─────────────────────────────────────────────
-    // Block 5 — Block 4 mission roll-up (additive)
-    //
-    // When the resolved inspection has linked missions, pull the AI
-    // analyses + QSP reviews for those missions so we can inject two
-    // extra sections into the report. Legacy projectId-only callers
-    // skip this entirely and get the same 7 sections as before.
-    // ─────────────────────────────────────────────
-    let missionRollup: MissionRollupRow[] = [];
-    let aiAnalyses: AiAnalysisRow[] = [];
-    let qspReviews: QspReviewRow[] = [];
-    const checkpointNameById = new Map<string, string>();
-
-    if (inspection) {
-      const { data: linkRows } = await supabase
-        .from('inspection_missions')
-        .select('mission_id')
-        .eq('inspection_id', inspection.id);
-
-      const missionIds = (linkRows ?? [])
-        .map((r) => r.mission_id as string)
-        .filter(Boolean);
-
-      if (missionIds.length > 0) {
-        // a) the missions themselves
-        const { data: missionRows } = await supabase
-          .from('drone_missions')
-          .select('id, name, status, completed_at, total_flight_seconds')
-          .in('id', missionIds);
-
-        // b) waypoint counts per mission
-        const { data: waypointRows } = await supabase
-          .from('waypoints')
-          .select('mission_id, capture_status')
-          .in('mission_id', missionIds);
-
-        const waypointStats = new Map<string, { total: number; captured: number }>();
-        for (const wp of waypointRows ?? []) {
-          const mid = wp.mission_id as string;
-          const stat = waypointStats.get(mid) ?? { total: 0, captured: 0 };
-          stat.total += 1;
-          if (wp.capture_status === 'captured') stat.captured += 1;
-          waypointStats.set(mid, stat);
-        }
-
-        missionRollup = (missionRows ?? []).map((row) => {
-          const stat = waypointStats.get(row.id as string) ?? { total: 0, captured: 0 };
-          return {
-            missionId: row.id as string,
-            missionName: (row.name as string) ?? null,
-            status: (row.status as string) ?? null,
-            completedAt: (row.completed_at as string) ?? null,
-            totalFlightSeconds: (row.total_flight_seconds as number) ?? null,
-            capturedWaypoints: stat.captured,
-            plannedWaypoints: stat.total,
-          };
-        });
-
-        // c) AI analyses for these missions
-        const { data: analysisRows } = await supabase
-          .from('mission_ai_analyses')
-          .select('*')
-          .in('mission_id', missionIds)
-          .order('mission_id')
-          .order('waypoint_number');
-
-        aiAnalyses = (analysisRows ?? []) as AiAnalysisRow[];
-
-        // d) QSP reviews for these missions
-        const { data: reviewRows } = await supabase
-          .from('mission_qsp_reviews')
-          .select('*')
-          .in('mission_id', missionIds);
-
-        qspReviews = (reviewRows ?? []) as QspReviewRow[];
-
-        // e) Resolve checkpoint names referenced by the analyses/reviews
-        const checkpointIds = Array.from(
-          new Set(
-            [
-              ...aiAnalyses.map((a) => a.checkpoint_id),
-              ...qspReviews.map((r) => r.checkpoint_id),
-            ].filter(Boolean)
-          )
-        );
-        if (checkpointIds.length > 0) {
-          const { data: cpRows } = await supabase
-            .from('checkpoints')
-            .select('id, name')
-            .in('id', checkpointIds);
-          for (const cp of cpRows ?? []) {
-            checkpointNameById.set(cp.id as string, cp.name as string);
-          }
-        }
-      }
-    }
+    // The regulator-submitted report does not include drone-mission
+    // roll-ups, AI vision findings, or QSP review decisions — those are
+    // internal workflow artifacts. We intentionally drop the mission
+    // join here; if you need that data in a different surface, fetch it
+    // there rather than back in this endpoint.
 
     // 3. Fetch current weather
     const { data: weatherSnapshot, error: weatherError } = await supabase
@@ -222,42 +128,10 @@ export async function POST(request: NextRequest) {
       console.error('Error fetching weather:', weatherError);
     }
 
-    // 4. Fetch checkpoints and compute status counts
-    let checkpointQuery = supabase
-      .from('checkpoints')
-      .select('*')
-      .eq('project_id', projectId);
-
-    if (scopedSegment) {
-      checkpointQuery = checkpointQuery.eq('segment_id', scopedSegment.id);
-    }
-
-    const { data: checkpoints, error: checkpointsError } = await checkpointQuery;
-
-    if (checkpointsError) {
-      console.error('Error fetching checkpoints:', checkpointsError);
-    }
-
-    const checkpointList = checkpoints || [];
-    const statusCounts = {
-      compliant: checkpointList.filter(c => c.status === 'compliant').length,
-      deficient: checkpointList.filter(c => c.status === 'deficient').length,
-      needsReview: checkpointList.filter(c => c.status === 'needs-review').length,
-      total: checkpointList.length,
-    };
-
-    // Group by BMP type
-    const bmpTypes = ['erosion-control', 'sediment-control', 'tracking-control', 'wind-erosion', 'materials-management', 'non-storm-water'];
-    const bmpStatusSummary = bmpTypes.map(type => {
-      const bmps = checkpointList.filter(c => c.bmp_type === type);
-      return {
-        type,
-        total: bmps.length,
-        compliant: bmps.filter(c => c.status === 'compliant').length,
-        deficient: bmps.filter(c => c.status === 'deficient').length,
-        needsReview: bmps.filter(c => c.status === 'needs-review').length,
-      };
-    }).filter(b => b.total > 0);
+    // The regulator-submitted report drives Part 2 (BMP Observations)
+    // from a fixed CGP checklist, not from per-checkpoint statuses, so
+    // we don't fetch the project's checkpoint rows here. The Part 3
+    // deficiency log below has all the deficiency context we need.
 
     // 5. Fetch active deficiencies
     const { data: deficiencies, error: deficienciesError } = await supabase
@@ -273,168 +147,235 @@ export async function POST(request: NextRequest) {
 
     const deficiencyList = deficiencies || [];
 
-    // Build the 7 report sections
+    // 6. Daily-Precipitation reports need pH/turbidity sample results
+    // attached as Part 4. We pull samples + parameter_results for the
+    // most recent SMARTS event on this project. If the inspection isn't
+    // a during-storm type (qpe), or no event/samples exist, Part 4 is
+    // omitted from the rendered report.
+    interface DbParamResultRow {
+      parameter: string;
+      qualifier: string;
+      result: number | null;
+      units: string;
+    }
+    interface DbSampleRow {
+      id: string;
+      sample_datetime: string;
+      qsp_name: string;
+      monitoring_location_id: string;
+      parameter_results: DbParamResultRow[];
+    }
+    interface DbMonitoringLocationRow {
+      id: string;
+      name: string;
+      drainage_area: string | null;
+    }
+
+    let storySamples: DbSampleRow[] = [];
+    let monitoringLocsById = new Map<string, DbMonitoringLocationRow>();
+    const isDailyPrecipReport = inspection?.type === 'qpe';
+
+    if (isDailyPrecipReport) {
+      const { data: latestEvent } = await supabase
+        .from('smarts_events')
+        .select('id')
+        .eq('project_id', projectId)
+        .in('status', ['active', 'forecast', 'ended'])
+        .order('forecast_detected_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestEvent?.id) {
+        const { data: sampleRows } = await supabase
+          .from('samples')
+          .select('id, sample_datetime, qsp_name, monitoring_location_id, parameter_results(*)')
+          .eq('smarts_event_id', latestEvent.id);
+        storySamples = (sampleRows ?? []) as DbSampleRow[];
+
+        const locIds = Array.from(new Set(storySamples.map((s) => s.monitoring_location_id)));
+        if (locIds.length > 0) {
+          const { data: locs } = await supabase
+            .from('monitoring_locations')
+            .select('id, name, drainage_area')
+            .in('id', locIds);
+          monitoringLocsById = new Map(
+            ((locs ?? []) as DbMonitoringLocationRow[]).map((l) => [l.id, l])
+          );
+        }
+      }
+    }
+
     const now = new Date();
     const reportId = `report-${Date.now()}`;
 
-    // Section 1: Project Information (dynamic by project type)
+    // ─────────────────────────────────────────────
+    // Part 1: General Information
+    // Mirrors the "Part 1" block from the state-mandated QSP report
+    // form: site info, weather, the 7 yes/no observation checks, and
+    // inspector identity.
+    // ─────────────────────────────────────────────
+    const riskLevel: CgpRiskLevel = (Number(project.risk_level) as CgpRiskLevel) || 2;
+    const constructionStage = project.construction_stage || 'N/A';
+    const currentWeatherLabel = weatherSnapshot?.condition || 'N/A';
+
+    const inspectionDateLabel = inspection
+      ? formatInspectionDateTime(inspection.date)
+      : formatInspectionDateTime(now.toISOString());
+    const inspectionType = inspectionTypeLabel(inspection?.type);
+
     const corridorMileage = project.linear_mileage
       ? `${Number(project.linear_mileage).toFixed(2)} miles`
       : project.corridor_total_length
         ? `${(Number(project.corridor_total_length) / 5280).toFixed(2)} miles`
         : 'N/A';
 
-    const siteInfoLines = [
-      `**Project Name:** ${project.name}`,
-      `**Address:** ${project.address}`,
-      `**WDID:** ${project.wdid}`,
-      `**Permit Number:** ${project.permit_number}`,
-      `**Risk Level:** ${project.risk_level}`,
-      isLinear
-        ? `**Corridor Length:** ${corridorMileage}`
-        : `**Total Acreage:** ${project.acreage} acres`,
+    const siteInfoLines: string[] = [
+      `**Construction Site Name & WDID No.:** ${project.name} ${project.wdid ? `· ${project.wdid}` : ''}`,
+      `**Address:** ${project.address || 'N/A'}`,
+      `**Permit Number:** ${project.permit_number || 'N/A'}`,
+      `**Project Risk Level:** ${riskLevel}`,
+      `**Construction Stage:** ${constructionStage}`,
+      `**Current Weather:** ${currentWeatherLabel}`,
+      `**Photos Taken:** Yes`,
+      isLinear ? `**Corridor Length:** ${corridorMileage}` : `**Total Acreage:** ${project.acreage ?? 'N/A'} acres`,
       isLinear && segments.length > 0
         ? `**Segments:** ${segments.length}${scopedSegment ? ` (Report scoped to: ${scopedSegment.name})` : ''}`
         : null,
-      `**Project Status:** ${project.status}`,
-      `**Start Date:** ${project.start_date}`,
-      `**Estimated Completion:** ${project.estimated_completion}`,
-    ].filter(Boolean);
-    const siteInfoContent = siteInfoLines.join('\n');
+    ].filter(Boolean) as string[];
 
-    // Section 2: Inspection Details
-    let inspectionContent = inspection ? `
-**Inspection Date:** ${new Date(inspection.date).toLocaleDateString()}
-**Inspection Type:** ${inspection.type}
-**Inspector:** ${inspection.inspector}
-**Overall Compliance:** ${inspection.overall_compliance}%
-**Mission ID:** ${inspection.mission_id || 'N/A'}
-    `.trim() : `
-**No recent inspection data available.**
+    const isStormRelevant =
+      inspection?.type === 'pre-storm' ||
+      inspection?.type === 'post-storm' ||
+      inspection?.type === 'qpe';
 
-A new inspection should be conducted to generate accurate compliance information.
-    `.trim();
+    const weatherLines: string[] = [
+      `**Estimated QPE Beginning:** ${isStormRelevant ? (inspection?.qpe_start ?? 'N/A') : 'N/A'}`,
+      `**Estimated QPE Duration:** ${isStormRelevant ? (inspection?.qpe_duration_hours ?? 'N/A') : 'N/A'}`,
+      `**End Date of QPE:** ${isStormRelevant ? (inspection?.qpe_end ?? 'N/A') : 'N/A'}`,
+      `**Rain Gauge reading (inches):** ${inspection?.rain_gauge_inches ?? 'N/A'}`,
+    ];
 
-    // Block 5 — append rich inspection metadata when present
-    if (inspection) {
-      const block5Lines: string[] = [];
-      if (inspection.trigger && inspection.trigger !== 'manual') {
-        block5Lines.push(`**Trigger:** ${inspection.trigger}`);
-      }
-      if (inspection.status) {
-        block5Lines.push(`**Status:** ${inspection.status}`);
-      }
-      if (inspection.due_by) {
-        block5Lines.push(`**Inspection Due By:** ${new Date(inspection.due_by).toLocaleString()}`);
-      }
-      if (inspection.submitted_at) {
-        block5Lines.push(`**Submitted At:** ${new Date(inspection.submitted_at).toLocaleString()}`);
-      }
-      if (typeof inspection.ai_overall_compliance === 'number') {
-        block5Lines.push(`**AI Overall Compliance:** ${inspection.ai_overall_compliance}%`);
-      }
-      if (typeof inspection.qsp_overall_compliance === 'number') {
-        block5Lines.push(`**QSP Overall Compliance:** ${inspection.qsp_overall_compliance}%`);
-      }
-      if (inspection.narrative) {
-        block5Lines.push('');
-        block5Lines.push('**QSP Narrative:**');
-        block5Lines.push(inspection.narrative);
-      }
-      if (block5Lines.length > 0) {
-        inspectionContent += '\n' + block5Lines.join('\n');
-      }
+    const observationsLines = SITE_OBSERVATION_CHECKS.map(
+      (check) => `- ${check.label} ${inspection?.[`obs_${check.id}`] ?? 'No'}`
+    );
 
-      // Mission roll-up addendum
-      if (missionRollup.length > 0) {
-        inspectionContent += `\n\n**Mission Roll-up (${missionRollup.length}):**`;
-        for (const m of missionRollup) {
-          const flightMin = m.totalFlightSeconds
-            ? `${(m.totalFlightSeconds / 60).toFixed(1)} min`
-            : 'N/A';
-          inspectionContent += `\n- ${m.missionName ?? m.missionId} — ${m.status ?? 'unknown'} — ${m.capturedWaypoints}/${m.plannedWaypoints} waypoints captured · ${flightMin}`;
-        }
+    const generalInfoContent = [
+      `**Date:** ${inspectionDateLabel}`,
+      `**Inspection Type:** ${inspectionType}`,
+      '',
+      '**Site Information**',
+      ...siteInfoLines,
+      '',
+      '**Weather**',
+      ...weatherLines,
+      '',
+      '**Exemption Documentation**',
+      'Visual inspections are not required outside of business hours or during dangerous weather conditions such as flooding or electrical storms.',
+      '',
+      '**Site Observations**',
+      ...observationsLines,
+      inspection?.observation_comments
+        ? `\n**Comments on presence:** ${inspection.observation_comments}`
+        : '',
+      '',
+      '**Inspector Information**',
+      `- Inspector Name: ${inspection?.inspector || project.qsp_name || 'N/A'}`,
+      `- Inspector Title: QSP`,
+      `- Signature Date: ${inspection ? new Date(inspection.date).toISOString().slice(0, 10) : now.toISOString().slice(0, 10)}`,
+      inspection?.narrative ? `\n**QSP Narrative:**\n${inspection.narrative}` : '',
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
+
+    // ─────────────────────────────────────────────
+    // Part 2: BMP Observations
+    // Canonical 22-question checklist for the project's risk level.
+    // Without per-question persistence (a future migration), every
+    // answer renders as "—" so the section visibly mirrors the real
+    // QSP form while making it obvious the field is awaiting input.
+    // ─────────────────────────────────────────────
+    const bmpCategories = getBmpCategoriesForRiskLevel(riskLevel);
+    const bmpSectionLines: string[] = [
+      `_Minimum BMPs for Risk Level ${riskLevel} Sites._`,
+      '',
+    ];
+    for (const cat of bmpCategories) {
+      bmpSectionLines.push(`**${cat.number} - ${cat.title}**`);
+      for (const q of cat.questions) {
+        bmpSectionLines.push(`- ${q.prompt} → —`);
       }
+      bmpSectionLines.push('');
     }
+    bmpSectionLines.push(
+      '_Yes / No answers and Action / Implementation dates are captured per-question during the inspection visit; pending entries are shown as "—"._'
+    );
+    const bmpObservationsContent = bmpSectionLines.join('\n').trim();
 
-    // Section 3: Weather Conditions
-    const weatherContent = weatherSnapshot ? `
-**Current Conditions at Time of Inspection:**
-- Temperature: ${weatherSnapshot.temperature}F
-- Condition: ${weatherSnapshot.condition}
-- Wind Speed: ${weatherSnapshot.wind_speed_mph} mph
-- Humidity: ${weatherSnapshot.humidity}%
-
-**Weather Data Retrieved:** ${new Date(weatherSnapshot.fetched_at).toLocaleString()}
-    `.trim() : `
-**Weather data unavailable.**
-
-Weather conditions should be recorded at the time of inspection.
-    `.trim();
-
-    // Section 4: BMP Status Summary
-    let bmpStatusContent = `
-**Overall BMP Status:**
-- Total BMPs: ${statusCounts.total}
-- Compliant: ${statusCounts.compliant} (${statusCounts.total > 0 ? Math.round((statusCounts.compliant / statusCounts.total) * 100) : 0}%)
-- Deficient: ${statusCounts.deficient} (${statusCounts.total > 0 ? Math.round((statusCounts.deficient / statusCounts.total) * 100) : 0}%)
-- Needs Review: ${statusCounts.needsReview} (${statusCounts.total > 0 ? Math.round((statusCounts.needsReview / statusCounts.total) * 100) : 0}%)
-
-**Status by BMP Type:**
-`;
-
-    for (const bmp of bmpStatusSummary) {
-      const typeName = bmp.type.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      bmpStatusContent += `
-- **${typeName}:** ${bmp.total} total (${bmp.compliant} compliant, ${bmp.deficient} deficient, ${bmp.needsReview} needs review)`;
-    }
-
-    // Per-segment breakdown for linear projects (full report only)
-    if (isLinear && !scopedSegment && segments.length > 0) {
-      bmpStatusContent += `\n\n**Per-Segment Compliance Breakdown:**\n`;
-      for (const seg of segments) {
-        const segCheckpoints = checkpointList.filter(c => c.segment_id === seg.id);
-        const segCompliant = segCheckpoints.filter(c => c.status === 'compliant').length;
-        const segDeficient = segCheckpoints.filter(c => c.status === 'deficient').length;
-        const segReview = segCheckpoints.filter(c => c.status === 'needs-review').length;
-        const compliancePct = segCheckpoints.length > 0
-          ? Math.round((segCompliant / segCheckpoints.length) * 100)
-          : 0;
-        const stationStart = `STA ${Math.floor(seg.start_station / 100)}+${(seg.start_station % 100).toString().padStart(2, '0')}`;
-        const stationEnd = `STA ${Math.floor(seg.end_station / 100)}+${(seg.end_station % 100).toString().padStart(2, '0')}`;
-        bmpStatusContent += `
-- **${seg.name}** (${stationStart} – ${stationEnd}): ${segCheckpoints.length} BMPs, ${compliancePct}% compliant (${segDeficient} deficient, ${segReview} needs review)`;
-      }
-    }
-
-    // Section 5: Deficiency Log
-    let deficiencyContent = '';
+    // ─────────────────────────────────────────────
+    // Part 3: Descriptions of BMP deficiencies
+    // ─────────────────────────────────────────────
+    let deficiencyContent = '_Repairs must begin within 72 hours of identification; complete repairs as soon as possible._\n\n';
     if (deficiencyList.length === 0) {
-      deficiencyContent = `
-**No active deficiencies identified.**
-
-All BMPs are currently in compliance with CGP requirements.
-      `.trim();
+      deficiencyContent += 'No active deficiencies identified during this inspection.';
     } else {
-      deficiencyContent = `
-**Active Deficiencies: ${deficiencyList.length}**
-
-`;
       for (const def of deficiencyList) {
-        const checkpointName = (def.checkpoints as { name: string })?.name || 'Unknown';
-        deficiencyContent += `
----
-**${checkpointName}** (${def.status})
-- Detected: ${new Date(def.detected_date).toLocaleDateString()}
-- Deadline: ${new Date(def.deadline).toLocaleDateString()}
-- CGP Violation: ${def.cgp_violation}
-- Description: ${def.description}
-- Corrective Action: ${def.corrective_action}
-`;
+        const checkpointName = (def.checkpoints as { name: string })?.name || 'Unknown checkpoint';
+        deficiencyContent += `---\n`;
+        deficiencyContent += `**${def.description}**\n`;
+        deficiencyContent += `- Checkpoint: ${checkpointName}\n`;
+        if (def.cgp_violation) deficiencyContent += `- CGP Violation: ${def.cgp_violation}\n`;
+        deficiencyContent += `- Detected: ${new Date(def.detected_date).toLocaleDateString()}\n`;
+        if (def.deadline) deficiencyContent += `- Deadline: ${new Date(def.deadline).toLocaleDateString()}\n`;
+        if (def.corrective_action) {
+          deficiencyContent += `- Corrective Action: ${def.corrective_action}\n`;
+        }
+        deficiencyContent += '\n';
       }
     }
 
-    // Section 6: Certification Statement
+    // ─────────────────────────────────────────────
+    // Part 4: Additional During Storm Observations (Daily Precip only)
+    // Pulls sample + parameter results captured during the active
+    // SMARTS event. Each monitoring location renders its measured pH
+    // and turbidity with the standard "outfall / discharge point"
+    // framing used on the regulator form.
+    // ─────────────────────────────────────────────
+    let stormObservationsContent = '';
+    if (isDailyPrecipReport) {
+      if (storySamples.length === 0) {
+        stormObservationsContent =
+          '_If BMPs cannot be inspected during inclement weather, list the results of visual inspections at all relevant outfalls, discharge points, and downstream locations._\n\n' +
+          'No sample data available for this inspection.';
+      } else {
+        const lines: string[] = [
+          '_If BMPs cannot be inspected during inclement weather, list the results of visual inspections at all relevant outfalls, discharge points, and downstream locations._',
+          '',
+        ];
+        for (const sample of storySamples) {
+          const loc = monitoringLocsById.get(sample.monitoring_location_id);
+          lines.push(`**Outfall / Discharge Point: ${loc?.name ?? sample.monitoring_location_id}**`);
+          if (loc?.drainage_area) lines.push(`- Drainage Area: ${loc.drainage_area}`);
+          lines.push(`- Sample Taken: ${new Date(sample.sample_datetime).toLocaleString()} by ${sample.qsp_name || 'QSP'}`);
+          for (const pr of sample.parameter_results ?? []) {
+            const value = pr.qualifier && pr.qualifier !== 'measured'
+              ? `${pr.qualifier}${pr.result != null ? ` ${pr.result}` : ''}`
+              : pr.result != null
+                ? `${pr.result}`
+                : 'N/A';
+            const units = pr.units ? ` ${pr.units}` : '';
+            lines.push(`- ${pr.parameter}: ${value}${units}`);
+          }
+          lines.push('');
+        }
+        stormObservationsContent = lines.join('\n').trim();
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // Certification + QSP Signature Block (kept; these also appear on
+    // the regulator-submitted form, just under the "Inspector
+    // Information" header rather than as separate sections).
+    // ─────────────────────────────────────────────
     const certificationContent = `
 I certify under penalty of law that this document and all attachments were prepared under my direction or supervision in accordance with a system designed to assure that qualified personnel properly gathered and evaluated the information submitted. Based on my inquiry of the person or persons who manage the system, or those persons directly responsible for gathering the information, the information submitted is, to the best of my knowledge and belief, true, accurate, and complete. I am aware that there are significant penalties for submitting false information, including the possibility of fine and imprisonment for knowing violations.
 
@@ -444,7 +385,6 @@ This inspection was conducted in accordance with the requirements of:
 - All applicable local, state, and federal regulations
     `.trim();
 
-    // Section 7: QSP Signature Block
     const signatureContent = `
 **Qualified SWPPP Practitioner (QSP) Information:**
 
@@ -459,134 +399,37 @@ This inspection was conducted in accordance with the requirements of:
 **Date:** _________________________
     `.trim();
 
-    // ─────────────────────────────────────────────
-    // Block 5 — AI Findings & QSP Decisions sections
-    // (only built when the inspection has linked missions)
-    // ─────────────────────────────────────────────
-    const reviewByCheckpoint = new Map<string, QspReviewRow>();
-    for (const r of qspReviews) {
-      reviewByCheckpoint.set(`${r.mission_id}:${r.waypoint_number}`, r);
-    }
-
-    let aiFindingsContent = '';
-    if (aiAnalyses.length > 0) {
-      const compliantCount = aiAnalyses.filter((a) => a.status === 'compliant').length;
-      const deficientCount = aiAnalyses.filter((a) => a.status === 'deficient').length;
-      const reviewCount = aiAnalyses.filter((a) => a.status === 'needs-review').length;
-      const compliancePct = Math.round((compliantCount / aiAnalyses.length) * 100);
-
-      aiFindingsContent = `
-**Claude Vision Analysis Summary:**
-- Total Waypoints Analyzed: ${aiAnalyses.length}
-- Compliant: ${compliantCount} (${compliancePct}%)
-- Deficient: ${deficientCount}
-- Needs Review: ${reviewCount}
-
-**Per-Waypoint Findings:**
-`;
-      for (const a of aiAnalyses) {
-        const cpName = checkpointNameById.get(a.checkpoint_id) ?? a.checkpoint_id;
-        const recs = Array.isArray(a.recommendations) ? a.recommendations : [];
-        aiFindingsContent += `
----
-**Waypoint ${a.waypoint_number} — ${cpName}** (${a.status} · ${a.confidence}% confidence)
-- CGP Reference: ${a.cgp_reference || 'N/A'}
-- Summary: ${a.summary}`;
-        if (recs.length > 0) {
-          aiFindingsContent += `\n- Recommendations: ${(recs as string[]).join('; ')}`;
-        }
-      }
-    } else if (missionRollup.length > 0) {
-      aiFindingsContent = '**No AI analyses recorded for the linked missions yet.**\n\nRun the analyzer from the Mission Review panel to populate this section.';
-    }
-
-    let qspDecisionsContent = '';
-    if (qspReviews.length > 0) {
-      const accepted = qspReviews.filter((r) => r.decision === 'accept').length;
-      const overridden = qspReviews.filter((r) => r.decision === 'override').length;
-      const pending = qspReviews.filter((r) => r.decision === 'pending').length;
-
-      qspDecisionsContent = `
-**QSP Review Decisions:**
-- Accepted as Reported: ${accepted}
-- Overridden: ${overridden}
-- Pending Review: ${pending}
-
-**Per-Waypoint Decisions:**
-`;
-      for (const r of qspReviews) {
-        const cpName = checkpointNameById.get(r.checkpoint_id) ?? r.checkpoint_id;
-        qspDecisionsContent += `
----
-**Waypoint ${r.waypoint_number} — ${cpName}** (${r.decision})`;
-        if (r.override_status) {
-          qspDecisionsContent += `\n- Override Status: ${r.override_status}`;
-        }
-        if (r.override_notes) {
-          qspDecisionsContent += `\n- QSP Notes: ${r.override_notes}`;
-        }
-        qspDecisionsContent += `\n- Reviewed At: ${new Date(r.reviewed_at).toLocaleString()}`;
-      }
-    } else if (missionRollup.length > 0) {
-      qspDecisionsContent = '**No QSP decisions recorded yet.**\n\nReview AI findings in the Mission Review panel to populate this section.';
-    }
-
     const sections: ReportSection[] = [
       {
-        id: 'site-info',
-        title: isLinear ? 'Corridor Information' : 'Site Information',
-        content: siteInfoContent,
-        type: 'text',
-        editable: false,
-      },
-      {
-        id: 'inspection-details',
-        title: 'Inspection Details',
-        content: inspectionContent,
+        id: 'part-1-general-info',
+        title: 'Part 1: General Information',
+        content: generalInfoContent,
         type: 'text',
         editable: true,
       },
       {
-        id: 'weather-conditions',
-        title: 'Weather Conditions',
-        content: weatherContent,
-        type: 'text',
-        editable: true,
-      },
-      {
-        id: 'bmp-status',
-        title: 'BMP Status Summary',
-        content: bmpStatusContent.trim(),
+        id: 'part-2-bmp-observations',
+        title: 'Part 2: BMP Observations',
+        content: bmpObservationsContent,
         type: 'table',
-        editable: false,
+        editable: true,
       },
-      // Block 5 — AI Findings (only when there's something to show)
-      ...(aiFindingsContent
-        ? [{
-            id: 'ai-findings',
-            title: 'AI Findings (Claude Vision)',
-            content: aiFindingsContent.trim(),
-            type: 'text' as const,
-            editable: true,
-          }]
-        : []),
-      // Block 5 — QSP Decisions (only when there's something to show)
-      ...(qspDecisionsContent
-        ? [{
-            id: 'qsp-decisions',
-            title: 'QSP Review Decisions',
-            content: qspDecisionsContent.trim(),
-            type: 'text' as const,
-            editable: true,
-          }]
-        : []),
       {
-        id: 'deficiency-log',
-        title: 'Deficiency Log',
+        id: 'part-3-deficiencies',
+        title: 'Part 3: Descriptions of BMP deficiencies',
         content: deficiencyContent.trim(),
         type: 'text',
         editable: true,
       },
+      ...(stormObservationsContent
+        ? [{
+            id: 'part-4-storm-observations',
+            title: 'Part 4: Additional During Storm Observations',
+            content: stormObservationsContent,
+            type: 'text' as const,
+            editable: true,
+          }]
+        : []),
       {
         id: 'certification',
         title: 'Certification Statement',
