@@ -25,3 +25,4 @@ export * from './smarts-event';
 export * from './monitoring-location';
 export * from './sample';
 export * from './parameter-result';
+export * from './qsp-profile';

@@ -1,6 +1,7 @@
 'use client';
 
-import { Bell, Cloud, Droplets, Wind, ThermometerSun, ChevronDown, MapPin, GitBranch, LogOut } from 'lucide-react';
+import { Bell, Cloud, Droplets, Wind, ThermometerSun, ChevronDown, MapPin, GitBranch, LogOut, UserCircle } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { useAppMode } from '@/hooks/use-app-mode';
@@ -216,6 +217,18 @@ export function TopBar() {
             3
           </span>
         </button>
+
+        {/* Account */}
+        <Link
+          href="/account"
+          aria-label="My account"
+          className={cn(
+            'flex items-center justify-center rounded-md border border-border bg-surface transition-colors hover:bg-surface-elevated hover:border-amber-500/40',
+            isApp ? 'h-7 w-7' : 'h-9 w-9'
+          )}
+        >
+          <UserCircle className={cn(isApp ? 'h-3.5 w-3.5' : 'h-4 w-4', 'text-muted-foreground')} />
+        </Link>
       </div>
     </header>
   );

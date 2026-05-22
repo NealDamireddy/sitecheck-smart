@@ -158,6 +158,38 @@ function NewProjectWizard() {
     }
   }, [searchParams]);
 
+  // Pre-fill QSP fields from the user's account profile. The wizard
+  // still writes a per-project copy on submit; this just avoids retyping
+  // the same name / license # / company on every new site.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/qsp-profile');
+        if (!res.ok) return;
+        const profile = (await res.json()) as {
+          name?: string;
+          licenseNumber?: string;
+          company?: string;
+          phone?: string;
+          email?: string;
+        };
+        if (cancelled) return;
+        // Only fill blanks — never clobber a value the user already typed.
+        setQspName((cur) => cur || profile.name || '');
+        setQspLicense((cur) => cur || profile.licenseNumber || '');
+        setQspCompany((cur) => cur || profile.company || '');
+        setQspPhone((cur) => cur || profile.phone || '');
+        setQspEmail((cur) => cur || profile.email || '');
+      } catch {
+        // Profile fetch is best-effort — wizard works without it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Derived
   const corridorLengthFeet = useMemo(() => centerlineLengthFeet(centerline), [centerline]);
   const corridorLengthMiles = corridorLengthFeet / 5280;
