@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { resolveProjectId, DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 
 
 // Transform snake_case database row to camelCase
@@ -24,8 +24,11 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 

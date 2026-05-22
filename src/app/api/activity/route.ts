@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { activityCreate } from '@/lib/validations';
-import { resolveProjectId, DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 
 const DEFAULT_LIMIT = 20;
 
@@ -47,8 +47,11 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const limit = parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
     const type = searchParams.get('type');
 
@@ -94,6 +97,10 @@ export async function POST(request: NextRequest) {
     const { supabase } = auth;
     const body = activityCreate.parse(await request.json());
 
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+
     // Validate required fields
     if (!body.type || !body.title || !body.description) {
       return NextResponse.json(
@@ -118,7 +125,7 @@ export async function POST(request: NextRequest) {
     const activityData = transformActivityToDb({
       ...body,
       id: activityId,
-      projectId: body.projectId || DEFAULT_PROJECT_ID,
+      projectId: body.projectId,
       timestamp: body.timestamp || new Date().toISOString(),
       severity: body.severity || 'info',
     });

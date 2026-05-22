@@ -1,12 +1,10 @@
 import { NextRequest } from 'next/server';
 
-export const DEFAULT_PROJECT_ID = 'riverside-phase2';
-
 /**
  * Resolve the project ID from a request's query parameters.
- * Falls back to DEFAULT_PROJECT_ID when none is provided.
+ * Returns null when absent — callers must return 400 in that case.
  */
-export function resolveProjectId(request: NextRequest): string {
+export function resolveProjectId(request: NextRequest): string | null {
   const { searchParams } = new URL(request.url);
-  return searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+  return searchParams.get('projectId') || null;
 }

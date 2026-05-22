@@ -20,7 +20,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { checkRainEvents } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
 import { detectRainEventForProject } from '@/lib/rain-event-detector';
 
 interface DbInspectionRow {
@@ -79,7 +78,10 @@ export async function POST(request: NextRequest) {
     let rawBody = {};
     try { rawBody = await request.json(); } catch { /* empty body ok */ }
     const body = checkRainEvents.parse(rawBody);
-    const projectId = (body?.projectId as string) || DEFAULT_PROJECT_ID;
+    const projectId = body?.projectId as string | undefined;
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
 
     const rainEvent = await detectRainEventForProject(projectId);
     if (!rainEvent) {

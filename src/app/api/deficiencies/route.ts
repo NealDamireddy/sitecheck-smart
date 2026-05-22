@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { deficiencyCreate } from '@/lib/validations';
-import { resolveProjectId, DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 
 
 // Transform snake_case DB row to camelCase
@@ -75,9 +75,12 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const { searchParams } = new URL(request.url);
 
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const status = searchParams.get('status');
 
     let query = supabase
@@ -122,9 +125,13 @@ export async function POST(request: NextRequest) {
     const { supabase } = auth;
     const body = deficiencyCreate.parse(await request.json());
 
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+
     // Ensure required fields
     const deficiencyId = body.id || generateId();
-    const projectId = body.projectId || DEFAULT_PROJECT_ID;
+    const projectId = body.projectId;
 
     if (!body.checkpointId) {
       return NextResponse.json(

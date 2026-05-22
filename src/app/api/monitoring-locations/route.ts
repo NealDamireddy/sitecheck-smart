@@ -8,9 +8,8 @@
  * points where pH/turbidity samples are taken during a SMARTS event.
  * They are managed independently of any individual smarts event.
  *
- * RLS handles project scoping (migration 008). The `?projectId=` filter
- * here is purely "which project's rows to return," falling back to
- * DEFAULT_PROJECT_ID when absent — matching corrective-actions / inspections.
+ * RLS handles project scoping (migration 008). `?projectId=` is required;
+ * requests without it return 400.
  *
  * Optional `?status=active|inactive` filter for the capture-screen path
  * which only wants active locations.
@@ -20,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { monitoringLocationCreate } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 import type {
   MonitoringLocation,
   MonitoringLocationStatus,
@@ -75,8 +74,11 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const status = searchParams.get('status');
 
     let query = supabase
@@ -112,9 +114,13 @@ export async function POST(request: NextRequest) {
     const { supabase } = auth;
     const body = monitoringLocationCreate.parse(await request.json());
 
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+
     const insertRow = {
       id: body.id || generateId(),
-      project_id: body.projectId || DEFAULT_PROJECT_ID,
+      project_id: body.projectId,
       name: body.name,
       drainage_area: body.drainageArea,
       discharge_point_type: body.dischargePointType,

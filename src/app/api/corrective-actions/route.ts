@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { correctiveActionCreate } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 
 const VALID_SEVERITIES = new Set(['low', 'medium', 'high']);
 const VALID_STATUSES = new Set(['open', 'in-progress', 'resolved', 'verified']);
@@ -74,8 +74,11 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const status = searchParams.get('status');
     const inspectionId = searchParams.get('inspectionId');
     const missionId = searchParams.get('missionId');
@@ -126,9 +129,13 @@ export async function POST(request: NextRequest) {
     const status =
       body.status && VALID_STATUSES.has(body.status) ? body.status : 'open';
 
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+
     const insertRow = {
       id: body.id || generateId(),
-      project_id: body.projectId || DEFAULT_PROJECT_ID,
+      project_id: body.projectId,
       inspection_id: body.inspectionId ?? null,
       mission_id: body.missionId ?? null,
       waypoint_number: body.waypointNumber ?? null,

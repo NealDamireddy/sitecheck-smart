@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { checkpointUpdate } from '@/lib/validations';
-import { resolveProjectId, DEFAULT_PROJECT_ID } from '@/lib/project-context';
 
 
 // Transform snake_case DB row to camelCase
@@ -184,7 +183,7 @@ export async function PUT(
 
     const oldStatus = existing.status;
     const newStatus = body.status;
-    const projectId = existing.project_id || DEFAULT_PROJECT_ID;
+    const projectId = existing.project_id;
 
     // Transform to snake_case and add updated_at
     const dbData = toSnakeCase({

@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { inspectionCreate } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 import {
   computeComplianceForMissions,
   writeComplianceToInspection,
@@ -167,9 +167,12 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const { searchParams } = new URL(request.url);
 
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const status = searchParams.get('status');
 
     let query = supabase
@@ -232,8 +235,11 @@ export async function POST(request: NextRequest) {
     const raw = await request.json();
     const body = inspectionCreate.parse(raw);
 
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const inspectionId = body.id || generateId();
-    const projectId = body.projectId || DEFAULT_PROJECT_ID;
+    const projectId = body.projectId;
     const trigger = body.trigger && VALID_TRIGGERS.has(body.trigger) ? body.trigger : 'manual';
     const inspectionType = body.type && VALID_TYPES.has(body.type) ? body.type : 'routine';
     const missionIds: string[] = Array.isArray(body.missionIds) ? body.missionIds : [];

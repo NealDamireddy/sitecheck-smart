@@ -42,7 +42,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { smartsEventSimulate } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
 import type { SmartsEvent, SmartsEventStatus, SmartsEventSource } from '@/types';
 
 interface DbSmartsEventRow {
@@ -93,7 +92,10 @@ export async function POST(request: NextRequest) {
     const { supabase } = auth;
     const body = smartsEventSimulate.parse(await request.json());
 
-    const projectId = body.projectId || DEFAULT_PROJECT_ID;
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+    const projectId = body.projectId;
     const now = new Date().toISOString();
 
     // Hardcoded — never read from the request body.

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ZodError } from 'zod';
 import { missionCreate } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 import { fetchAirspaceContext } from '@/lib/airspace-context';
 import { validateFlightPath } from '@/lib/geofence';
 
@@ -98,8 +98,10 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
-    const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
 
     const { data, error } = await supabase
       .from('drone_missions')
@@ -136,9 +138,13 @@ export async function POST(request: NextRequest) {
     const raw = await request.json();
     const body = missionCreate.parse(raw);
 
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+
     // Generate ID if not provided
     const missionId = body.id || `mission-${Date.now()}`;
-    const resolvedProjectId = body.projectId || DEFAULT_PROJECT_ID;
+    const resolvedProjectId = body.projectId;
 
     // Block 3: validate flight path against project geofence + active no-fly zones
     // before persisting. This catches the case where a user manually drags a waypoint

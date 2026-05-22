@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { checkpointBulk } from '@/lib/validations';
-import { resolveProjectId, DEFAULT_PROJECT_ID } from '@/lib/project-context';
 
 
 // Transform snake_case DB row to camelCase
@@ -100,7 +99,10 @@ export async function POST(request: NextRequest) {
     }
 
     const checkpoints = body.checkpoints as Record<string, unknown>[];
-    const projectId = (body.projectId as string) || DEFAULT_PROJECT_ID;
+    const projectId = body.projectId as string | undefined;
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
 
     if (checkpoints.length === 0) {
       return NextResponse.json(

@@ -138,3 +138,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vercel
+
+# Claude Code workspace state (worktrees, memory, hooks)
+.claude/

@@ -3,7 +3,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { generateMission } from '@/lib/validations';
 import { generateSmartFlightPath } from '@/lib/flight-path';
-import { resolveProjectId, DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 import { fetchAirspaceContext } from '@/lib/airspace-context';
 import { validateFlightPath } from '@/lib/geofence';
 import type { ProjectType } from '@/types/project';
@@ -55,7 +55,10 @@ export async function POST(request: NextRequest) {
       projectId?: string;
     };
 
-    const projectId = bodyProjectId || resolveProjectId(request) || DEFAULT_PROJECT_ID;
+    const projectId = bodyProjectId || resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
 
     if (!checkpoints || !Array.isArray(checkpoints) || checkpoints.length === 0) {
       return NextResponse.json({ error: 'No checkpoints provided' }, { status: 400 });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { checkpointCreate } from '@/lib/validations';
-import { DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 import { ZodError } from 'zod';
 
 
@@ -84,9 +84,12 @@ export async function GET(request: NextRequest) {
     if (auth.error) return auth.error;
     const { supabase } = auth;
 
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
     const { searchParams } = new URL(request.url);
 
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
     const status = searchParams.get('status');
     const bmpType = searchParams.get('bmpType');
     const zone = searchParams.get('zone');
@@ -156,9 +159,13 @@ export async function POST(request: NextRequest) {
     const raw = await request.json();
     const body = checkpointCreate.parse(raw);
 
+    if (!body.projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+
     // Ensure required fields
     const checkpointId = body.id || generateId();
-    const projectId = body.projectId || DEFAULT_PROJECT_ID;
+    const projectId = body.projectId;
 
     // Transform to snake_case for DB
     const dbData = toSnakeCase({

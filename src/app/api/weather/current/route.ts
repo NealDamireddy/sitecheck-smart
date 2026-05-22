@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchCurrentWeather } from '@/lib/weather-api';
-import { resolveProjectId, DEFAULT_PROJECT_ID } from '@/lib/project-context';
+import { resolveProjectId } from '@/lib/project-context';
 
 const CACHE_DURATION_MINUTES = 15;
 
@@ -22,8 +22,10 @@ export async function GET(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
-    const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+    const projectId = resolveProjectId(request);
+    if (!projectId) {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
 
     // Check for cached data
     const { data: cached, error: cacheError } = await supabase
@@ -85,8 +87,13 @@ export async function GET(request: NextRequest) {
       const fallbackAuth = await requireAuth();
       if (fallbackAuth.error) return fallbackAuth.error;
       const { supabase } = fallbackAuth;
-      const { searchParams } = new URL(request.url);
-      const projectId = searchParams.get('projectId') || DEFAULT_PROJECT_ID;
+      const projectId = resolveProjectId(request);
+      if (!projectId) {
+        return NextResponse.json(
+          { error: 'Failed to fetch weather data' },
+          { status: 500 }
+        );
+      }
 
       const { data: staleCache } = await supabase
         .from('weather_snapshots')
