@@ -143,16 +143,25 @@ export async function fetchCurrentWeather(): Promise<WeatherSnapshot> {
  * Fetch 7-day forecast from OpenWeatherMap
  * OpenWeatherMap free tier provides 5-day/3-hour forecast
  * We request 56 data points (7 days * 8 intervals/day)
+ *
+ * `coords` is optional; defaults to the legacy Fresno location used by
+ * the dashboard's single-project widget. The cron pre-storm detector
+ * passes per-project coords so each site gets its own forecast.
  */
-export async function fetchForecast(): Promise<WeatherDay[]> {
+export async function fetchForecast(
+  coords?: { lat: number; lng: number }
+): Promise<WeatherDay[]> {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
 
   if (!apiKey) {
     throw new Error('OPENWEATHERMAP_API_KEY environment variable is not set');
   }
 
+  const lat = coords?.lat ?? FRESNO_LAT;
+  const lon = coords?.lng ?? FRESNO_LON;
+
   // Note: Free tier only provides 5 days, but we request 56 for 7 days
-  const url = `${OWM_BASE_URL}/forecast?lat=${FRESNO_LAT}&lon=${FRESNO_LON}&appid=${apiKey}&units=imperial&cnt=56`;
+  const url = `${OWM_BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=imperial&cnt=56`;
 
   const response = await fetch(url, {
     headers: {

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/pre-storm-detector",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}
