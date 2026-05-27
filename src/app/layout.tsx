@@ -4,6 +4,8 @@ import localFont from 'next/font/local';
 import { ViewModeWrapper } from '@/components/layout/view-mode-wrapper';
 import { RealtimeProvider } from '@/components/providers/realtime-provider';
 import { ErrorBoundary } from '@/components/providers/error-boundary';
+import { OfflineBanner } from '@/components/offline/offline-banner';
+import { ServiceWorkerRegister } from '@/components/offline/sw-register';
 import './globals.css';
 
 const inter = Inter({
@@ -45,6 +47,8 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-background text-foreground antialiased texture-concrete">
         <ErrorBoundary>
+          <ServiceWorkerRegister />
+          <OfflineBanner />
           <RealtimeProvider>
             <ViewModeWrapper>{children}</ViewModeWrapper>
           </RealtimeProvider>
