@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useSmartsEventsStore } from '@/stores/smarts-events-store';
 import { buildSmartsWalkthrough } from '@/lib/smarts/walkthrough';
+import { buildSmartsCsvFilename } from '@/lib/smarts/csv-export';
 import { cn } from '@/lib/utils';
 import type { SmartsExportInput } from '@/lib/smarts/types';
 
@@ -78,6 +79,7 @@ export function SyncToSmartsDialog({
   const excelFilename = `smarts-ad-hoc-${
     wdid && wdid.trim() ? wdid.trim() : eventId
   }-${dateStr}.xlsx`;
+  const csvFilename = buildSmartsCsvFilename(walkthroughInput.projectName);
 
   async function handleCopyWalkthrough() {
     try {
@@ -130,19 +132,30 @@ export function SyncToSmartsDialog({
           <StepBlock
             number={1}
             title="Download Excel data-entry aid"
-            helper="Open this file alongside SMARTS as you type. SMARTS does not accept this file as an upload — it's a reference."
+            helper="Open this file alongside SMARTS as you type. SMARTS does not accept this file as an upload — it's a reference. The CSV is the same data as a flat file you can review or edit anywhere before syncing."
             checked={step1Done}
             onCheckedChange={setStep1Done}
           >
-            <a
-              href={`/api/smarts-events/${eventId}/export`}
-              download={excelFilename}
-              onClick={() => setStep1Done(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-800/60"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Download xlsx
-            </a>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/api/smarts-events/${eventId}/export`}
+                download={excelFilename}
+                onClick={() => setStep1Done(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-800/60"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download xlsx
+              </a>
+              <a
+                href={`/api/smarts-events/${eventId}/export?format=csv`}
+                download={csvFilename}
+                onClick={() => setStep1Done(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-800/60"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download CSV
+              </a>
+            </div>
           </StepBlock>
 
           <StepBlock

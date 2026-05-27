@@ -1,24 +1,32 @@
 /**
  * GET /api/smarts-events/[id]/export
  *
- * Streams an .xlsx of the event's samples + parameter results. The
- * workbook is a SMARTS data-entry aid, not an upload artifact — see
- * src/lib/smarts/excel-export.ts for the full rationale.
+ * Streams an .xlsx (default) or .csv (`?format=csv`) of the event's
+ * samples + parameter results. The Excel workbook is a SMARTS data-
+ * entry aid (see src/lib/smarts/excel-export.ts); the CSV is a flat
+ * review file QSPs can open or edit anywhere before syncing (see
+ * src/lib/smarts/csv-export.ts). Both formats share this single data-
+ * fetch path.
  *
  * Joins smarts_events / monitoring_locations (project-scoped) /
  * samples / parameter_results via the standard RLS-scoped Supabase
  * client. Returns 404 when the event row isn't reachable, 500 on any
- * other read or build failure. Always returns a workbook on success
- * even if there are zero samples (Sheet 2 still has the project
- * summary; Sheet 1 just has the header row).
+ * other read or build failure. Always returns a result on success
+ * even if there are zero samples (the Excel Sheet 2 still has the
+ * project summary; the CSV emits a header-only file).
  *
- * Filename: smarts-ad-hoc-{wdid-or-event-id}-{YYYY-MM-DD}.xlsx
- * Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+ * Filenames:
+ *   xlsx → smarts-ad-hoc-{wdid-or-event-id}-{YYYY-MM-DD}.xlsx
+ *   csv  → smarts-export-{project-name-slug}-{YYYY-MM-DD}.csv
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { buildSmartsExcelWorkbook } from '@/lib/smarts/excel-export';
+import {
+  buildSmartsCsv,
+  buildSmartsCsvFilename,
+} from '@/lib/smarts/csv-export';
 import type {
   AnalyzedBy,
   DischargePointType,
@@ -153,9 +161,18 @@ function buildFilename(wdid: string | null, eventId: string): string {
   return `smarts-ad-hoc-${slug}-${yyyy}-${mm}-${dd}.xlsx`;
 }
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+    const format = (
+      request.nextUrl.searchParams.get('format') ?? 'xlsx'
+    ).toLowerCase();
+    if (format !== 'xlsx' && format !== 'csv') {
+      return NextResponse.json(
+        { error: `Unsupported format '${format}' (expected 'xlsx' or 'csv')` },
+        { status: 400 }
+      );
+    }
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
@@ -205,14 +222,28 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       transformSample
     );
 
-    const buffer = await buildSmartsExcelWorkbook({
+    const exportInput = {
       event,
       projectName,
       wdid,
       monitoringLocations,
       samples,
-    });
+    };
 
+    if (format === 'csv') {
+      const csv = buildSmartsCsv(exportInput);
+      const filename = buildSmartsCsvFilename(projectName);
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
+    const buffer = await buildSmartsExcelWorkbook(exportInput);
     const filename = buildFilename(wdid, event.id);
 
     return new NextResponse(buffer, {
