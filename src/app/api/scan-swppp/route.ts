@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File must be a PDF' }, { status: 400 });
     }
 
-    if (file.size > 25 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File too large (max 25MB)' }, { status: 400 });
+    if (file.size > 30 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File too large (max 30MB)' }, { status: 400 });
     }
 
     // Convert to base64

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback } from 'react';
-import { Upload, FileText, X, AlertCircle, Sparkles } from 'lucide-react';
+import { Upload, FileText, X, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSwpppStore } from '@/stores/swppp-store';
@@ -23,21 +23,38 @@ export function UploadZone() {
     setIsDragOver(false);
   }, []);
 
+  // Max PDF size accepted by /api/scan-swppp. Keep in sync with the
+  // server-side guard in src/app/api/scan-swppp/route.ts.
+  const MAX_PDF_BYTES = 30 * 1024 * 1024;
+
+  const acceptFile = useCallback((candidate: File) => {
+    if (candidate.type !== 'application/pdf') {
+      setError('File must be a PDF.');
+      return;
+    }
+    if (candidate.size > MAX_PDF_BYTES) {
+      setError('File too large (max 30MB).');
+      return;
+    }
+    setError(null);
+    setFile(candidate);
+  }, [MAX_PDF_BYTES, setError, setFile]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && droppedFile.type === 'application/pdf') {
-      setFile(droppedFile);
+    if (droppedFile) {
+      acceptFile(droppedFile);
     }
-  }, [setFile]);
+  }, [acceptFile]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
+      acceptFile(selectedFile);
     }
-  }, [setFile]);
+  }, [acceptFile]);
 
   const handleRemoveFile = useCallback(() => {
     setFile(null);
@@ -134,7 +151,7 @@ export function UploadZone() {
               {isDragOver ? 'Release to upload' : 'Drop your SWPPP PDF here'}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              or click to browse • PDF up to 20MB
+              or click to browse • PDF up to 30MB
             </p>
           </div>
         ) : (
