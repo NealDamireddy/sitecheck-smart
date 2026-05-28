@@ -11,6 +11,10 @@ export function UploadZone() {
   const { file, setFile, setProcessingStep, setProgress, setError, setSiteInfo, setExtractedCheckpoints } = useSwpppStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // Local-only validation message. Must NOT use the store's setError —
+  // that also flips processingStep to 'error', which would swap the
+  // whole page to the failure screen the moment a file is selected.
+  const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -25,20 +29,20 @@ export function UploadZone() {
 
   // Max PDF size accepted by /api/scan-swppp. Keep in sync with the
   // server-side guard in src/app/api/scan-swppp/route.ts.
-  const MAX_PDF_BYTES = 30 * 1024 * 1024;
+  const MAX_PDF_BYTES = 50 * 1024 * 1024;
 
   const acceptFile = useCallback((candidate: File) => {
     if (candidate.type !== 'application/pdf') {
-      setError('File must be a PDF.');
+      setValidationError('File must be a PDF.');
       return;
     }
     if (candidate.size > MAX_PDF_BYTES) {
-      setError('File too large (max 30MB).');
+      setValidationError('File too large (max 50MB).');
       return;
     }
-    setError(null);
+    setValidationError(null);
     setFile(candidate);
-  }, [MAX_PDF_BYTES, setError, setFile]);
+  }, [MAX_PDF_BYTES, setFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -83,8 +87,17 @@ export function UploadZone() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Scan failed');
+        // Surface the real cause instead of swallowing it. A 413 (body
+        // too large) or 401 (auth) often returns non-JSON, so fall back
+        // to text, then to the bare status code.
+        let serverMsg = '';
+        try {
+          const errorData = await response.json();
+          serverMsg = errorData?.error ? String(errorData.error) : '';
+        } catch {
+          serverMsg = await response.text().catch(() => '');
+        }
+        throw new Error(serverMsg || `Scan failed (HTTP ${response.status})`);
       }
 
       const data = await response.json();
@@ -151,8 +164,13 @@ export function UploadZone() {
               {isDragOver ? 'Release to upload' : 'Drop your SWPPP PDF here'}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              or click to browse • PDF up to 30MB
+              or click to browse • PDF up to 50MB
             </p>
+            {validationError && (
+              <p className="mt-3 text-xs font-medium text-red-400">
+                {validationError}
+              </p>
+            )}
           </div>
         ) : (
           /* File selected */

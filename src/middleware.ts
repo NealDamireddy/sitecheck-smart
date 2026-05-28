@@ -103,11 +103,16 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except:
+     * - api (route handlers self-authenticate via requireAuth(); running
+     *   the Supabase session-refresh response through here drops POST
+     *   bodies — `NextResponse.next({ request })` during a token refresh
+     *   yields "Failed to parse body as FormData" in handlers that call
+     *   request.formData(), e.g. /api/scan-swppp uploads)
      * - _next/static (static files)
      * - _next/image (image optimization)
      * - favicon.ico, sitemap.xml, robots.txt
      * - Public assets (images, fonts, demo photos)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|demo-photos|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf)).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|demo-photos|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf)).*)',
   ],
 };

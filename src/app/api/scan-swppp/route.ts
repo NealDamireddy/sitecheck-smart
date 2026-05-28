@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
+// Note: pdf-parse's index.js has a debug branch (`if (!module.parent)`)
+// that reads a bundled test PDF when run directly via node. When
+// imported as a module from Next.js, module.parent is defined, so the
+// branch is skipped — safe to import from the package root.
+import pdfParse from 'pdf-parse';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+// Real SWPPPs run 100–300+ pages, which blow through Anthropic's 100-
+// page / 32MB PDF document limit *and* the 32MB request limit (base64
+// inflates files ~33%). Instead of sending the PDF to Claude, we
+// extract text server-side with pdf-parse and send only the text —
+// removing both limits. Claude's 200K-token context easily fits a
+// multi-hundred-page SWPPP as text.
+const MAX_PDF_BYTES = 50 * 1024 * 1024;
+
+// Vercel serverless functions time out at 10s on Hobby and 60s on Pro;
+// large SWPPPs take ~5–15s to parse plus another ~10–30s for Claude.
+// Bumping to 60s covers Pro deploys cleanly.
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,13 +39,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File must be a PDF' }, { status: 400 });
     }
 
-    if (file.size > 30 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File too large (max 30MB)' }, { status: 400 });
+    if (file.size > MAX_PDF_BYTES) {
+      return NextResponse.json({ error: 'File too large (max 50MB)' }, { status: 400 });
     }
 
-    // Convert to base64
+    const fileSizeMb = file.size / (1024 * 1024);
+    console.log(
+      `[scan-swppp] received "${file.name}" — ${fileSizeMb.toFixed(1)}MB, ${file.type}`
+    );
+
+    // Extract text locally with pdf-parse. This avoids Anthropic's PDF
+    // limits entirely — we never send the binary document to Claude, just
+    // the extracted text as a regular text message block.
     const arrayBuffer = await file.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString('base64');
+    const buffer = Buffer.from(arrayBuffer);
+
+    const parseStart = Date.now();
+    const parsed = await pdfParse(buffer);
+    const parseMs = Date.now() - parseStart;
+    const text = (parsed.text || '').trim();
+
+    console.log(
+      `[scan-swppp] extracted ${parsed.numpages} pages, ${(text.length / 1024).toFixed(1)}KB of text in ${parseMs}ms`
+    );
+
+    if (text.length < 50) {
+      return NextResponse.json(
+        {
+          error:
+            'Could not extract text from this PDF. It looks like a scanned/image-only document that would need OCR before analysis.',
+        },
+        { status: 400 }
+      );
+    }
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -78,20 +122,11 @@ Respond ONLY with valid JSON (no markdown code fences, no commentary) matching t
       messages: [
         {
           role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: base64Data,
-              },
-            },
-            {
-              type: 'text',
-              text: 'Extract all BMP checkpoint locations from this SWPPP document. Return structured JSON with site info and all checkpoints.',
-            },
-          ],
+          content: `Extract all BMP checkpoint locations from the following SWPPP document text. Return structured JSON with site info and all checkpoints.
+
+--- SWPPP DOCUMENT TEXT START ---
+${text}
+--- SWPPP DOCUMENT TEXT END ---`,
         },
       ],
     });
@@ -123,8 +158,11 @@ Respond ONLY with valid JSON (no markdown code fences, no commentary) matching t
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error('SWPPP scan error:', error);
+    // Anthropic SDK errors carry a `status`; log it explicitly so any
+    // upstream failure is obvious.
+    const anthropicStatus = (error as { status?: number })?.status;
+    console.error('SWPPP scan error:', anthropicStatus ?? '', error);
     const errorMessage = error instanceof Error ? error.message : 'Scan failed';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: anthropicStatus ?? 500 });
   }
 }
