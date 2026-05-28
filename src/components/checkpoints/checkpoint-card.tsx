@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Camera } from 'lucide-react';
+import { useState } from 'react';
+import { Camera, CheckCircle2, XCircle, CircleHelp, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { BMP_CATEGORY_LABELS, BMP_CATEGORY_COLORS } from '@/lib/constants';
 import { formatRelativeTime } from '@/lib/format';
-import { Checkpoint } from '@/types/checkpoint';
+import { Checkpoint, CheckpointStatus } from '@/types/checkpoint';
+import { useCheckpointStore } from '@/stores/checkpoint-store';
 import { cn } from '@/lib/utils';
 import { useAppMode } from '@/hooks/use-app-mode';
 
@@ -25,6 +27,28 @@ const priorityColors: Record<string, string> = {
 export function CheckpointCard({ checkpoint, index }: CheckpointCardProps) {
   const { isApp } = useAppMode();
   const bmpColor = BMP_CATEGORY_COLORS[checkpoint.bmpType];
+  const updateCheckpoint = useCheckpointStore((s) => s.updateCheckpoint);
+  const [updating, setUpdating] = useState<CheckpointStatus | null>(null);
+
+  async function handleStatusClick(
+    e: React.MouseEvent,
+    next: CheckpointStatus,
+  ) {
+    // The whole card is a <Link> to the detail page, so quick-action
+    // clicks must not bubble or they'll navigate away mid-update.
+    e.preventDefault();
+    e.stopPropagation();
+    if (checkpoint.status === next || updating) return;
+    setUpdating(next);
+    try {
+      await updateCheckpoint(checkpoint.id, {
+        status: next,
+        lastInspectionDate: new Date().toISOString(),
+      });
+    } finally {
+      setUpdating(null);
+    }
+  }
 
   return (
     <motion.div
@@ -97,9 +121,96 @@ export function CheckpointCard({ checkpoint, index }: CheckpointCardProps) {
                 {formatRelativeTime(checkpoint.lastInspectionDate)}
               </span>
             </div>
+
+            {/* Quick status actions — mark a BMP without opening the
+                detail page. Buttons stop propagation so the parent
+                <Link> doesn't navigate when the QSP just wants to log
+                a status. */}
+            <div className="flex items-center gap-1.5 pt-1">
+              <QuickStatusButton
+                label="Compliant"
+                icon={<CheckCircle2 className="h-3 w-3" />}
+                active={checkpoint.status === 'compliant'}
+                loading={updating === 'compliant'}
+                disabled={updating !== null}
+                onClick={(e) => handleStatusClick(e, 'compliant')}
+                tone="green"
+              />
+              <QuickStatusButton
+                label="Deficient"
+                icon={<XCircle className="h-3 w-3" />}
+                active={checkpoint.status === 'deficient'}
+                loading={updating === 'deficient'}
+                disabled={updating !== null}
+                onClick={(e) => handleStatusClick(e, 'deficient')}
+                tone="red"
+              />
+              <QuickStatusButton
+                label="Review"
+                icon={<CircleHelp className="h-3 w-3" />}
+                active={checkpoint.status === 'needs-review'}
+                loading={updating === 'needs-review'}
+                disabled={updating !== null}
+                onClick={(e) => handleStatusClick(e, 'needs-review')}
+                tone="purple"
+              />
+            </div>
           </CardContent>
         </Card>
       </Link>
     </motion.div>
+  );
+}
+
+const TONE_CLASSES: Record<
+  'green' | 'red' | 'purple',
+  { active: string; idle: string }
+> = {
+  green: {
+    active: 'border-green-500/40 bg-green-500/15 text-green-300',
+    idle: 'border-green-500/20 bg-green-500/5 text-green-300/80 hover:bg-green-500/15 hover:text-green-300',
+  },
+  red: {
+    active: 'border-red-500/40 bg-red-500/15 text-red-300',
+    idle: 'border-red-500/20 bg-red-500/5 text-red-300/80 hover:bg-red-500/15 hover:text-red-300',
+  },
+  purple: {
+    active: 'border-purple-500/40 bg-purple-500/15 text-purple-300',
+    idle: 'border-purple-500/20 bg-purple-500/5 text-purple-300/80 hover:bg-purple-500/15 hover:text-purple-300',
+  },
+};
+
+function QuickStatusButton({
+  label,
+  icon,
+  active,
+  loading,
+  disabled,
+  onClick,
+  tone,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  loading: boolean;
+  disabled: boolean;
+  onClick: (e: React.MouseEvent) => void;
+  tone: 'green' | 'red' | 'purple';
+}) {
+  const classes = TONE_CLASSES[tone];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || active}
+      title={active ? `Already ${label.toLowerCase()}` : `Mark ${label.toLowerCase()}`}
+      className={cn(
+        'inline-flex flex-1 items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-[10px] font-medium uppercase tracking-wider transition-colors disabled:cursor-default disabled:opacity-90',
+        active ? classes.active : classes.idle,
+      )}
+    >
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : icon}
+      {label}
+    </button>
   );
 }
