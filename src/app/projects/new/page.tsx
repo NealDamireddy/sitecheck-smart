@@ -13,6 +13,7 @@ import {
 } from '@/components/projects/monitoring-locations-builder';
 import { centerlineLengthFeet, formatLinearLength } from '@/lib/format';
 import { useProjectStore } from '@/stores/project-store';
+import { useCheckpointStore } from '@/stores/checkpoint-store';
 import type { ProjectType, ProjectSegment, Project } from '@/types/project';
 
 /** sessionStorage keys used by /swppp to hand off extracted SWPPP data. */
@@ -65,6 +66,8 @@ function NewProjectWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fetchProjects = useProjectStore((s) => s.fetchProjects);
+  const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
+  const fetchCheckpoints = useCheckpointStore((s) => s.fetchCheckpoints);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [projectType, setProjectType] = useState<ProjectType>('linear');
@@ -396,6 +399,13 @@ function NewProjectWizard() {
       }
 
       await fetchProjects();
+      // Switch the active project so the dashboard, checkpoints page, and
+      // every project-scoped store reads from the site we just created
+      // instead of whichever site was selected before. Then prime the
+      // checkpoint store so /checkpoints shows the freshly-persisted BMPs
+      // without waiting for a manual project switch.
+      setCurrentProject(id);
+      await fetchCheckpoints();
       const partial: string[] = [];
       if (locationErrors.length > 0) {
         partial.push(
