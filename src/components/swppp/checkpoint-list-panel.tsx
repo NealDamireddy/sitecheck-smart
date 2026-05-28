@@ -27,7 +27,7 @@ export function CheckpointListPanel({ selectedCheckpointId, onSelect, extractedC
     if (storeCheckpoints.length === 0) fetchCheckpoints();
   }, [storeCheckpoints.length, fetchCheckpoints]);
 
-  const aiAnalyses: Array<{ checkpointId: string }> = [];
+  const aiAnalyses: Array<{ checkpointId: string; confidence: number }> = [];
 
   // Use extracted checkpoints if provided, otherwise fall back to static data
   const useExtracted = extractedCheckpoints && extractedCheckpoints.length > 0;

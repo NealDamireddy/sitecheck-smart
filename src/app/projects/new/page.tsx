@@ -364,13 +364,18 @@ function NewProjectWizard() {
       for (const cp of extractedCheckpoints) {
         const safeZone =
           cp.zone && ALLOWED_ZONES.has(cp.zone) ? cp.zone : 'central';
+        // Don't forward Claude's BMP code (e.g. "SC-1") as the DB primary
+        // key — `checkpoints.id` is globally unique, not scoped per
+        // project, so short codes collide across projects and across
+        // retries of this same wizard. Let the API mint a unique id and
+        // surface the BMP code in the name so the QSP still sees it.
+        const displayName = cp.id ? `${cp.id} — ${cp.name}` : cp.name;
         const cpRes = await fetch('/api/checkpoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: cp.id,
             projectId: id,
-            name: cp.name,
+            name: displayName,
             bmpType: cp.bmpType,
             description: cp.description || cp.name,
             cgpSection: cp.cgpSection || 'TBD',
