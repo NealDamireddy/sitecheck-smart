@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
-// Note: pdf-parse's index.js has a debug branch (`if (!module.parent)`)
-// that reads a bundled test PDF when run directly via node. When
-// imported as a module from Next.js, module.parent is defined, so the
-// branch is skipped — safe to import from the package root.
-import pdfParse from 'pdf-parse';
+// pdf-parse@1.1.1 ships a debug branch in index.js (`if (!module.parent)`)
+// that synchronously reads ./test/data/05-versions-space.pdf on import.
+// Next.js bundles the import in a way where `module.parent` is undefined,
+// so the branch fires and crashes the route with ENOENT before our
+// handler runs. Importing the implementation directly from lib/ skips
+// index.js entirely and avoids the side-effect.
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -18,6 +20,12 @@ const anthropic = new Anthropic({
 // removing both limits. Claude's 200K-token context easily fits a
 // multi-hundred-page SWPPP as text.
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
+
+// Cap the extracted text we send to Claude. Sonnet 4's context is ~200K
+// tokens; ~3.5 chars/token gives ~700K chars. We stay well under that
+// to leave headroom for the system prompt and response, and to keep
+// latency predictable for very long SWPPPs.
+const MAX_TEXT_CHARS = 500_000;
 
 // Vercel serverless functions time out at 10s on Hobby and 60s on Pro;
 // large SWPPPs take ~5–15s to parse plus another ~10–30s for Claude.
@@ -55,12 +63,24 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     const parseStart = Date.now();
-    const parsed = await pdfParse(buffer);
+    let parsed;
+    try {
+      parsed = await pdfParse(buffer);
+    } catch (parseError: unknown) {
+      const msg = parseError instanceof Error ? parseError.message : String(parseError);
+      console.error('[scan-swppp] pdf-parse failed:', msg);
+      return NextResponse.json(
+        { error: `Could not parse PDF: ${msg}` },
+        { status: 400 }
+      );
+    }
     const parseMs = Date.now() - parseStart;
-    const text = (parsed.text || '').trim();
+    const rawText = (parsed.text || '').trim();
+    const truncated = rawText.length > MAX_TEXT_CHARS;
+    const text = truncated ? rawText.slice(0, MAX_TEXT_CHARS) : rawText;
 
     console.log(
-      `[scan-swppp] extracted ${parsed.numpages} pages, ${(text.length / 1024).toFixed(1)}KB of text in ${parseMs}ms`
+      `[scan-swppp] extracted ${parsed.numpages} pages, ${(rawText.length / 1024).toFixed(1)}KB of text in ${parseMs}ms${truncated ? ` (truncated to ${(text.length / 1024).toFixed(1)}KB for Claude)` : ''}`
     );
 
     if (text.length < 50) {
@@ -73,9 +93,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const claudeStart = Date.now();
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: `You are an expert SWPPP (Storm Water Pollution Prevention Plan) document analyst for construction sites in California. You analyze uploaded SWPPP documents and extract all BMP (Best Management Practice) checkpoint information.
 
 Your task: Extract every BMP checkpoint mentioned in this SWPPP document and return structured JSON.
@@ -122,39 +143,69 @@ Respond ONLY with valid JSON (no markdown code fences, no commentary) matching t
       messages: [
         {
           role: 'user',
-          content: `Extract all BMP checkpoint locations from the following SWPPP document text. Return structured JSON with site info and all checkpoints.
+          content: `Extract all BMP checkpoint locations from the following SWPPP document text. Return structured JSON with site info and all checkpoints. Output ONLY the JSON object, no prose, no markdown fences.
 
 --- SWPPP DOCUMENT TEXT START ---
 ${text}
 --- SWPPP DOCUMENT TEXT END ---`,
         },
+        // Prefill the assistant turn with `{` so Claude is forced to
+        // continue with valid JSON instead of any preamble or fences.
+        // We re-prepend the `{` to the response below before parsing.
+        {
+          role: 'assistant',
+          content: '{',
+        },
       ],
     });
+
+    const claudeMs = Date.now() - claudeStart;
 
     // Extract text content
     const textContent = message.content.find((block) => block.type === 'text');
     if (!textContent || textContent.type !== 'text') {
+      console.error('[scan-swppp] no text block in Claude response', message);
       throw new Error('No text response from Claude');
     }
 
-    // Parse JSON from response - try direct parse first, then extract from markdown
-    let result;
+    // Re-attach the prefilled `{` and try to parse. Fall back to
+    // scanning for the largest JSON object if Claude wandered.
+    const responseText = '{' + textContent.text;
+    let result: { siteInfo?: unknown; checkpoints?: unknown };
     try {
-      result = JSON.parse(textContent.text);
+      result = JSON.parse(responseText);
     } catch {
-      // Try extracting JSON from markdown code block
-      const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
+        try {
+          result = JSON.parse(jsonMatch[0]);
+        } catch (parseErr) {
+          console.error(
+            '[scan-swppp] could not parse Claude JSON. Response was:',
+            responseText.slice(0, 500)
+          );
+          throw new Error(
+            `Could not parse JSON from Claude response: ${parseErr instanceof Error ? parseErr.message : 'unknown'}`
+          );
+        }
       } else {
+        console.error(
+          '[scan-swppp] no JSON object found in Claude response. Response was:',
+          responseText.slice(0, 500)
+        );
         throw new Error('Could not parse JSON from Claude response');
       }
     }
 
     // Validate response shape
-    if (!result.siteInfo || !Array.isArray(result.checkpoints)) {
+    if (!result || typeof result !== 'object' || !result.siteInfo || !Array.isArray(result.checkpoints)) {
+      console.error('[scan-swppp] invalid response shape:', result);
       throw new Error('Invalid response structure from Claude');
     }
+
+    console.log(
+      `[scan-swppp] done — ${(result.checkpoints as unknown[]).length} checkpoints, claude=${claudeMs}ms`
+    );
 
     return NextResponse.json(result);
   } catch (error: unknown) {
