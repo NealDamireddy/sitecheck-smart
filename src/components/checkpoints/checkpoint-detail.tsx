@@ -12,8 +12,12 @@ import {
   AlertTriangle,
   Brain,
   History,
+  CheckCircle2,
+  XCircle,
+  CircleHelp,
+  Loader2,
 } from 'lucide-react';
-import type { Checkpoint } from '@/types/checkpoint';
+import type { Checkpoint, CheckpointStatus } from '@/types/checkpoint';
 import type { AIAnalysis } from '@/types/drone';
 import type { Deficiency } from '@/types/deficiency';
 import {
@@ -47,6 +51,8 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
   const [matchingDeficiencies, setMatchingDeficiencies] = useState<Deficiency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState<CheckpointStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     // Demo session → fall back to bundled demo data when the API can't
@@ -115,6 +121,48 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
   }
 
   const bmpColor = BMP_CATEGORY_COLORS[checkpoint.bmpType];
+
+  // Mark a checkpoint compliant / deficient / needs-review without
+  // requiring a photo. Useful when the QSP physically inspects a BMP
+  // and just needs to record the result. Sends a PUT to the existing
+  // /api/checkpoints/[id] endpoint and reflects the change locally so
+  // the badge + sidebar update immediately.
+  async function setCheckpointStatus(next: CheckpointStatus) {
+    if (!checkpoint || checkpoint.status === next || statusUpdating) return;
+    setStatusUpdating(next);
+    setStatusError(null);
+    try {
+      const res = await fetch(`/api/checkpoints/${checkpoint.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: next,
+          lastInspectionDate: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || `Update failed (HTTP ${res.status})`);
+      }
+      const updated = await res.json();
+      setCheckpoint((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: updated.status ?? next,
+              lastInspectionDate:
+                updated.lastInspectionDate ?? new Date().toISOString(),
+            }
+          : prev,
+      );
+    } catch (err) {
+      setStatusError(
+        err instanceof Error ? err.message : 'Failed to update status',
+      );
+    } finally {
+      setStatusUpdating(null);
+    }
+  }
 
   return (
     <motion.div
@@ -190,6 +238,97 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
             }
             onAnalyzed={(next) => setAnalysis(next)}
           />
+
+          {/* Photo-less status actions. The QSP can record a visual
+              inspection result directly, without uploading or running
+              AI analysis. */}
+          <Card className="border-border bg-surface">
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-foreground">
+                  Mark this BMP without a photo
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Records an inspection result and updates the last-inspected timestamp.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCheckpointStatus('compliant')}
+                  disabled={
+                    checkpoint.status === 'compliant' || statusUpdating !== null
+                  }
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+                    checkpoint.status === 'compliant'
+                      ? 'border-green-500/40 bg-green-500/15 text-green-300'
+                      : 'border-green-500/30 bg-green-500/10 text-green-300 hover:bg-green-500/20',
+                  )}
+                >
+                  {statusUpdating === 'compliant' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )}
+                  {checkpoint.status === 'compliant'
+                    ? 'Compliant'
+                    : 'Mark Compliant'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckpointStatus('deficient')}
+                  disabled={
+                    checkpoint.status === 'deficient' || statusUpdating !== null
+                  }
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+                    checkpoint.status === 'deficient'
+                      ? 'border-red-500/40 bg-red-500/15 text-red-300'
+                      : 'border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20',
+                  )}
+                >
+                  {statusUpdating === 'deficient' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5" />
+                  )}
+                  {checkpoint.status === 'deficient'
+                    ? 'Deficient'
+                    : 'Mark Deficient'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckpointStatus('needs-review')}
+                  disabled={
+                    checkpoint.status === 'needs-review' ||
+                    statusUpdating !== null
+                  }
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+                    checkpoint.status === 'needs-review'
+                      ? 'border-purple-500/40 bg-purple-500/15 text-purple-300'
+                      : 'border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20',
+                  )}
+                >
+                  {statusUpdating === 'needs-review' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CircleHelp className="h-3.5 w-3.5" />
+                  )}
+                  {checkpoint.status === 'needs-review'
+                    ? 'Needs Review'
+                    : 'Mark Needs Review'}
+                </button>
+              </div>
+              {statusError && (
+                <div className="flex w-full items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] text-red-300">
+                  <AlertTriangle className="h-3 w-3" />
+                  {statusError}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Tabs */}
           <Tabs defaultValue="ai-analysis">
