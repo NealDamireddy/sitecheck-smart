@@ -141,3 +141,6 @@ vite.config.ts.timestamp-*
 
 # Claude Code workspace state (worktrees, memory, hooks)
 .claude/
+
+# macOS noise
+.DS_Store

@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
-    const { supabase } = auth;
+    const { supabase, user } = auth;
     const raw = await request.json();
     const body = inspectionCreate.parse(raw);
 
@@ -244,6 +244,23 @@ export async function POST(request: NextRequest) {
     const inspectionType = body.type && VALID_TYPES.has(body.type) ? body.type : 'routine';
     const missionIds: string[] = Array.isArray(body.missionIds) ? body.missionIds : [];
 
+    // The `inspector` column is NOT NULL in the schema. Callers that
+    // start an inspection from the dashboard picker don't yet know which
+    // QSP will sign it, so fall back to the project's stored QSP name,
+    // then the authenticated user, then a generic "QSP" placeholder.
+    let inspector = body.inspector;
+    if (!inspector) {
+      const { data: projectRow } = await supabase
+        .from('projects')
+        .select('qsp_name')
+        .eq('id', projectId)
+        .maybeSingle();
+      inspector =
+        (projectRow?.qsp_name as string | undefined) ||
+        user.email ||
+        'QSP';
+    }
+
     // Pre-compute compliance from any linked missions so the new row has
     // real numbers from the moment it's created.
     const initialCompliance = await computeComplianceForMissions(supabase, missionIds);
@@ -254,6 +271,7 @@ export async function POST(request: NextRequest) {
       projectId,
       type: inspectionType,
       trigger,
+      inspector,
       missionId: body.missionId ?? missionIds[0] ?? null,
       overallCompliance:
         body.overallCompliance ?? initialCompliance.qspOverallCompliance ?? 0,

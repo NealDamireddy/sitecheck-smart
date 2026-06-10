@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Pencil, Lock, Check, X } from 'lucide-react';
+import { ReportTableSection } from '@/components/reports/report-table-section';
 
 interface EditableSectionProps {
   section: ReportSection;
@@ -41,6 +42,13 @@ export function EditableSection({ section, onSave }: EditableSectionProps) {
   function handleCancel() {
     setEditContent(section.content);
     setIsEditing(false);
+  }
+
+  // Structured table sections (Part 1 / 2 / 3) bypass the markdown
+  // editor entirely — they're rendered as proper tables and aren't
+  // free-text editable.
+  if (section.data) {
+    return <ReportTableSection title={section.title} data={section.data} />;
   }
 
   return (

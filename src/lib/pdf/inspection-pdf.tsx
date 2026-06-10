@@ -28,6 +28,13 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 import type { ReactElement } from 'react';
+import type {
+  Part1Data,
+  Part1Group,
+  Part2Data,
+  Part3Data,
+} from '@/lib/cgp/report-data';
+import type { ReportSectionData } from '@/types/report';
 
 // ─────────────────────────────────────────────
 // Types
@@ -37,6 +44,7 @@ export interface PdfReportSection {
   title: string;
   content: string;
   type?: 'text' | 'table' | 'signature';
+  data?: ReportSectionData;
 }
 
 export interface PdfProjectInfo {
@@ -157,6 +165,58 @@ const styles = StyleSheet.create({
     borderBottomColor: '#cbd5e1',
     marginVertical: 4,
   },
+  // ── Table styles (Parts 1 / 2 / 3) ──────────
+  tableContainer: {
+    marginTop: 2,
+  },
+  tableRow: {
+    flexDirection: 'row',
+  },
+  tableCell: {
+    borderWidth: 0.5,
+    borderColor: '#475569',
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+    fontSize: 9,
+    color: '#0f172a',
+  },
+  tableCellHeader: {
+    borderWidth: 0.5,
+    borderColor: '#475569',
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
+  },
+  tableBanner: {
+    borderWidth: 0.5,
+    borderColor: '#475569',
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+    fontSize: 9.5,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+    backgroundColor: '#d4d4d8',
+    flex: 1,
+  },
+  tableLabel: {
+    borderWidth: 0.5,
+    borderColor: '#475569',
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    color: '#0f172a',
+  },
+  tableAnswerNo: {
+    color: '#b91c1c',
+    fontFamily: 'Helvetica-Bold',
+  },
+  tableAnswerDateNo: {
+    color: '#b91c1c',
+  },
   signatureBlock: {
     marginTop: 8,
     paddingTop: 8,
@@ -199,6 +259,165 @@ function renderRichLine(line: string, key: string): ReactElement {
         return part;
       })}
     </Text>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Table renderers — Parts 1 / 2 / 3
+// ─────────────────────────────────────────────
+function renderPart1Table(data: Part1Data): ReactElement {
+  return (
+    <View style={styles.tableContainer}>
+      <View style={styles.tableRow}>
+        <Text style={[styles.tableLabel, { width: '25%' }]}>Date</Text>
+        <Text style={[styles.tableCell, { width: '75%' }]}>{data.date}</Text>
+      </View>
+      <View style={styles.tableRow}>
+        <Text style={[styles.tableLabel, { width: '25%' }]}>Inspection Type</Text>
+        <Text style={[styles.tableCell, { width: '75%' }]}>{data.inspectionType}</Text>
+      </View>
+      {data.groups.map((group, gi) => (
+        <Part1GroupPdf key={gi} group={group} />
+      ))}
+    </View>
+  );
+}
+
+function Part1GroupPdf({ group }: { group: Part1Group }): ReactElement {
+  return (
+    <>
+      <View style={styles.tableRow}>
+        <Text style={styles.tableBanner}>{group.heading}</Text>
+      </View>
+      {group.rows.map((row, ri) => {
+        if (row.kind === 'note') {
+          return (
+            <View key={ri} style={styles.tableRow}>
+              <Text style={[styles.tableCell, { width: '100%' }]}>
+                <Text style={{ fontFamily: 'Helvetica-Bold' }}>{row.label}</Text>{' '}
+                {row.value}
+              </Text>
+            </View>
+          );
+        }
+        const [a, b] = row.cells;
+        return (
+          <View key={ri} style={styles.tableRow}>
+            <Text style={[styles.tableLabel, { width: '25%' }]}>{a.label}</Text>
+            <Text style={[styles.tableCell, { width: b ? '25%' : '75%' }]}>
+              {a.value || ' '}
+            </Text>
+            {b ? (
+              <>
+                <Text style={[styles.tableLabel, { width: '25%' }]}>{b.label}</Text>
+                <Text style={[styles.tableCell, { width: '25%' }]}>
+                  {b.value || ' '}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
+function renderPart2Table(data: Part2Data): ReactElement {
+  return (
+    <View style={styles.tableContainer}>
+      <View style={styles.tableRow}>
+        <Text style={[styles.tableCellHeader, { width: '50%' }]}>
+          Minimum BMPs for Risk Level {data.riskLevel} Sites
+        </Text>
+        <Text style={[styles.tableCellHeader, { width: '25%' }]}>
+          Adequately designed, implemented and effective?
+        </Text>
+        <Text style={[styles.tableCellHeader, { width: '25%' }]}>
+          Action Implemented Date
+        </Text>
+      </View>
+      {data.categories.map((cat) => (
+        <View key={cat.number}>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableBanner}>
+              {cat.number} - {cat.title}
+            </Text>
+          </View>
+          {cat.questions.map((q) => {
+            const isNo = q.answer === 'No';
+            return (
+              <View key={q.id} style={styles.tableRow} wrap={false}>
+                <Text style={[styles.tableCell, { width: '50%' }]}>
+                  {q.number} — {q.prompt}
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: '25%' },
+                    isNo ? styles.tableAnswerNo : {},
+                  ]}
+                >
+                  {q.answer}
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: '25%' },
+                    isNo ? styles.tableAnswerDateNo : {},
+                  ]}
+                >
+                  {q.actionDate}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function renderPart3Table(data: Part3Data): ReactElement {
+  if (data.rows.length === 0) {
+    return (
+      <View style={styles.tableContainer}>
+        <View style={styles.tableRow}>
+          <Text style={[styles.tableCell, { width: '100%' }]}>
+            No active deficiencies identified during this inspection.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.tableContainer}>
+      <View style={styles.tableRow}>
+        <Text style={[styles.tableCellHeader, { width: '50%' }]}>Deficiency</Text>
+        <Text style={[styles.tableCellHeader, { width: '50%' }]}>
+          Recommendations — Repairs must begin within 72 hours of identification.
+        </Text>
+      </View>
+      {data.rows.map((row, idx) => (
+        <View key={idx} style={styles.tableRow} wrap={false}>
+          <Text
+            style={[
+              styles.tableCell,
+              { width: '50%', color: '#b91c1c' },
+            ]}
+          >
+            {row.deficiency}
+          </Text>
+          <Text
+            style={[
+              styles.tableCell,
+              { width: '50%', color: '#b91c1c' },
+            ]}
+          >
+            {row.recommendation}
+          </Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -301,14 +520,33 @@ export function InspectionReportPdf(
         </View>
 
         {/* Sections */}
-        {sections.map((section) => (
-          <View key={section.id} style={styles.sectionWrapper} wrap={false}>
-            <View style={styles.sectionTitleBar}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+        {sections.map((section) => {
+          // Structured table sections render the proper regulator-form
+          // grid; legacy text sections fall back to the markdown body.
+          const tableBody = section.data
+            ? section.data.kind === 'part1'
+              ? renderPart1Table(section.data.payload)
+              : section.data.kind === 'part2'
+                ? renderPart2Table(section.data.payload)
+                : section.data.kind === 'part3'
+                  ? renderPart3Table(section.data.payload)
+                  : null
+            : null;
+          return (
+            <View
+              key={section.id}
+              style={styles.sectionWrapper}
+              wrap={!!tableBody}
+            >
+              <View style={styles.sectionTitleBar}>
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+              </View>
+              <View style={styles.sectionBody}>
+                {tableBody ?? renderSectionBody(section.content)}
+              </View>
             </View>
-            <View style={styles.sectionBody}>{renderSectionBody(section.content)}</View>
-          </View>
-        ))}
+          );
+        })}
 
         {/* Signature block (only when signed) */}
         {signedBy ? (

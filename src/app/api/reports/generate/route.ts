@@ -7,6 +7,15 @@ import {
   SITE_OBSERVATION_CHECKS,
   type CgpRiskLevel,
 } from '@/lib/cgp/risk-level-bmps';
+import {
+  buildPart2Data,
+  buildPart3DataFromPart2,
+  type Part1Data,
+  type Part1Group,
+  type Part3Data,
+} from '@/lib/cgp/report-data';
+import type { ReportSectionData } from '@/types/report';
+import type { BMPCategory, CheckpointStatus } from '@/types/checkpoint';
 
 
 interface ReportSection {
@@ -15,6 +24,7 @@ interface ReportSection {
   content: string;
   type: 'text' | 'table' | 'signature';
   editable: boolean;
+  data?: ReportSectionData;
 }
 
 /**
@@ -128,10 +138,19 @@ export async function POST(request: NextRequest) {
       console.error('Error fetching weather:', weatherError);
     }
 
-    // The regulator-submitted report drives Part 2 (BMP Observations)
-    // from a fixed CGP checklist, not from per-checkpoint statuses, so
-    // we don't fetch the project's checkpoint rows here. The Part 3
-    // deficiency log below has all the deficiency context we need.
+    // Part 2 (BMP Observations) Yes/No answers are driven by per-checkpoint
+    // statuses, rolled up by CGP category. Any deficient or needs-review
+    // checkpoint flips its CGP category to "No"; everything else stays
+    // "Yes". Categories with no checkpoints default to "Yes".
+    const { data: checkpointRows } = await supabase
+      .from('checkpoints')
+      .select('id, bmp_type, status')
+      .eq('project_id', projectId);
+    const checkpoints: { bmpType: BMPCategory; status: CheckpointStatus }[] =
+      (checkpointRows ?? []).map((row: { bmp_type: string; status: string }) => ({
+        bmpType: row.bmp_type as BMPCategory,
+        status: row.status as CheckpointStatus,
+      }));
 
     // 5. Fetch active deficiencies
     const { data: deficiencies, error: deficienciesError } = await supabase
@@ -399,27 +418,223 @@ This inspection was conducted in accordance with the requirements of:
 **Date:** _________________________
     `.trim();
 
+    // ─────────────────────────────────────────────
+    // Structured table payloads (rendered by both the in-app preview
+    // and the @react-pdf/renderer PDF). The markdown `content` strings
+    // built above are kept as a fallback so anyone editing the report
+    // still has the same text to work from.
+    // ─────────────────────────────────────────────
+    const todayShort = now.toLocaleDateString();
+    const inspectorName = inspection?.inspector || project.qsp_name || 'N/A';
+    const signatureDate = inspection
+      ? new Date(inspection.date).toISOString().slice(0, 10)
+      : now.toISOString().slice(0, 10);
+
+    const part1Groups: Part1Group[] = [
+      {
+        heading: 'Site Information',
+        rows: [
+          {
+            kind: 'kv',
+            cells: [
+              {
+                label: 'Construction Site Name & WDID No.',
+                value: `${project.name}${project.wdid ? ` · ${project.wdid}` : ''}`,
+              },
+            ],
+          },
+          {
+            kind: 'kv',
+            cells: [
+              { label: 'Project Risk Level', value: String(riskLevel) },
+              { label: 'Photos Taken', value: 'Yes' },
+            ],
+          },
+          {
+            kind: 'kv',
+            cells: [
+              { label: 'Construction Stage', value: String(constructionStage) },
+              { label: 'Current Weather', value: String(currentWeatherLabel) },
+            ],
+          },
+          {
+            kind: 'kv',
+            cells: [
+              { label: 'Address', value: project.address || 'N/A' },
+              { label: 'Permit Number', value: project.permit_number || 'N/A' },
+            ],
+          },
+          {
+            kind: 'kv',
+            cells: [
+              isLinear
+                ? { label: 'Corridor Length', value: corridorMileage }
+                : {
+                    label: 'Total Acreage',
+                    value:
+                      project.acreage != null
+                        ? `${project.acreage} acres`
+                        : 'N/A',
+                  },
+            ],
+          },
+        ],
+      },
+      {
+        heading: 'Weather',
+        rows: [
+          {
+            kind: 'kv',
+            cells: [
+              {
+                label: 'Estimated QPE Beginning',
+                value: isStormRelevant
+                  ? String(inspection?.qpe_start ?? 'N/A')
+                  : 'N/A',
+              },
+              {
+                label: 'Estimated QPE Duration',
+                value: isStormRelevant
+                  ? String(inspection?.qpe_duration_hours ?? 'N/A')
+                  : 'N/A',
+              },
+            ],
+          },
+          {
+            kind: 'kv',
+            cells: [
+              {
+                label: 'End Date of QPE',
+                value: isStormRelevant
+                  ? String(inspection?.qpe_end ?? 'N/A')
+                  : 'N/A',
+              },
+              {
+                label: 'Rain Gauge reading (inches)',
+                value: String(inspection?.rain_gauge_inches ?? 'N/A'),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: 'Exemption Documentation',
+        rows: [
+          {
+            kind: 'note',
+            label:
+              'Exemption Documentation (explanation required if inspection could not be conducted)',
+            value:
+              'Visual inspections are not required outside of business hours or during dangerous weather conditions such as flooding or electrical storms.',
+          },
+        ],
+      },
+      {
+        heading: 'Site Observations',
+        rows: (() => {
+          const checks = SITE_OBSERVATION_CHECKS;
+          const rows: Part1Group['rows'] = [];
+          for (let i = 0; i < checks.length; i += 2) {
+            const a = checks[i];
+            const b = checks[i + 1];
+            rows.push({
+              kind: 'kv',
+              cells: [
+                {
+                  label: a.label,
+                  value: String(inspection?.[`obs_${a.id}`] ?? 'No'),
+                },
+                ...(b
+                  ? [
+                      {
+                        label: b.label,
+                        value: String(inspection?.[`obs_${b.id}`] ?? 'No'),
+                      },
+                    ]
+                  : []),
+              ],
+            });
+          }
+          rows.push({
+            kind: 'kv',
+            cells: [
+              {
+                label: 'Comments on presence',
+                value: inspection?.observation_comments || '',
+              },
+            ],
+          });
+          return rows;
+        })(),
+      },
+      {
+        heading: 'Inspector Information',
+        rows: [
+          {
+            kind: 'kv',
+            cells: [
+              { label: 'Inspector Name', value: inspectorName },
+              { label: 'Inspector Title', value: 'QSP' },
+            ],
+          },
+          {
+            kind: 'kv',
+            cells: [
+              { label: 'Signature', value: inspectorName },
+              { label: 'Date', value: signatureDate },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const part1Data: Part1Data = {
+      date: inspectionDateLabel,
+      inspectionType,
+      groups: part1Groups,
+    };
+
+    const part2Data = buildPart2Data(riskLevel, checkpoints, todayShort);
+
+    const part3FromChecklist = buildPart3DataFromPart2(part2Data);
+    const part3Data: Part3Data = {
+      rows: [
+        ...part3FromChecklist.rows,
+        ...deficiencyList.map((def) => ({
+          deficiency:
+            (def.description as string) ||
+            ((def.checkpoints as { name?: string })?.name ?? 'Open deficiency'),
+          recommendation:
+            (def.corrective_action as string) ||
+            'Repairs must begin within 72 hours of identification.',
+        })),
+      ],
+    };
+
     const sections: ReportSection[] = [
       {
         id: 'part-1-general-info',
         title: 'Part 1: General Information',
         content: generalInfoContent,
-        type: 'text',
-        editable: true,
+        type: 'table',
+        editable: false,
+        data: { kind: 'part1', payload: part1Data },
       },
       {
         id: 'part-2-bmp-observations',
         title: 'Part 2: BMP Observations',
         content: bmpObservationsContent,
         type: 'table',
-        editable: true,
+        editable: false,
+        data: { kind: 'part2', payload: part2Data },
       },
       {
         id: 'part-3-deficiencies',
         title: 'Part 3: Descriptions of BMP deficiencies',
         content: deficiencyContent.trim(),
-        type: 'text',
-        editable: true,
+        type: 'table',
+        editable: false,
+        data: { kind: 'part3', payload: part3Data },
       },
       ...(stormObservationsContent
         ? [{

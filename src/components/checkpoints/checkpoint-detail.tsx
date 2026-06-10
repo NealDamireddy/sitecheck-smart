@@ -38,6 +38,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useActiveInspectionStore } from '@/stores/active-inspection-store';
 
 const priorityColors: Record<string, string> = {
   high: 'bg-red-500',
@@ -155,6 +156,8 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
             }
           : prev,
       );
+      // Count this BMP toward the active inspection's reviewed total.
+      useActiveInspectionStore.getState().markReviewed(checkpoint.id);
     } catch (err) {
       setStatusError(
         err instanceof Error ? err.message : 'Failed to update status',

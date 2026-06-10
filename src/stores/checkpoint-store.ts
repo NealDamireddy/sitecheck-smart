@@ -136,6 +136,21 @@ export const useCheckpointStore = create<CheckpointStore>((set, get) => ({
           cp.id === id ? { ...cp, ...updated } : cp
         ),
       }));
+      // Status changes during an active inspection count toward the
+      // reviewed-progress banner. Dynamic import keeps this store from
+      // taking a hard dependency on the active-inspection store, which
+      // can be mounted later in the boot order.
+      if (data.status) {
+        try {
+          const { useActiveInspectionStore } = await import(
+            './active-inspection-store'
+          );
+          useActiveInspectionStore.getState().markReviewed(id);
+        } catch {
+          // active-inspection store unavailable — banner will still
+          // count from a hard reload because reviewed ids are persisted.
+        }
+      }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Unknown error' });
     }
