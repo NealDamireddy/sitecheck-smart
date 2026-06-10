@@ -35,7 +35,7 @@ parent `Sitecheck-main/` fails with `ERR_MODULE_NOT_FOUND` (it looks for
 under `smarts-automation/`.
 
 ```bash
-# Tests (mocked — fast). 92/92 passing across 12 files as of handoff.
+# Tests (mocked — fast). 103/103 passing across 13 files as of handoff.
 cd /Users/nealdamireddy/Documents/Sitecheck-main/smarts-automation && npm test
 
 # Typecheck (must be clean before any commit/run)
@@ -145,11 +145,25 @@ Env vars beyond credentials:
 - **Duplicate-draft guard, halt path** (`find-existing-draft.ts` + step 3.5 in
   `navigate.ts`): scans the "Ad Hoc Reports - Outstanding" table (tbody
   `noiReadyForm:adhocOutstandingTable_data`, positional columns: 3 = Facility,
-  6 = Reporting Period, 7 = Event Type) for drafts matching (siteName
-  case-insensitive substring, reporting period whitespace-normalized exact,
-  event type exact). **Multi-match halts loudly** (verified live against an
-  account with 7 duplicate drafts for one event); zero matches falls through to
-  create-new.
+  6 = Reporting Period, 7 = Event Type) for drafts matching the key.
+  **Multi-match halts loudly** (verified live against an account with 7
+  duplicate drafts for one event); zero matches falls through to create-new.
+  Matching (hardened 2026-06-10, pure `matchOutstandingRows` is unit-tested in
+  `tests/find-existing-draft.test.ts`):
+  - **siteName**: EXACT equality (case-insensitive, whitespace-normalized)
+    against the FIRST line of the Facility cell — the cell is
+    `<name><br><address lines>`, extracted before the first `<br>` in the page
+    scan. The earlier substring-vs-whole-cell match was a collision risk:
+    addresses can embed site names (Equus Ct's own address is "4002 Equus Ct").
+    On zero matches the guard logs every facility name it saw, so a misspelled
+    `SMARTS_SITE_NAME` (which would silently create yet another duplicate) is
+    diagnosable from run.log.
+  - **reportingPeriod**: whitespace-normalized exact (`MM/DD/YYYY - MM/DD/YYYY`
+    from the first record's event start/end).
+  - **eventType**: exact after trim; defaults to `EVENT_TYPE_OPTION`
+    ("Precipitation Event") exported by `event-information.ts` — the SAME
+    constant the form fill selects, so guard and fill cannot diverge. Override
+    per run via `SMARTS_EVENT_TYPE` if other event types ever get filled.
 
 ### BUILT BUT NOT VERIFIED LIVE ⚠️
 - **Resume-into-existing-draft** (single match): clicks the draft's report-id
@@ -163,13 +177,16 @@ Env vars beyond credentials:
 ## 5. What's next — three workstreams, in priority order
 
 **A. Make duplicate-prevention production-ready.**
-- The siteName match is a case-insensitive substring against the Facility cell
-  (name + address concatenated) — could collide when one site's name is a
-  substring of another's address. Consider matching the name segment only.
-- `eventType` defaults to "Precipitation Event" globally — fine today, fragile
-  when other event types appear.
-- Verify live: after the user deletes duplicates and re-runs, does the resume
-  path land where we assume (see ⚠️ above)?
+- ~~siteName substring collision~~ DONE 2026-06-10: exact match on the
+  Facility cell's name line (see §4).
+- ~~eventType global default fragility~~ DONE 2026-06-10: guard default now
+  shares `EVENT_TYPE_OPTION` with the form fill. (True multi-event-type support
+  — filling anything other than Precipitation Event — is workstream B/C scope.)
+- REMAINING — live verification: after the user deletes duplicates and re-runs,
+  does the resume path land where we assume (see ⚠️ above)? Ask the user to
+  delete down to ONE draft for (Equus Ct, 05/27/2026 - 05/29/2026), re-run with
+  `SMARTS_SITE_NAME="Equus Ct"`, and paste the `[resume]` / `[nav] step 3.5`
+  lines from run.log plus any halt screenshot.
 
 **B. Split constants from variables.** `MonitoringRecord` mixes per-inspection
 data (sample datetime, pH, turbidity) with per-site constants (QSP name, lab,
@@ -259,6 +276,6 @@ unrelated modified files.
 ## 10. Status snapshot
 
 - `npm run typecheck`: clean.
-- `npm test`: **92/92 passing** across 12 files.
+- `npm test`: **103/103 passing** across 13 files.
 - Auto-memory also captured: `smarts-automation-progress`,
   `smarts-jsf-dropdown-technique` (load automatically in new sessions).

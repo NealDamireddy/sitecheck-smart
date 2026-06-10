@@ -15,7 +15,10 @@ const EVENT_INFO_TIMEOUT_MS = 30_000;
 // and drifts between page versions — a live run proved the recon'd id was stale.
 // So we select it by its OPTION text ("Precipitation Event", value "5" in the
 // recon HTML) rather than by id; this is resilient to id drift.
-const EVENT_TYPE_OPTION = "Precipitation Event";
+// Exported: the duplicate-draft guard defaults its Event Type match to this
+// same constant so the value the form fills and the value the guard scans for
+// can never silently diverge.
+export const EVENT_TYPE_OPTION = "Precipitation Event";
 
 // The date/time/precip inputs have stable, human-named ids (not j_idt###). JSF
 // ids contain ":", so in a CSS selector they need an [id="..."] attribute

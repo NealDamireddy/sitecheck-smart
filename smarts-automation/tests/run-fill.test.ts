@@ -30,6 +30,7 @@ vi.mock("../src/orchestrator/structural-clicks.js", () => ({
 
 vi.mock("../src/orchestrator/event-information.js", () => ({
   fillEventInformation: vi.fn().mockResolvedValue(null),
+  EVENT_TYPE_OPTION: "Precipitation Event",
 }));
 
 vi.mock("../src/util/primefaces.js", () => ({

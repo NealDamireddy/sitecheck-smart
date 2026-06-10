@@ -15,7 +15,7 @@ import { createSession } from "../auth/create-session.js";
 import type { MonitoringRecord } from "../types/monitoring-record.js";
 import type { HaltedResult } from "../types/run-result.js";
 import { setJsfSelectByText } from "../util/primefaces.js";
-import { fillEventInformation } from "./event-information.js";
+import { fillEventInformation, EVENT_TYPE_OPTION } from "./event-information.js";
 import { fillSampleDetails, fillSampleTable } from "./sample-form.js";
 import type { DraftResumeKey } from "./find-existing-draft.js";
 import { navigateToProject, navigateToTab } from "./navigate.js";
@@ -39,17 +39,20 @@ export interface RunFillOptions {
   headless?: boolean;
   closeSessionAfter?: boolean;
   /**
-   * Facility/Site Name as displayed in the SMARTS "Ad Hoc Reports - Outstanding"
-   * table (e.g. "Equus Ct"). When present alongside event start/end on the
-   * records, runFill checks for an existing draft for the same (siteName,
-   * reporting period, event type) and resumes it instead of creating a new
-   * report. Without this, every run creates a new draft (legacy behavior).
+   * Facility/Site Name EXACTLY as displayed on the first line of the
+   * Facility/Site Name & Address column in the SMARTS "Ad Hoc Reports -
+   * Outstanding" table (e.g. "Equus Ct"; case-insensitive). When present
+   * alongside event start/end on the records, runFill checks for an existing
+   * draft for the same (siteName, reporting period, event type) and resumes it
+   * instead of creating a new report. Without this, every run creates a new
+   * draft (legacy behavior).
    */
   siteName?: string;
   /**
    * Event Type label as it appears in the outstanding table's "Event Type"
-   * column. Defaults to "Precipitation Event" (the only supported type today;
-   * matches what `fillEventInformation` selects in the form).
+   * column. Defaults to {@link EVENT_TYPE_OPTION} ("Precipitation Event") —
+   * the same constant `fillEventInformation` selects in the form, so the
+   * guard and the fill cannot diverge.
    */
   eventType?: string;
 }
@@ -317,7 +320,7 @@ function buildResumeKey(
   options: RunFillOptions,
 ): DraftResumeKey | undefined {
   const siteName = options.siteName?.trim();
-  const eventType = (options.eventType ?? "Precipitation Event").trim();
+  const eventType = (options.eventType ?? EVENT_TYPE_OPTION).trim();
   const start = record.eventStartDate?.trim();
   const end = record.eventEndDate?.trim();
   if (!siteName || !start || !end) return undefined;

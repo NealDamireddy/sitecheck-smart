@@ -27,10 +27,12 @@
 import type { Page } from "playwright";
 
 export interface DraftResumeKey {
-  // The site Facility name as displayed in the "Facility/Site Name & Address"
-  // cell (e.g. "Equus Ct"). Matched as a case-insensitive substring against the
-  // cell text — SMARTS shows the name + address joined by line breaks, so a
-  // substring match is the resilient choice.
+  // The site Facility name as displayed on the FIRST line of the
+  // "Facility/Site Name & Address" cell (e.g. "Equus Ct"). The cell renders the
+  // name and address as <br>-separated lines; we extract the name line in the
+  // browser and compare it EXACTLY (case-insensitive, whitespace-normalized).
+  // A substring match against the whole cell was rejected because addresses can
+  // contain other sites' names (Equus Ct's own address is "4002 Equus Ct").
   siteName: string;
   // Formatted reporting period, "MM/DD/YYYY - MM/DD/YYYY" with single spaces
   // (e.g. "05/27/2026 - 05/29/2026"). Compared after whitespace normalization
@@ -70,18 +72,7 @@ export async function findExistingDraft(
   page: Page,
   key: DraftResumeKey,
 ): Promise<DraftMatch[]> {
-  const siteNeedle = key.siteName.trim().toLowerCase();
-  const periodNeedle = normalizeWhitespace(key.reportingPeriod);
-  const typeNeedle = key.eventType.trim();
-
-  let rows: Array<{
-    rowIndex: number;
-    facility: string;
-    reportingPeriod: string;
-    eventType: string;
-    reportId: string;
-    linkElementId: string;
-  }> = [];
+  let rows: OutstandingRow[] = [];
 
   try {
     // IMPORTANT: this callback is serialized and run in the browser, so it must
@@ -97,16 +88,31 @@ export async function findExistingDraft(
       return trs.map((tr) => {
         const tds = Array.from(tr.querySelectorAll("td"));
         const link = tds[0] ? tds[0].querySelector("a") : null;
+        // The Facility cell is "<name><br><address line(s)>". Take the text
+        // nodes BEFORE the first <br> as the facility name — robust even if
+        // SMARTS reformats source whitespace. Fall back to the full text when
+        // the cell has no <br> at all.
+        let facilityName = "";
+        const facilityCell = tds[3];
+        if (facilityCell) {
+          for (const n of Array.from(facilityCell.childNodes)) {
+            if (n.nodeType === 1 && (n as Element).tagName === "BR") break;
+            facilityName += n.textContent || "";
+          }
+          if (facilityName.trim() === "") {
+            facilityName = facilityCell.textContent || "";
+          }
+        }
         return {
           rowIndex: Number(tr.getAttribute("data-ri") ?? "-1"),
-          facility: tds[3] ? (tds[3].textContent || "").trim() : "",
+          facilityName: facilityName,
           reportingPeriod: tds[6] ? (tds[6].textContent || "").trim() : "",
           eventType: tds[7] ? (tds[7].textContent || "").trim() : "",
           reportId: link ? (link.textContent || "").trim() : "",
           linkElementId: link ? link.id || "" : "",
         };
       });
-    })) as typeof rows;
+    })) as OutstandingRow[];
   } catch (e) {
     console.log(
       `${TAG} outstanding-table scan failed (${
@@ -123,13 +129,66 @@ export async function findExistingDraft(
     return [];
   }
 
+  const matches = matchOutstandingRows(rows, key);
+
+  console.log(
+    `${TAG} scanned ${rows.length} outstanding draft(s); ${matches.length} match(es) for ` +
+      `site="${key.siteName}" period="${key.reportingPeriod}" type="${key.eventType}"` +
+      (matches.length > 0
+        ? ` -> [${matches.map((m) => m.reportId).join(", ")}]`
+        : ""),
+  );
+  if (matches.length === 0) {
+    // A zero-match miss caused by a misspelled SMARTS_SITE_NAME silently
+    // creates ANOTHER duplicate draft — exactly what this guard exists to
+    // prevent. Log the facility names actually present so run.log shows why
+    // nothing matched.
+    const seen = [...new Set(rows.map((r) => normalizeWhitespace(r.facilityName)))];
+    console.log(
+      `${TAG} facility names present in the outstanding table: [${seen.join(" | ")}] — ` +
+        `siteName must EXACTLY match one of these (case-insensitive) to resume.`,
+    );
+  }
+  return matches;
+}
+
+/** One scanned row of the outstanding table (shape returned by the page scan). */
+export interface OutstandingRow {
+  rowIndex: number;
+  /** First line of the Facility/Site Name & Address cell (the site name). */
+  facilityName: string;
+  reportingPeriod: string;
+  eventType: string;
+  reportId: string;
+  linkElementId: string;
+}
+
+/**
+ * Pure matching logic, split from the page scan so it is unit-testable.
+ * A row matches when:
+ *  - its facility NAME line equals `key.siteName` (case-insensitive,
+ *    whitespace-normalized) — exact, never substring, so one site's name
+ *    appearing inside another row's address can not collide;
+ *  - its reporting period equals `key.reportingPeriod` after whitespace
+ *    normalization on both sides;
+ *  - its event type equals `key.eventType` after trim;
+ *  - it has a clickable report-id link.
+ */
+export function matchOutstandingRows(
+  rows: OutstandingRow[],
+  key: DraftResumeKey,
+): DraftMatch[] {
+  const siteNeedle = normalizeWhitespace(key.siteName).toLowerCase();
+  const periodNeedle = normalizeWhitespace(key.reportingPeriod);
+  const typeNeedle = key.eventType.trim();
+
   const matches: DraftMatch[] = [];
   for (const row of rows) {
-    const facility = row.facility.toLowerCase();
+    const facility = normalizeWhitespace(row.facilityName).toLowerCase();
     const period = normalizeWhitespace(row.reportingPeriod);
     const type = row.eventType.trim();
     if (
-      facility.includes(siteNeedle) &&
+      facility === siteNeedle &&
       period === periodNeedle &&
       type === typeNeedle &&
       row.linkElementId !== ""
@@ -141,14 +200,6 @@ export async function findExistingDraft(
       });
     }
   }
-
-  console.log(
-    `${TAG} scanned ${rows.length} outstanding draft(s); ${matches.length} match(es) for ` +
-      `site="${key.siteName}" period="${key.reportingPeriod}" type="${key.eventType}"` +
-      (matches.length > 0
-        ? ` -> [${matches.map((m) => m.reportId).join(", ")}]`
-        : ""),
-  );
   return matches;
 }
 
