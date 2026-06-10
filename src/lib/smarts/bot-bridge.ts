@@ -19,12 +19,25 @@
  * still happens in SMARTS, by a human, after the bot stops.
  */
 
-import type { ParameterResult, Sample } from '@/types';
+import type { ParameterName, ParameterResult, Sample } from '@/types';
 import type { SmartsExportInput } from '@/lib/smarts/types';
 import { isParameterNal } from '@/lib/smarts/nal-thresholds';
+import { normalizeMethod } from '@/lib/smarts/normalize';
 
 /** Mirrors EVENT_TYPE_OPTION in smarts-automation (the only type filled today). */
 export const SMARTS_EVENT_TYPE = 'Precipitation Event';
+
+/**
+ * Analytical Method dropdown options per parameter, verbatim from the
+ * live SMARTS Raw Data form DOM. The bot selects by option text, so a
+ * method that isn't in this list (after normalizeMethod) would halt the
+ * fill mid-run — blocked at preview instead. Re-recon with
+ * SMARTS_DUMP_FORM=1 if SMARTS adds options.
+ */
+const SMARTS_METHOD_OPTIONS: Record<ParameterName, readonly string[]> = {
+  pH: ['A4500HB', 'E150.2', 'pH_Field', 'pH_Paper'],
+  Turbidity: ['E180.1', 'A2130B'],
+};
 
 export interface SyncParameterPreview {
   /** Numeric reading exactly as it will be typed into the Result cell. */
@@ -186,7 +199,7 @@ function toParameterPreview(p: ParameterResult): SyncParameterPreview | null {
   if (p.result == null) return null;
   return {
     result: p.result,
-    analyticalMethod: p.analyticalMethod,
+    analyticalMethod: normalizeMethod(p.analyticalMethod),
     mdl: p.mdl,
     rl: p.rl,
     analyzedBy: p.analyzedBy,
@@ -290,6 +303,18 @@ export function buildSyncPayload(input: SmartsExportInput): SyncPayload {
 
     const ph = phRaw ? toParameterPreview(phRaw) : null;
     const turbidity = turbidityRaw ? toParameterPreview(turbidityRaw) : null;
+    // Methods must match a SMARTS dropdown option verbatim or the bot
+    // halts mid-fill — catch it here with the allowed list spelled out.
+    for (const [param, pv] of [
+      ['pH', ph],
+      ['Turbidity', turbidity],
+    ] as const) {
+      if (pv && !SMARTS_METHOD_OPTIONS[param].includes(pv.analyticalMethod)) {
+        blockers.push(
+          `${label}: ${param} analytical method "${pv.analyticalMethod}" is not a SMARTS dropdown option (SMARTS lists: ${SMARTS_METHOD_OPTIONS[param].join(', ')}). Fix the method on the sample.`
+        );
+      }
+    }
     if (ph?.nalExceedance) {
       warnings.push(
         `${label}: pH ${ph.result} is an NAL exceedance — it will be reported to SMARTS as-is.`

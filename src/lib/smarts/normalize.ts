@@ -19,14 +19,25 @@ export function normalizeUnits(units: string): string {
 }
 
 /**
- * Map a stored analytical-method value to the SMARTS dropdown string.
- *   'pH field' → 'pH_field' (underscore is the SMARTS form)
- *   'Hach 2100Q' → 'EPA 180.1' (Hach 2100Q is an instrument, not an EPA method)
+ * Map a stored analytical-method value to the EXACT SMARTS dropdown
+ * option text. Casing and spelling matter: the sync bot selects these
+ * dropdowns by option text, so any mismatch halts the fill. The target
+ * strings below were read from the live SMARTS Raw Data form DOM
+ * (pH: A4500HB / E150.2 / pH_Field / pH_Paper; turbidity: E180.1 /
+ * A2130B) — note there is NO "EPA 180.1" or "pH_field" in SMARTS.
+ *
+ *   'pH field'  → 'pH_Field'  (underscored, capital F — SMARTS form)
+ *   'Hach 2100Q'→ 'E180.1'    (instrument name → the EPA 180.1 method,
+ *                              which SMARTS lists as "E180.1")
+ *   'EPA 180.1' → 'E180.1'    (long-form alias)
+ *   'EPA 150.2' → 'E150.2'    (long-form alias)
  *   Everything else passes through.
  */
 export function normalizeMethod(method: string): string {
-  if (method === 'pH field') return 'pH_field';
-  if (method === 'Hach 2100Q') return 'EPA 180.1';
+  if (method === 'pH field') return 'pH_Field';
+  if (method === 'Hach 2100Q') return 'E180.1';
+  if (method === 'EPA 180.1') return 'E180.1';
+  if (method === 'EPA 150.2') return 'E150.2';
   return method;
 }
 
