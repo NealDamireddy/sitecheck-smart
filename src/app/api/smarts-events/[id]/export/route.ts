@@ -1,226 +1,75 @@
 /**
- * GET /api/smarts-events/[id]/export
+ * GET /api/smarts-events/[id]/export[?format=csv]
  *
- * Streams an .xlsx of the event's samples + parameter results. The
- * workbook is a SMARTS data-entry aid, not an upload artifact — see
- * src/lib/smarts/excel-export.ts for the full rationale.
+ * Default (no format / format=xlsx): streams an .xlsx of the event's
+ * samples + parameter results. The workbook is a SMARTS data-entry aid,
+ * not an upload artifact — see src/lib/smarts/excel-export.ts.
  *
- * Joins smarts_events / monitoring_locations (project-scoped) /
- * samples / parameter_results via the standard RLS-scoped Supabase
- * client. Returns 404 when the event row isn't reachable, 500 on any
- * other read or build failure. Always returns a workbook on success
- * even if there are zero samples (Sheet 2 still has the project
- * summary; Sheet 1 just has the header row).
+ * format=csv: streams the bot-format monitoring CSV — the exact file
+ * the Sync-to-SMARTS bot consumes (smarts-automation CSV schema). Useful
+ * as a portable export and for running the bot by hand.
  *
- * Filename: smarts-ad-hoc-{wdid-or-event-id}-{YYYY-MM-DD}.xlsx
- * Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+ * Data assembly is shared with the sync routes via fetchSmartsExportInput
+ * (RLS-scoped). Returns 404 when the event row isn't reachable, 500 on
+ * any other read or build failure.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { buildSmartsExcelWorkbook } from '@/lib/smarts/excel-export';
-import type {
-  AnalyzedBy,
-  DischargePointType,
-  MonitoringLocation,
-  ParameterName,
-  ParameterQualifier,
-  Sample,
-  SmartsEvent,
-  SmartsEventSource,
-  SmartsEventStatus,
-} from '@/types';
+import { buildSyncPayload } from '@/lib/smarts/bot-bridge';
+import { fetchSmartsExportInput } from '@/lib/smarts/fetch-export-input';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-function transformEvent(row: Record<string, unknown>): SmartsEvent {
-  return {
-    id: row.id as string,
-    projectId: row.project_id as string,
-    status: row.status as SmartsEventStatus,
-    source: row.source as SmartsEventSource,
-    forecastDetectedAt: row.forecast_detected_at as string,
-    startedAt: (row.started_at as string | null) ?? undefined,
-    endedAt: (row.ended_at as string | null) ?? undefined,
-    precipitationInches:
-      row.precipitation_inches == null
-        ? undefined
-        : Number(row.precipitation_inches),
-    notes: (row.notes as string | null) ?? undefined,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
-}
-
-interface DbMonitoringLocationRow {
-  id: string;
-  project_id: string;
-  name: string;
-  drainage_area: string;
-  discharge_point_type: string;
-  is_ats: boolean;
-  is_passive_treatment: boolean;
-  description: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-function transformLocation(row: DbMonitoringLocationRow): MonitoringLocation {
-  return {
-    id: row.id,
-    projectId: row.project_id,
-    name: row.name,
-    drainageArea: row.drainage_area,
-    dischargePointType: row.discharge_point_type as DischargePointType,
-    isAts: row.is_ats,
-    isPassiveTreatment: row.is_passive_treatment,
-    description: row.description ?? undefined,
-    latitude: row.latitude ?? undefined,
-    longitude: row.longitude ?? undefined,
-    status: row.status as 'active' | 'inactive',
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-interface DbParameterResultRow {
-  id: string;
-  project_id: string;
-  sample_id: string;
-  parameter: string;
-  qualifier: string;
-  result: number | null;
-  units: string;
-  analytical_method: string;
-  mdl: number | null;
-  rl: number | null;
-  analyzed_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DbSampleRow {
-  id: string;
-  project_id: string;
-  smarts_event_id: string;
-  monitoring_location_id: string;
-  sample_datetime: string;
-  qsp_name: string;
-  created_at: string;
-  updated_at: string;
-  parameter_results: DbParameterResultRow[];
-}
-
-function transformSample(row: DbSampleRow): Sample {
-  return {
-    id: row.id,
-    projectId: row.project_id,
-    smartsEventId: row.smarts_event_id,
-    monitoringLocationId: row.monitoring_location_id,
-    sampleDatetime: row.sample_datetime,
-    qspName: row.qsp_name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    parameterResults: (row.parameter_results ?? []).map((p) => ({
-      id: p.id,
-      projectId: p.project_id,
-      sampleId: p.sample_id,
-      parameter: p.parameter as ParameterName,
-      qualifier: p.qualifier as ParameterQualifier,
-      result: p.result == null ? undefined : Number(p.result),
-      units: p.units,
-      analyticalMethod: p.analytical_method,
-      mdl: p.mdl == null ? undefined : Number(p.mdl),
-      rl: p.rl == null ? undefined : Number(p.rl),
-      analyzedBy: p.analyzed_by as AnalyzedBy,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-    })),
-  };
-}
-
-function buildFilename(wdid: string | null, eventId: string): string {
+function buildFilename(
+  wdid: string | null,
+  eventId: string,
+  ext: 'xlsx' | 'csv'
+): string {
   const slug = wdid && wdid.trim() ? wdid.trim() : eventId;
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
-  return `smarts-ad-hoc-${slug}-${yyyy}-${mm}-${dd}.xlsx`;
+  return `smarts-ad-hoc-${slug}-${yyyy}-${mm}-${dd}.${ext}`;
 }
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
     const auth = await requireAuth();
     if (auth.error) return auth.error;
-    const { supabase } = auth;
 
-    // Event
-    const { data: eventRow, error: eventError } = await supabase
-      .from('smarts_events')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (eventError) {
-      if (eventError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Smarts event not found' },
-          { status: 404 }
-        );
-      }
-      throw new Error(eventError.message);
+    const fetched = await fetchSmartsExportInput(auth.supabase, id);
+    if (!fetched.ok) {
+      return NextResponse.json({ error: fetched.error }, { status: fetched.status });
     }
-    const event = transformEvent(eventRow as Record<string, unknown>);
+    const { input, event } = fetched;
 
-    // Project (for name + wdid)
-    const { data: projectRow } = await supabase
-      .from('projects')
-      .select('name, wdid')
-      .eq('id', event.projectId)
-      .single();
-    const projectName =
-      (projectRow?.name as string | undefined) ?? event.projectId;
-    const wdid = (projectRow?.wdid as string | null) ?? null;
+    const format = request.nextUrl.searchParams.get('format') ?? 'xlsx';
 
-    // Locations for this project
-    const { data: locationsData } = await supabase
-      .from('monitoring_locations')
-      .select('*')
-      .eq('project_id', event.projectId);
-    const monitoringLocations = ((locationsData ?? []) as unknown as DbMonitoringLocationRow[]).map(
-      transformLocation
-    );
+    if (format === 'csv') {
+      const payload = buildSyncPayload(input);
+      return new NextResponse(payload.csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${buildFilename(input.wdid, event.id, 'csv')}"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
 
-    // Samples + nested parameter_results
-    const { data: samplesData } = await supabase
-      .from('samples')
-      .select(`*, parameter_results (*)`)
-      .eq('smarts_event_id', id);
-    const samples = ((samplesData ?? []) as unknown as DbSampleRow[]).map(
-      transformSample
-    );
-
-    const buffer = await buildSmartsExcelWorkbook({
-      event,
-      projectName,
-      wdid,
-      monitoringLocations,
-      samples,
-    });
-
-    const filename = buildFilename(wdid, event.id);
-
+    const buffer = await buildSmartsExcelWorkbook(input);
     return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename="${buildFilename(input.wdid, event.id, 'xlsx')}"`,
         'Cache-Control': 'no-store',
       },
     });

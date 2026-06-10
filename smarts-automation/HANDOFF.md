@@ -198,13 +198,25 @@ CSV schema first; match the working shape, don't replace it. The inventory of
 onboarding-time SMARTS tabs is NOT confirmed complete (user mentioned drainage
 areas and monitoring locations) — ask before assuming.
 
-**C. Wire the bot into the parent Next.js app** (Sitecheck-main, App Router,
-existing inspection/checkpoint/photo-analysis routes) as a backend job
-triggered from the website. Unresolved architectural decisions: where SMARTS
-credentials live (per-user encrypted? vault?), where Playwright runs (Vercel
-Node runtime is iffy for Chromium — likely a worker service), and how the
-human certification handoff surfaces in the UI. Pick a defensible direction and
-explain tradeoffs; don't ask the user to pre-decide everything.
+**C. Wire the bot into the parent Next.js app** — BUILT 2026-06-10 (first
+cut, not yet live-tested; Supabase project was paused). The flow: rain-event
+review page → "Sync to SMARTS" → `/projects/[id]/events/[id]/sync`
+review-and-confirm page (renders the exact payload the bot will type, with
+blockers/warnings) → POST `/api/smarts/sync` rebuilds the payload server-side,
+spawns the bot via `src/lib/smarts/sync-job.ts` (detached `tsx` child process,
+file-backed job store in `smarts-automation/artifacts/sync-jobs/`) → client
+polls `/api/smarts/sync/[jobId]`, then shows the certification screenshot +
+"log into SMARTS to certify" handoff. Decisions taken: credentials are
+server-env only (`SMARTS_USERNAME`/`SMARTS_PASSWORD` in the app's
+`.env.local`, never client-side); Playwright runs on the same machine as the
+Next server (correct for the local-first setup; a hosted deploy would move the
+spawn behind a queue — the job-store shape anticipates that). Key bridge file:
+`src/lib/smarts/bot-bridge.ts` — converts SmartsEvent+samples to the bot CSV;
+NOTE its fake-UTC wall-clock encoding (the bot's `formatForSmarts` renders
+getUTC*, so the CSV encodes America/Los_Angeles wall-clock with a Z suffix).
+Unsupported by auto-sync (blocked with a message, file manually): ND/DNQ
+qualifiers, mixed Self/Lab within one sample. Remaining: live end-to-end test
+once Supabase is unpaused + creds are in `.env.local`.
 
 ## 6. Open issues / risks to watch
 

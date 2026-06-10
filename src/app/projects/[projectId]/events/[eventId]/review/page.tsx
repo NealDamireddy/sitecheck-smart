@@ -14,13 +14,13 @@
  *     turn red when any parameter is in NAL exceedance
  *   * Bottom actions — "Back to capture" + "Mark event ended"
  *
- * The Excel download, walkthrough clipboard, and SMARTS sync flows are
- * step 11 / step 12 / step 13. They don't live on this page.
+ * From here the QSP can export the data (xlsx aid / bot CSV) or go to
+ * the Sync-to-SMARTS review & confirm page, which previews exactly what
+ * the bot will fill before launching it.
  */
 
 import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   CloudRain,
   Copy,
+  Download,
   Loader2,
   Send,
 } from 'lucide-react';
@@ -36,7 +37,6 @@ import {
 import { PageTransition } from '@/components/shared/page-transition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SyncToSmartsDialog } from '@/components/smarts/sync-modal';
 import {
   EMPTY_MONITORING_LOCATIONS,
   useMonitoringLocationsStore,
@@ -85,7 +85,6 @@ export default function ReviewPage({
   params: Promise<{ projectId: string; eventId: string }>;
 }) {
   const { projectId, eventId } = use(params);
-  const router = useRouter();
 
   // Stores
   const event = useSmartsEventsStore((s) => s.byId[eventId] ?? null);
@@ -111,9 +110,6 @@ export default function ReviewPage({
   // Local state for "Copy walkthrough" — inline state-swap pattern
   // (no shared toast component in @/components/ui).
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
-
-  // Sync-to-SMARTS modal
-  const [syncOpen, setSyncOpen] = useState(false);
 
   useEffect(() => {
     fetchEvent(eventId);
@@ -388,9 +384,9 @@ export default function ReviewPage({
                 })
               )}
 
-              {/* Bottom actions — Back (outline, secondary), Copy (ghost,
-                  tertiary), Mark ended (emerald, primary). On phones they
-                  stack vertically. */}
+              {/* Bottom actions, two rows: secondary utilities (Back, Copy,
+                  CSV export) then the primary Sync CTA. On phones everything
+                  stacks vertically. */}
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Link
                   href={`/projects/${projectId}/events/${eventId}/capture`}
@@ -427,48 +423,47 @@ export default function ReviewPage({
                     </>
                   )}
                 </Button>
-                <Button
-                  onClick={() => setSyncOpen(true)}
-                  disabled={isFiled}
-                  className="min-h-[48px] flex-1 bg-emerald-600 text-emerald-50 hover:bg-emerald-700 disabled:opacity-50"
+                <a
+                  href={`/api/smarts-events/${eventId}/export?format=csv`}
+                  className="flex-1"
                 >
-                  {isFiled ? (
-                    <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Event filed
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Sync to SMARTS
-                    </>
-                  )}
-                </Button>
+                  <Button variant="ghost" className="min-h-[48px] w-full">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export CSV
+                  </Button>
+                </a>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href={`/projects/${projectId}/events/${eventId}/sync`}
+                  className="flex-1"
+                  aria-disabled={isFiled}
+                  tabIndex={isFiled ? -1 : undefined}
+                  onClick={(e) => {
+                    if (isFiled) e.preventDefault();
+                  }}
+                >
+                  <Button
+                    disabled={isFiled}
+                    className="min-h-[48px] w-full bg-emerald-600 text-emerald-50 hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {isFiled ? (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Event filed
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Sync to SMARTS
+                      </>
+                    )}
+                  </Button>
+                </Link>
               </div>
             </>
           )}
         </div>
-
-        {/* Sync to SMARTS — structured manual-filing checklist. */}
-        {event && (
-          <SyncToSmartsDialog
-            eventId={eventId}
-            projectId={projectId}
-            open={syncOpen}
-            onClose={() => setSyncOpen(false)}
-            onCompleted={() => {
-              setSyncOpen(false);
-              router.push('/dashboard');
-            }}
-            walkthroughInput={{
-              event,
-              projectName: project?.name ?? projectId,
-              wdid: project?.wdid ?? null,
-              monitoringLocations: locations,
-              samples,
-            }}
-          />
-        )}
       </div>
     </PageTransition>
   );
