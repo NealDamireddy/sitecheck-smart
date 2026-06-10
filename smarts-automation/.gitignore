@@ -1,0 +1,16 @@
+node_modules
+dist
+*.log
+.env
+.env.local
+.env.*.local
+artifacts
+playwright-report
+test-results
+
+# macOS noise
+.DS_Store
+
+# Saved SMARTS DOM dumps / screenshots from logged-in sessions — never commit
+recon/
+smarts-automation/

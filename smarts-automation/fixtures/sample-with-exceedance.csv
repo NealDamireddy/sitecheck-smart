@@ -1,0 +1,5 @@
+monitoring_location_id,monitoring_location_name,sample_datetime,discharge_point,ph_value,turbidity_ntu,analytical_method,lab_name,qualifier_code
+ML-001,North Outfall,2026-05-20T09:15:00Z,DP-1,7.2,12.4,EPA 150.1,Acme Labs,
+ML-002,South Outfall,2026-05-20T10:30:00Z,DP-2,6.8,312,EPA 180.1,Acme Labs,
+ML-003,East Catch Basin,2026-05-21T08:00:00Z,DP-3,9.7,180,SM 4500-H+B,Acme Labs,
+ML-004,West Outfall,2026-05-21T08:30:00Z,DP-4,7.1,,SM 4500-H+B,,U

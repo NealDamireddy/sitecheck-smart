@@ -1,0 +1,4 @@
+monitoring_location_id,monitoring_location_name,sample_datetime,ph_value,turbidity_ntu,analytical_method,ph_analytical_method,turbidity_analytical_method,mdl_ph,rl_ph,mdl_turbidity,rl_turbidity,lab_name,qualifier_code,discharge_point,event_start_date,event_start_time,event_end_date,event_end_time,precipitation_inches,qsp_name
+ML-001,City DI Northeast,2026-05-28T09:15:00Z,7.2,12.4,E150.2,E150.2,E180.1,0.1,0.1,0.1,1,Acme Labs,,DP-1,05/27/2026,11:20,05/29/2026,11:30,2,Nilai Damireddy
+ML-002,County Pipe Outfall Southeast,2026-05-28T10:30:00Z,6.8,28.1,E180.1,E150.2,E180.1,0.1,0.1,0.1,1,Acme Labs,J,DP-2,05/27/2026,11:20,05/29/2026,11:30,2,Nilai Damireddy
+ML-003,City DI Northeast,2026-05-29T08:00:00Z,7.9,321,A4500HB,A4500HB,E180.1,0.1,0.1,0.1,1,Acme Labs,U,DP-3,05/27/2026,11:20,05/29/2026,11:30,2,Nilai Damireddy
