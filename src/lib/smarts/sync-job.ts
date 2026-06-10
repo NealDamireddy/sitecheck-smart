@@ -8,9 +8,10 @@
  * reader re-derives the outcome from the job's log file when the
  * in-process exit listener is gone.
  *
- * Credentials come from the APP server's env (SMARTS_USERNAME /
- * SMARTS_PASSWORD in .env.local) and are passed to the child via env —
- * they never transit the browser and are never written to the job files.
+ * Credentials are resolved by the caller (per-inspector saved
+ * credentials, decrypted server-side — see lib/smarts/credentials.ts —
+ * or the server-env fallback) and passed to the child via env. They
+ * never transit the browser and are never written to the job files.
  *
  * Deployment note: this runs the bot on the same machine as the Next.js
  * server, which is correct for the current local-first setup. A hosted
@@ -66,12 +67,6 @@ export interface SyncJobState {
 export interface SyncJobView extends SyncJobState {
   /** Last lines of the bot's run log, for the live progress view. */
   logTail: string[];
-}
-
-export function smartsCredentialsConfigured(): boolean {
-  return Boolean(
-    process.env.SMARTS_USERNAME?.trim() && process.env.SMARTS_PASSWORD?.trim()
-  );
 }
 
 function statePath(jobId: string): string {
@@ -177,6 +172,9 @@ export interface StartSyncJobInput {
   csv: string;
   /** Show the Chromium window on the server machine while filling. */
   headed: boolean;
+  /** Resolved SMARTS login — env-passed to the child, never persisted. */
+  username: string;
+  password: string;
 }
 
 export type StartSyncJobResult =
@@ -184,12 +182,12 @@ export type StartSyncJobResult =
   | { ok: false; status: 400 | 409 | 500; error: string };
 
 export function startSyncJob(input: StartSyncJobInput): StartSyncJobResult {
-  if (!smartsCredentialsConfigured()) {
+  if (!input.username.trim() || !input.password) {
     return {
       ok: false,
       status: 400,
       error:
-        'SMARTS credentials are not configured on the server. Add SMARTS_USERNAME and SMARTS_PASSWORD to .env.local and restart the dev server.',
+        'No SMARTS credentials available. Save your SMARTS username and password on the My Account page.',
     };
   }
   if (!existsSync(BOT_DIR)) {
@@ -230,6 +228,10 @@ export function startSyncJob(input: StartSyncJobInput): StartSyncJobResult {
       cwd: BOT_DIR,
       env: {
         ...process.env,
+        // Explicit override — a stale server-env pair must never shadow
+        // the per-inspector credentials resolved for this run.
+        SMARTS_USERNAME: input.username,
+        SMARTS_PASSWORD: input.password,
         SMARTS_WDID: input.wdid,
         SMARTS_SITE_NAME: input.siteName,
         SMARTS_EVENT_TYPE: input.eventType,

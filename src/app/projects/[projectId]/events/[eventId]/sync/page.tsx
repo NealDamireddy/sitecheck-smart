@@ -53,7 +53,11 @@ import type { SyncPayload } from '@/lib/smarts/bot-bridge';
 const SMARTS_PORTAL_URL = 'https://smarts.waterboards.ca.gov';
 const POLL_MS = 2500;
 
-type SyncPreview = SyncPayload & { credentialsConfigured: boolean };
+type SyncPreview = SyncPayload & {
+  credentialsConfigured: boolean;
+  credentialSource: 'account' | 'server-env' | null;
+  credentialUsername: string | null;
+};
 
 interface JobStatus {
   id: string;
@@ -342,25 +346,55 @@ export default function SyncPage({
                   )}
 
                   {/* Credentials notice */}
-                  {!preview.credentialsConfigured && (
+                  {!preview.credentialsConfigured ? (
                     <div className="rounded-lg border border-amber-700 bg-amber-900/30 p-4 text-xs text-amber-200">
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <span>
-                          SMARTS credentials are not configured on the server.
-                          Add{' '}
-                          <code className="rounded bg-slate-950/60 px-1 font-mono">
-                            SMARTS_USERNAME
-                          </code>{' '}
-                          and{' '}
-                          <code className="rounded bg-slate-950/60 px-1 font-mono">
-                            SMARTS_PASSWORD
-                          </code>{' '}
-                          to <code className="font-mono">.env.local</code> and
-                          restart the dev server. Credentials never leave the
-                          server.
+                          No SMARTS login on file for your account. Save your
+                          SMARTS username and password on the{' '}
+                          <Link
+                            href="/account"
+                            className="font-semibold underline hover:text-amber-100"
+                          >
+                            My Account
+                          </Link>{' '}
+                          page. Your password is encrypted at rest and never
+                          shown again after saving.
                         </span>
                       </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-xs text-muted-foreground">
+                      Filing as SMARTS user{' '}
+                      <span className="font-mono text-slate-300">
+                        {preview.credentialUsername}
+                      </span>
+                      {preview.credentialSource === 'server-env' ? (
+                        <>
+                          {' '}
+                          (server fallback — save your own login on the{' '}
+                          <Link
+                            href="/account"
+                            className="underline hover:text-slate-200"
+                          >
+                            My Account
+                          </Link>{' '}
+                          page)
+                        </>
+                      ) : (
+                        <>
+                          {' '}
+                          (from your{' '}
+                          <Link
+                            href="/account"
+                            className="underline hover:text-slate-200"
+                          >
+                            account
+                          </Link>
+                          )
+                        </>
+                      )}
                     </div>
                   )}
 

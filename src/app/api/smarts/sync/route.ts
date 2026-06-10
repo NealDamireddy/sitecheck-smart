@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchSmartsExportInput } from '@/lib/smarts/fetch-export-input';
 import { buildSyncPayload, SMARTS_EVENT_TYPE } from '@/lib/smarts/bot-bridge';
+import { resolveSmartsCredentials } from '@/lib/smarts/credentials';
 import { startSyncJob } from '@/lib/smarts/sync-job';
 
 export async function POST(request: NextRequest) {
@@ -46,6 +47,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Per-inspector saved credentials (decrypted server-side), falling
+    // back to the server-env pair. Never accepted from the request body.
+    const credentials = await resolveSmartsCredentials(
+      auth.supabase,
+      auth.user.id
+    );
+    if (!credentials) {
+      return NextResponse.json(
+        {
+          error:
+            'No SMARTS credentials on file. Save your SMARTS username and password on the My Account page first.',
+        },
+        { status: 400 }
+      );
+    }
+
     const started = startSyncJob({
       eventId: payload.eventId,
       projectId: payload.projectId,
@@ -54,6 +71,8 @@ export async function POST(request: NextRequest) {
       eventType: SMARTS_EVENT_TYPE,
       csv: payload.csv,
       headed: body.headed ?? true,
+      username: credentials.username,
+      password: credentials.password,
     });
     if (!started.ok) {
       return NextResponse.json({ error: started.error }, { status: started.status });

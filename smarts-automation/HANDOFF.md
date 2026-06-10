@@ -207,10 +207,17 @@ spawns the bot via `src/lib/smarts/sync-job.ts` (detached `tsx` child process,
 file-backed job store in `smarts-automation/artifacts/sync-jobs/`) → client
 polls `/api/smarts/sync/[jobId]`, then shows the certification screenshot +
 "log into SMARTS to certify" handoff. Decisions taken: credentials are
-server-env only (`SMARTS_USERNAME`/`SMARTS_PASSWORD` in the app's
-`.env.local`, never client-side); Playwright runs on the same machine as the
-Next server (correct for the local-first setup; a hosted deploy would move the
-spawn behind a queue — the job-store shape anticipates that). Key bridge file:
+per-inspector — saved on the My Account page, AES-256-GCM-encrypted at rest in
+the `smarts_credentials` table (RLS owner-only; key = `SMARTS_CREDENTIALS_KEY`
+in the app's `.env.local`; write-only API, decrypted server-side only at
+launch; `src/lib/smarts/credentials.ts`), with `SMARTS_USERNAME`/
+`SMARTS_PASSWORD` env vars as server-wide fallback. Migration
+`supabase/migrations/014_smarts_credentials.sql` — NOT yet applied to the live
+DB (the `SUPABASE_DB_URL` password was rotated when the project was
+paused/restored; user must run it in the SQL editor or refresh the URL).
+Playwright runs on the same machine as the Next server (correct for the
+local-first setup; a hosted deploy would move the spawn behind a queue — the
+job-store shape anticipates that). Key bridge file:
 `src/lib/smarts/bot-bridge.ts` — converts SmartsEvent+samples to the bot CSV;
 NOTE its fake-UTC wall-clock encoding (the bot's `formatForSmarts` renders
 getUTC*, so the CSV encodes America/Los_Angeles wall-clock with a Z suffix).

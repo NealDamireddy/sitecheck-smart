@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchSmartsExportInput } from '@/lib/smarts/fetch-export-input';
 import { buildSyncPayload } from '@/lib/smarts/bot-bridge';
-import { smartsCredentialsConfigured } from '@/lib/smarts/sync-job';
+import { smartsCredentialStatus } from '@/lib/smarts/credentials';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,9 +31,12 @@ export async function GET(request: NextRequest) {
     }
 
     const payload = buildSyncPayload(fetched.input);
+    const credentials = await smartsCredentialStatus(auth.supabase, auth.user.id);
     return NextResponse.json({
       ...payload,
-      credentialsConfigured: smartsCredentialsConfigured(),
+      credentialsConfigured: credentials.configured,
+      credentialSource: credentials.source,
+      credentialUsername: credentials.username,
     });
   } catch (err: unknown) {
     console.error('SMARTS sync preview error:', err);
