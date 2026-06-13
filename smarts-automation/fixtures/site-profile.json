@@ -1,0 +1,25 @@
+{
+  "wdid": "2 01C402404",
+  "siteName": "Equus Ct",
+  "qspName": "Nilai Damireddy",
+  "monitoringLocations": [
+    {
+      "id": "1081657",
+      "name": "City DI Northeast",
+      "dischargePoint": "DP-1"
+    },
+    {
+      "id": "1081658",
+      "name": "County Pipe Outfall Southeast",
+      "dischargePoint": "DP-2"
+    }
+  ],
+  "phAnalyticalMethod": "E150.2",
+  "turbidityAnalyticalMethod": "E180.1",
+  "labName": "Acme Labs",
+  "mdlPh": "0.1",
+  "rlPh": "0.1",
+  "mdlTurbidity": "0.1",
+  "rlTurbidity": "1",
+  "eventType": "Precipitation Event"
+}
