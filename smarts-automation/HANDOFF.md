@@ -1,6 +1,12 @@
 # SMARTS Automation — Session Handoff
 
-_Last updated: 2026-06-10. Read this top-to-bottom before resuming._
+_Last updated: 2026-06-13. Read this top-to-bottom before resuming._
+
+> **This file is the single source of truth.** Earlier sessions (Claude Code)
+> also kept auto-memory notes that loaded automatically; that does NOT carry
+> over to factory.ai or any other tool. Everything you need is in this file and
+> in the git history on `feat/inspection-flow`. If something here disagrees with
+> a memory note you saw elsewhere, trust this file + the code.
 
 ## 1. What this is
 
@@ -188,42 +194,121 @@ Env vars beyond credentials:
   `SMARTS_SITE_NAME="Equus Ct"`, and paste the `[resume]` / `[nav] step 3.5`
   lines from run.log plus any halt screenshot.
 
-**B. Split constants from variables.** `MonitoringRecord` mixes per-inspection
-data (sample datetime, pH, turbidity) with per-site constants (QSP name, lab,
+**B. Split constants from variables. — THE MAIN REMAINING WORKSTREAM.**
+`MonitoringRecord` (`src/types/monitoring-record.ts`) mixes per-inspection data
+(sample datetime, pH, turbidity) with per-site constants (QSP name, lab,
 analytical methods, MDLs, RLs, monitoring locations, event template). The user
-wants onboarding to capture constants once per WDID; per-inspection submissions
-carry only measured values. Design SiteProfile + InspectionEntry → composed
-`MonitoringRecord[]` for the existing `runFill` — read the existing types and
-CSV schema first; match the working shape, don't replace it. The inventory of
-onboarding-time SMARTS tabs is NOT confirmed complete (user mentioned drainage
-areas and monitoring locations) — ask before assuming.
+wants onboarding to capture constants ONCE per WDID; per-inspection submissions
+carry only the measured values.
+- Design `SiteProfile` + `InspectionEntry` → composed `MonitoringRecord[]` that
+  the existing `runFill` consumes unchanged. **Read the existing types and the
+  CSV schema (`src/csv/monitoring-record.schema.ts`) FIRST** — there is a
+  working shape to match, not replace. The composed output must still satisfy
+  `parseMonitoringCsv` + `validateForCgp`.
+- In the parent app this maps onto tables that already exist: `projects` (WDID,
+  site name), `qsp_profiles`, `monitoring_locations` (drainage area + discharge
+  point already modeled), `samples`/`parameter_results`. So "the constants"
+  largely live in the app DB already; the bridge (`src/lib/smarts/bot-bridge.ts`)
+  is where composition happens for the app path. The CLI/CSV path is the one
+  that still carries everything per-row.
+- **ASK the user before assuming the onboarding inventory is complete.** They
+  mentioned drainage areas and monitoring locations as onboarding-time SMARTS
+  fills beyond what's automated; there may be more SMARTS tabs (the bot today
+  only fills Event Information + Raw Data).
 
-**C. Wire the bot into the parent Next.js app** — BUILT 2026-06-10 (first
-cut, not yet live-tested; Supabase project was paused). The flow: rain-event
-review page → "Sync to SMARTS" → `/projects/[id]/events/[id]/sync`
-review-and-confirm page (renders the exact payload the bot will type, with
-blockers/warnings) → POST `/api/smarts/sync` rebuilds the payload server-side,
-spawns the bot via `src/lib/smarts/sync-job.ts` (detached `tsx` child process,
-file-backed job store in `smarts-automation/artifacts/sync-jobs/`) → client
-polls `/api/smarts/sync/[jobId]`, then shows the certification screenshot +
-"log into SMARTS to certify" handoff. Decisions taken: credentials are
-per-inspector — saved on the My Account page, AES-256-GCM-encrypted at rest in
-the `smarts_credentials` table (RLS owner-only; key = `SMARTS_CREDENTIALS_KEY`
-in the app's `.env.local`; write-only API, decrypted server-side only at
-launch; `src/lib/smarts/credentials.ts`), with `SMARTS_USERNAME`/
-`SMARTS_PASSWORD` env vars as server-wide fallback. Migration
-`supabase/migrations/014_smarts_credentials.sql` — NOT yet applied to the live
-DB (the `SUPABASE_DB_URL` password was rotated when the project was
-paused/restored; user must run it in the SQL editor or refresh the URL).
-Playwright runs on the same machine as the Next server (correct for the
-local-first setup; a hosted deploy would move the spawn behind a queue — the
-job-store shape anticipates that). Key bridge file:
-`src/lib/smarts/bot-bridge.ts` — converts SmartsEvent+samples to the bot CSV;
-NOTE its fake-UTC wall-clock encoding (the bot's `formatForSmarts` renders
-getUTC*, so the CSV encodes America/Los_Angeles wall-clock with a Z suffix).
-Unsupported by auto-sync (blocked with a message, file manually): ND/DNQ
-qualifiers, mixed Self/Lab within one sample. Remaining: live end-to-end test
-once Supabase is unpaused + creds are in `.env.local`.
+**C. Wire the bot into the parent Next.js app** — BUILT, not yet live-tested
+end-to-end. Lives in the PARENT repo (`Sitecheck-main/src/...`), not in
+`smarts-automation/`. Flow:
+
+  rain-event review page (`src/app/projects/[projectId]/events/[eventId]/review`)
+  → "Sync to SMARTS"
+  → review-and-confirm page (`.../events/[eventId]/sync/page.tsx`) — renders the
+    EXACT payload the bot will type (event window, per-location rows, methods,
+    MDL/RL, analyzed-by), with hard blockers + soft warnings, and an explicit
+    confirm checkbox
+  → POST `/api/smarts/sync` rebuilds the payload server-side (never trusts the
+    client), resolves credentials, spawns the bot via
+    `src/lib/smarts/sync-job.ts` (detached `tsx` child; file-backed job store in
+    `smarts-automation/artifacts/sync-jobs/`, survives dev-server reloads)
+  → client polls `GET /api/smarts/sync/[jobId]`; on success shows the
+    Certification screenshot + "log into SMARTS to certify" handoff.
+
+Architectural decisions taken (with rationale, so they can be revisited):
+- **Credentials = per-inspector, encrypted at rest.** Saved on the My Account
+  page; AES-256-GCM with a server-only key (`SMARTS_CREDENTIALS_KEY` in the
+  app's `.env.local`); stored in the `smarts_credentials` table (RLS owner-only).
+  The API is WRITE-ONLY for the secret (status reads return only username +
+  timestamps); decryption happens in exactly one place — resolving creds at
+  sync-launch (`src/lib/smarts/credentials.ts`). `SMARTS_USERNAME`/
+  `SMARTS_PASSWORD` env vars remain a server-wide fallback. Chosen over a vault
+  to stay local-first; the encrypt/resolve boundary is isolated enough to swap
+  for a KMS later.
+- **Playwright runs on the same machine as the Next server.** Correct for the
+  local-first setup. A hosted deploy (Vercel) can't run Chromium in a route
+  handler — the spawn would move behind a queue to a worker box; the job-store
+  shape (file/JSON per job) deliberately mirrors what a queue would persist, so
+  that move is mechanical.
+- **Human-certification handoff is explicit in the UI.** The confirm checkbox is
+  consent to auto-FILL only; the page states the legal certification happens in
+  SMARTS, by the QSP, after the bot stops. The bot never certifies (inherited
+  invariant).
+
+Key bridge file `src/lib/smarts/bot-bridge.ts` converts SmartsEvent + samples
+to the bot CSV. TWO things to know:
+- **Fake-UTC wall-clock encoding.** The bot's `formatForSmarts` renders with
+  `getUTC*`, so the bridge encodes America/Los_Angeles wall-clock into an ISO
+  string with a `Z` suffix (verified across DST + midnight). Don't "fix" this to
+  real UTC — it would shift every sample time by the offset.
+- **Analytical-method normalization** (`src/lib/smarts/normalize.ts`,
+  `normalizeMethod`): the app stores capture-friendly labels (`pH field`,
+  `Hach 2100Q`) that are NOT valid SMARTS dropdown options. Mapped to the exact
+  live option text (`pH_Field`, `E180.1`, etc.; pH options: `A4500HB` `E150.2`
+  `pH_Field` `pH_Paper`, turbidity: `E180.1` `A2130B`). Applied to BOTH the
+  preview and the CSV so what's reviewed equals what's filled; anything still
+  unmatched becomes a preview blocker, never a mid-fill halt.
+
+Unsupported by auto-sync (blocked with a message, user files those manually):
+ND/DNQ qualifiers, mixed Self/Lab within one sample.
+
+REMAINING for C:
+1. **Apply migration `supabase/migrations/014_smarts_credentials.sql` to the
+   live DB.** Still not applied — the `SUPABASE_DB_URL` password rotated when
+   the Supabase project was paused/restored, so it can't be run from a script
+   with the current `.env.local`. User runs it in the Supabase SQL editor (the
+   table + RLS policies + a `NOTIFY pgrst, 'reload schema'`), OR refreshes
+   `SUPABASE_DB_URL` so a future session can apply it. Until then, saving creds
+   on the account page errors with "Could not find the table
+   'public.smarts_credentials'".
+2. **Live end-to-end test** once the table exists and a SMARTS login is saved.
+
+## 5.5 How to work (operating guidance — read before touching selectors)
+
+- **The hard invariant is load-bearing.** The bot NEVER clicks Certify, NEVER
+  checks the attestation checkbox, NEVER submits. A human certifies, always.
+  This is non-negotiable and is asserted in comments throughout
+  (`run-fill.ts` header especially). Don't relax it for convenience.
+- **Green tests ≠ working live run.** `smarts-automation/tests/` mock the page;
+  they verify ORCHESTRATION WIRING, not live selectors. They're invaluable for
+  refactors but a passing suite says nothing about whether SMARTS's DOM still
+  matches. Real validation = a headed run with the user pasting back `run.log` +
+  screenshots. The agent has no SMARTS creds and CANNOT run live.
+- **Halt loudly.** When something doesn't match, halt with enough context in the
+  message that the next iteration knows exactly what was expected vs. seen. This
+  is how earlier sessions caught real SMARTS facts the recon got wrong:
+  `EPA 150.1` doesn't exist (it's `E150.2`), and the Result Qualifier domain is
+  `=`/`<`/`>` with NO `"J"`. A vague halt would have hidden both.
+- **Selector strategy, in order:** stable human-named id (`…:eventStartDate_input`)
+  → element `name` → option text (`setJsfSelectByText`) → role (buttons). NEVER
+  hardcode a `j_idt###` JSF auto-id as the primary strategy — they drift between
+  page versions and have broken us repeatedly. Where only an auto-id exists (QSP
+  field, table cells), match by `name` and expect to re-recon.
+- **`page.evaluate` = inline anonymous arrows only.** No named functions, no
+  named inner const-arrows, no closing over module scope. tsx/esbuild wraps
+  named things with `__name(...)`, which is undefined in the browser and throws
+  `__name is not defined`. Pass values as the `evaluate` arg.
+- **Recon when unsure — ask for the specific artifact.** Not "run it again" but
+  e.g. "paste the `[dump] sample form controls` JSON block from `run.log` after
+  a run with `SMARTS_DUMP_FORM=1`." The user runs live; the agent does not.
 
 ## 6. Open issues / risks to watch
 
@@ -240,10 +325,16 @@ once Supabase is unpaused + creds are in `.env.local`.
   not yet enforce "lab ⇒ MDL/RL present".
 - **Data Summary / Certification tabs:** screenshotted only; content never
   parsed or verified.
-- _Resolved since last handoff:_ sample dates now sit inside the event window
-  (05/28–05/29 within 05/27–05/29); analytical-method CSV values now match the
-  live dropdown text (`E150.2`, `A4500HB`, `E180.1` — the old `EPA 150.1` /
-  `SM 4500-H+B` never existed in SMARTS).
+- **`smarts_credentials` migration not yet applied to the live DB** (see §5 C
+  remaining #1). This is the top blocker for testing the app sync path.
+- _Resolved this session (2026-06-13):_ analytical-method labels now normalize
+  to exact SMARTS option text on BOTH the app preview and the bot CSV
+  (`pH field`→`pH_Field`, `Hach 2100Q`→`E180.1`); unmatched methods are preview
+  blockers, not mid-fill halts.
+- _Resolved earlier:_ sample dates sit inside the event window; CSV
+  analytical-method values match the live dropdown text (`E150.2`, `A4500HB`,
+  `E180.1` — the old `EPA 150.1` / `SM 4500-H+B` never existed in SMARTS);
+  duplicate-guard siteName/eventType matching hardened.
 
 ## 7. Key files
 
@@ -263,6 +354,24 @@ once Supabase is unpaused + creds are in `.env.local`.
 | `src/types/monitoring-record.ts` | `MonitoringRecord` shape |
 | `fixtures/sample.csv` | Test data — REAL Equus Ct locations, in-window dates, live method labels |
 | `tests/*` | Vitest (mocks the page; pins orchestration + parsing) |
+
+Parent-app files (workstream C — paths relative to `Sitecheck-main/`):
+
+| File | Purpose |
+|---|---|
+| `src/lib/smarts/bot-bridge.ts` | SmartsEvent+samples → bot CSV + preview; blockers/warnings; fake-UTC + method normalization |
+| `src/lib/smarts/credentials.ts` | Per-user creds: encrypt/decrypt, resolve (account→env), status (write-only secret) |
+| `src/lib/smarts/sync-job.ts` | Spawns the bot as a detached child; file-backed job store; log→outcome parsing |
+| `src/lib/smarts/fetch-export-input.ts` | RLS-scoped DB join → `SmartsExportInput` (shared by export + sync) |
+| `src/lib/smarts/normalize.ts` | `normalizeMethod`/`normalizeUnits`/`normalizeQualifier` → exact SMARTS option text |
+| `src/app/api/smarts/sync/route.ts` | POST launch (rebuilds payload, resolves creds, starts job) |
+| `src/app/api/smarts/sync/preview/route.ts` | GET preview payload + credential status |
+| `src/app/api/smarts/sync/[jobId]/route.ts` | GET job status (no secrets, screenshot keys not paths) |
+| `src/app/api/smarts/sync/[jobId]/screenshot/route.ts` | Serves a job screenshot (path-confined to artifacts) |
+| `src/app/api/smarts/credentials/route.ts` | GET status / PUT save / DELETE per-user SMARTS creds |
+| `src/app/projects/[projectId]/events/[eventId]/sync/page.tsx` | Review-and-confirm UI + live job progress |
+| `src/app/account/page.tsx` | QSP profile + SMARTS login card |
+| `supabase/migrations/014_smarts_credentials.sql` | `smarts_credentials` table + RLS (NOT yet applied live) |
 
 `MonitoringRecord` fields: core `monitoringLocationId, monitoringLocationName,
 sampleDateTime (Date), phValue, turbidityNtu, analyticalMethod (legacy
@@ -284,17 +393,32 @@ columns default to `undefined`. Note: `tests/parse-monitoring-csv.test.ts` pins
 
 ## 9. Git / commit state
 
-The module now has a **baseline commit** on `feat/inspection-flow` in the parent
-repo (Sitecheck-main) — the whole `smarts-automation/` tree minus ignored
-content. `node_modules/`, `artifacts/`, `*.log`, `.env*`, `recon/` (saved DOM
-dumps from logged-in sessions — treat as sensitive, never commit), and the
-nested `smarts-automation/` recon directory are all gitignored. Future work
-should diff against that baseline; don't mix bot commits with the parent app's
-unrelated modified files.
+Everything is committed and pushed on branch **`feat/inspection-flow`**
+(remote `origin` = github.com/NealDamireddy/sitecheck-smart). Main branch is
+`smarts-feature`. Relevant commits, newest first:
+
+| Commit | What |
+|---|---|
+| `cdfca45` | normalize analytical methods to exact SMARTS option text |
+| `d2d7203` | per-inspector SMARTS credentials, encrypted at rest (migration 014) |
+| `22f7ca3` | wire Sync-to-SMARTS bot into the rain-event flow (app routes + pages) |
+| `537eff0` | active-inspection tracking + table-based CGP report sections |
+| `c858093` | harden duplicate-draft guard matching |
+| `d2d7203`'s parents include | `cf2aa0c` baseline commit of the whole `smarts-automation/` module |
+
+Gitignored (never commit): `node_modules/`, `artifacts/`, `*.log`, `.env*`,
+`recon/` (saved DOM dumps from logged-in sessions — treat as sensitive), and
+the nested `smarts-automation/` recon dir. `.env.local` (parent repo) holds
+`SMARTS_USERNAME`/`SMARTS_PASSWORD` (server-wide fallback creds) and
+`SMARTS_CREDENTIALS_KEY` (the AES key) — present locally, NOT in git.
 
 ## 10. Status snapshot
 
-- `npm run typecheck`: clean.
-- `npm test`: **103/103 passing** across 13 files.
-- Auto-memory also captured: `smarts-automation-progress`,
-  `smarts-jsf-dropdown-technique` (load automatically in new sessions).
+- Bot (`smarts-automation/`): `npm run typecheck` clean; `npm test`
+  **103/103 passing** across 13 files.
+- Parent app: `npx tsc -p tsconfig.json --noEmit` clean; new SMARTS files lint
+  clean.
+- **Moving to factory.ai:** this file is the handoff. The bot is unchanged from
+  the last green state; the open work is workstream B (SiteProfile/InspectionEntry
+  split) and the two REMAINING items under §5 C (apply migration 014, live e2e
+  test). Start by skimming §5–§6, then the code in the §7 table.
