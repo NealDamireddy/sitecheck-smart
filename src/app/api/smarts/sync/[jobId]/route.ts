@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     if (auth.error) return auth.error;
 
     const { jobId } = await context.params;
-    const job = getSyncJob(jobId);
+    const job = await getSyncJob(jobId);
     if (!job) {
       return NextResponse.json({ error: 'Sync job not found' }, { status: 404 });
     }

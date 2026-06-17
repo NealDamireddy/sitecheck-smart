@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const started = startSyncJob({
+    const started = await startSyncJob({
       eventId: payload.eventId,
       projectId: payload.projectId,
       wdid: payload.wdid!,
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       headed: body.headed ?? true,
       username: credentials.username,
       password: credentials.password,
+      userId: auth.user.id,
     });
     if (!started.ok) {
       return NextResponse.json({ error: started.error }, { status: started.status });

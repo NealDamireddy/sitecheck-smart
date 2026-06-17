@@ -36,6 +36,11 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import {
+  recordRunStart,
+  recordRunFinalize,
+  toRunAuditStatus,
+} from '@/lib/smarts/run-audit';
 
 const BOT_DIR = resolve(process.cwd(), 'smarts-automation');
 const JOBS_DIR = resolve(BOT_DIR, 'artifacts', 'sync-jobs');
@@ -54,6 +59,9 @@ export interface SyncJobState {
   id: string;
   eventId: string;
   projectId: string;
+  /** Owning user — persisted so the audit row can be written from the
+   * detached child's exit listener, which has no request context. */
+  userId: string;
   status: SyncJobStatus;
   pid: number | null;
   startedAt: string;
@@ -140,7 +148,29 @@ function parseOutcomeFromLog(
   };
 }
 
-function finalize(jobId: string, exitCode: number | null): void {
+/**
+ * Best-effort human-readable "furthest step reached", derived from the
+ * orchestrator's stdout. Used for the audit row + run-status UI; never
+ * drives control flow.
+ */
+function deriveLastStep(
+  log: string,
+  outcomeStatus: SyncJobStatus
+): string | null {
+  if (outcomeStatus === 'filled') return 'Filled — stopped before certification';
+  const samples = [...log.matchAll(/^sample-(\d+)\.png saved/gm)];
+  if (/^HALTED:/m.test(log)) {
+    if (/Certification/m.test(log)) return 'Halted at Certification';
+    if (/Data Summary/m.test(log)) return 'Halted at Data Summary';
+    if (samples.length > 0) return `Halted at Raw Data (sample ${samples.length})`;
+    if (/Event Information|halt-event-info/m.test(log)) return 'Halted at Event Information';
+    if (/halt-nav-project/m.test(log)) return 'Halted navigating to project';
+    return 'Halted';
+  }
+  return null;
+}
+
+async function finalize(jobId: string, exitCode: number | null): Promise<void> {
   const state = readState(jobId);
   if (!state || state.status !== 'running') return;
   let log = '';
@@ -155,6 +185,15 @@ function finalize(jobId: string, exitCode: number | null): void {
     ...outcome,
     exitCode,
     finishedAt: new Date().toISOString(),
+  });
+
+  // Durable audit (LEGAL INVARIANT for the 'filled' path: persist
+  // 'stopped_before_cert' before returning). Awaited; never throws.
+  await recordRunFinalize({
+    jobId,
+    status: toRunAuditStatus(outcome.status),
+    lastStepReached: deriveLastStep(log, outcome.status),
+    errorMessage: outcome.status === 'filled' ? null : outcome.reason,
   });
 }
 
@@ -175,13 +214,17 @@ export interface StartSyncJobInput {
   /** Resolved SMARTS login — env-passed to the child, never persisted. */
   username: string;
   password: string;
+  /** Owning user, for the durable run-audit row. */
+  userId: string;
 }
 
 export type StartSyncJobResult =
   | { ok: true; jobId: string }
   | { ok: false; status: 400 | 409 | 500; error: string };
 
-export function startSyncJob(input: StartSyncJobInput): StartSyncJobResult {
+export async function startSyncJob(
+  input: StartSyncJobInput
+): Promise<StartSyncJobResult> {
   if (!input.username.trim() || !input.password) {
     return {
       ok: false,
@@ -198,7 +241,7 @@ export function startSyncJob(input: StartSyncJobInput): StartSyncJobResult {
     };
   }
 
-  const running = findRunningJobForEvent(input.eventId);
+  const running = await findRunningJobForEvent(input.eventId);
   if (running) {
     return {
       ok: false,
@@ -260,6 +303,7 @@ export function startSyncJob(input: StartSyncJobInput): StartSyncJobResult {
     id: jobId,
     eventId: input.eventId,
     projectId: input.projectId,
+    userId: input.userId,
     status: 'running',
     pid: child.pid ?? null,
     startedAt: new Date().toISOString(),
@@ -270,20 +314,34 @@ export function startSyncJob(input: StartSyncJobInput): StartSyncJobResult {
   };
   writeState(state);
 
-  child.on('exit', (code) => finalize(jobId, code));
+  // Durable audit: 'running' row at spawn time. Awaited so the row exists
+  // before the finalize update can race it; never throws.
+  await recordRunStart({
+    jobId,
+    userId: input.userId,
+    projectId: input.projectId,
+    wdid: input.wdid,
+    csvText: input.csv,
+  });
+
+  child.on('exit', (code) => {
+    finalize(jobId, code).catch((err) =>
+      console.error(`sync-job finalize (exit) failed for ${jobId}:`, err)
+    );
+  });
   child.unref();
 
   return { ok: true, jobId };
 }
 
-export function getSyncJob(jobId: string): SyncJobView | null {
+export async function getSyncJob(jobId: string): Promise<SyncJobView | null> {
   let state = readState(jobId);
   if (!state) return null;
 
   // If the dev server reloaded mid-run, our exit listener is gone. When
   // the pid is no longer alive, settle the job from its log file.
   if (state.status === 'running' && (state.pid == null || !pidAlive(state.pid))) {
-    finalize(jobId, null);
+    await finalize(jobId, null);
     state = readState(jobId) ?? state;
   }
 
@@ -298,7 +356,9 @@ export function getSyncJob(jobId: string): SyncJobView | null {
   return { ...state, logTail };
 }
 
-function findRunningJobForEvent(eventId: string): SyncJobState | null {
+async function findRunningJobForEvent(
+  eventId: string
+): Promise<SyncJobState | null> {
   if (!existsSync(JOBS_DIR)) return null;
   for (const file of readdirSync(JOBS_DIR)) {
     if (!file.endsWith('.json')) continue;
@@ -308,7 +368,7 @@ function findRunningJobForEvent(eventId: string): SyncJobState | null {
     }
     if (state.pid != null && pidAlive(state.pid)) return state;
     // Stale "running" job whose process died — settle it and keep scanning.
-    finalize(state.id, null);
+    await finalize(state.id, null);
   }
   return null;
 }
