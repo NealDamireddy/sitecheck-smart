@@ -113,6 +113,30 @@ function pidAlive(pid: number): boolean {
 // Log parsing — mirrors smarts-automation/src/orchestrator/cli.ts output
 // ──────────────────────────────────────────────────────
 
+/**
+ * SECOND, independent certification hard-stop guard (additive — the
+ * orchestrator already never clicks Certify/checks the attestation/submits;
+ * see the INVARIANT header in run-fill.ts). These markers describe an
+ * AFFIRMATIVE certified/submitted state that the bot must NEVER report.
+ * They are deliberately specific so they cannot match the clean output,
+ * which legitimately contains "review package ready for human certification",
+ * "certification: <screenshot>", and "a human must click Certify".
+ * If any matches, the run is rejected as an error regardless of FILLED.
+ */
+const CERTIFICATION_BREACH_MARKERS: readonly RegExp[] = [
+  /\bCERTIFIED\b/,
+  /\bSUBMITTED\b/,
+  /report (?:was )?(?:certified|submitted)/i,
+  /successfully (?:certified|submitted)/i,
+  /certification (?:complete|completed|submitted|successful)/i,
+  /clicked (?:the )?certif/i,
+  /attestation (?:checkbox )?(?:checked|accepted|ticked)/i,
+];
+
+function detectCertificationBreach(log: string): boolean {
+  return CERTIFICATION_BREACH_MARKERS.some((re) => re.test(log));
+}
+
 function parseOutcomeFromLog(
   log: string,
   exitCode: number | null
@@ -134,6 +158,18 @@ function parseOutcomeFromLog(
   screenshots.certification =
     log.match(/^ {2}certification: (\/.*)$/m)?.[1] ?? null;
   screenshots.halt = log.match(/^screenshot: (\/.*)$/m)?.[1] ?? null;
+
+  // Hard-stop guard (overrides everything, including FILLED): the bot must
+  // never reach a certified/submitted state. If the log says it did, the
+  // automation has been tampered with — reject the run.
+  if (detectCertificationBreach(log)) {
+    return {
+      status: 'error',
+      reason:
+        'Certification hard-stop: the run reported a certified/submitted state, which the bot must never do. Run rejected — review and certify manually in SMARTS.',
+      screenshots,
+    };
+  }
 
   if (filled) {
     return { status: 'filled', reason: null, screenshots };
