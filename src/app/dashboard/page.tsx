@@ -9,6 +9,7 @@ import { ProjectStatusHeader } from '@/components/dashboard/project-status-heade
 import { MetricCard } from '@/components/dashboard/metric-card';
 import { ActivityFeed } from '@/components/dashboard/activity-feed';
 import { InspectionPicker } from '@/components/dashboard/inspection-picker';
+import { SmartsRunStatusPanel } from '@/components/smarts/run-status-panel';
 import {
   AlertTriangle,
   Calendar,
@@ -182,6 +183,9 @@ export default function DashboardPage() {
 
       {/* Inspection-type dropdown — primary entry into the visit flow. */}
       <InspectionPicker />
+
+      {/* Latest Sync-to-SMARTS run status. */}
+      <SmartsRunStatusPanel projectId={currentProjectId} />
 
       {/* Metric Cards */}
       {loading ? (
