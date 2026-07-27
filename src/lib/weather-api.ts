@@ -1,294 +1,341 @@
+/**
+ * Site weather — NOAA api.weather.gov implementation (CMP-01/CMP-02).
+ *
+ * Rewritten in the Stage 3 hardening pass. The previous implementation
+ * used OpenWeatherMap and had three defects:
+ *   * wind double-conversion — OWM was queried with units=imperial (mph)
+ *     and the value was then multiplied by 2.237 (the m/s→mph factor),
+ *     inflating every wind reading ~2.2×;
+ *   * UTC day bucketing — daily totals were grouped on UTC dates, so a
+ *     California evening storm split across two "days" and could dodge
+ *     the 0.5″ QPE flag;
+ *   * silent Fresno fallback — with no coordinates it served Fresno's
+ *     weather as if it were the site's.
+ *
+ * This implementation keeps the same exported names and result shapes
+ * (`fetchCurrentWeather`, `fetchForecast` → WeatherSnapshot/WeatherDay)
+ * so the routes and the pre-storm detector work unchanged, but:
+ *   * one weather source for the whole app: NOAA, the official US
+ *     forecast service (User-Agent from NOAA_USER_AGENT, as in
+ *     src/lib/smarts/noaa.ts);
+ *   * daily aggregation on America/Los_Angeles calendar days — every
+ *     CGP site this product serves is in California;
+ *   * precipitation from NOAA's quantitative precipitation forecast
+ *     (QPF, millimeters), apportioned hour-by-hour into local days;
+ *   * missing coordinates are an explicit error, never another site's
+ *     weather.
+ *
+ * Forecast `isQPE` is anticipation only — the compliance QPE
+ * determination is made from OBSERVED gauge data in src/lib/qpe/.
+ */
+
 import { WeatherSnapshot, WeatherDay, WeatherCondition } from '@/types/weather';
+import { QPE_THRESHOLD_INCHES } from '@/lib/cgp/constants';
 
-const FRESNO_LAT = 36.7378;
-const FRESNO_LON = -119.7871;
-const OWM_BASE_URL = 'https://api.openweathermap.org/data/2.5';
+const BASE_URL = 'https://api.weather.gov';
+const DEFAULT_USER_AGENT = 'SiteCheck Dev (dev@example.com)';
+const CACHE_TTL_MS = 10 * 60 * 1000;
+/** All CGP 2022 sites are California construction sites. */
+const SITE_TZ = 'America/Los_Angeles';
 
-// Map OpenWeatherMap condition codes to app's WeatherCondition type
-function mapOWMCondition(main: string, description?: string): WeatherCondition {
-  const mainLower = main.toLowerCase();
-  const descLower = (description || '').toLowerCase();
+// ──────────────────────────────────────────────────────────────────────
+// NOAA HTTP + cache
+// ──────────────────────────────────────────────────────────────────────
 
-  switch (mainLower) {
-    case 'clear':
-      return 'clear';
-    case 'clouds':
-      if (descLower.includes('few') || descLower.includes('scattered')) {
-        return 'partly-cloudy';
-      }
-      return 'cloudy';
-    case 'rain':
-    case 'drizzle':
-      if (descLower.includes('light') || descLower.includes('drizzle')) {
-        return 'light-rain';
-      }
-      if (descLower.includes('heavy') || descLower.includes('extreme')) {
-        return 'heavy-rain';
-      }
-      return 'rain';
-    case 'thunderstorm':
-      return 'thunderstorm';
-    case 'mist':
-    case 'fog':
-    case 'haze':
-    case 'smoke':
-    case 'dust':
-    case 'sand':
-      return 'fog';
-    case 'snow':
-      return 'cloudy'; // Treat snow as cloudy for construction site context
-    default:
-      return 'partly-cloudy';
+function userAgent(): string {
+  return process.env.NOAA_USER_AGENT || DEFAULT_USER_AGENT;
+}
+
+async function noaaFetch(url: string): Promise<unknown> {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': userAgent(), Accept: 'application/geo+json' },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`NOAA ${url} → ${res.status}: ${body.slice(0, 160)}`);
   }
+  return res.json();
 }
 
-// Convert wind speed from m/s to mph
-function msToMph(ms: number): number {
-  return Math.round(ms * 2.237);
+interface PointsResponse {
+  properties: { forecastHourly: string; forecastGridData: string };
 }
 
-// Convert mm to inches
+interface HourlyPeriod {
+  startTime: string;
+  temperature: number;
+  windSpeed: string;
+  windDirection: string;
+  shortForecast: string;
+  probabilityOfPrecipitation?: { value: number | null };
+  relativeHumidity?: { value: number | null };
+}
+
+interface HourlyResponse {
+  properties: { periods: HourlyPeriod[] };
+}
+
+interface GridDataResponse {
+  properties: {
+    quantitativePrecipitation?: {
+      uom: string;
+      values: Array<{ validTime: string; value: number | null }>;
+    };
+  };
+}
+
+interface SiteForecastBundle {
+  hourly: HourlyPeriod[];
+  qpf: Array<{ validTime: string; value: number | null }>;
+}
+
+const bundleCache = new Map<string, { data: SiteForecastBundle; at: number }>();
+
+async function fetchBundle(lat: number, lng: number): Promise<SiteForecastBundle> {
+  const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  const cached = bundleCache.get(key);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.data;
+
+  const points = (await noaaFetch(
+    `${BASE_URL}/points/${lat.toFixed(4)},${lng.toFixed(4)}`
+  )) as PointsResponse;
+
+  const [hourlyRes, gridRes] = await Promise.all([
+    noaaFetch(points.properties.forecastHourly) as Promise<HourlyResponse>,
+    (noaaFetch(points.properties.forecastGridData) as Promise<GridDataResponse>).catch(
+      (err): GridDataResponse | null => {
+        console.warn('NOAA gridData fetch failed (forecast continues without QPF):', err);
+        return null;
+      }
+    ),
+  ]);
+
+  const data: SiteForecastBundle = {
+    hourly: hourlyRes.properties.periods,
+    qpf: gridRes?.properties?.quantitativePrecipitation?.values ?? [],
+  };
+  bundleCache.set(key, { data, at: Date.now() });
+  return data;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Pure mapping helpers
+// ──────────────────────────────────────────────────────────────────────
+
 function mmToInches(mm: number): number {
   return mm / 25.4;
 }
 
-interface OWMCurrentResponse {
-  main: {
-    temp: number;
-    humidity: number;
-  };
-  weather: Array<{
-    main: string;
-    description: string;
-  }>;
-  wind: {
-    speed: number;
-    deg?: number;
-  };
+/** NOAA windSpeed strings: "10 mph" or "10 to 20 mph" — take the max. */
+export function parseWindMph(windSpeed: string): number {
+  const numbers = windSpeed.match(/\d+/g);
+  if (!numbers || numbers.length === 0) return 0;
+  return Math.max(...numbers.map(Number));
 }
 
-interface OWMForecastItem {
-  dt: number;
-  dt_txt: string;
-  main: {
-    temp: number;
-    temp_min: number;
-    temp_max: number;
-    humidity: number;
-  };
-  weather: Array<{
-    main: string;
-    description: string;
-  }>;
-  wind: {
-    speed: number;
-    deg?: number;
-  };
-  pop?: number; // Probability of precipitation (0-1)
-  rain?: {
-    '3h'?: number; // Rain volume for last 3 hours, mm
-  };
+/** Map a NOAA shortForecast phrase onto the app's condition enum. */
+export function mapNoaaCondition(shortForecast: string): WeatherCondition {
+  const s = shortForecast.toLowerCase();
+  if (/thunder/.test(s)) return 'thunderstorm';
+  if (/heavy rain|downpour/.test(s)) return 'heavy-rain';
+  if (/light rain|drizzle|sprinkle/.test(s)) return 'light-rain';
+  if (/rain|shower/.test(s)) return 'rain';
+  if (/fog|mist|haze|smoke/.test(s)) return 'fog';
+  if (/mostly cloudy|overcast|cloudy/.test(s) && !/partly/.test(s)) return 'cloudy';
+  if (/partly|mostly sunny|mostly clear/.test(s)) return 'partly-cloudy';
+  if (/sunny|clear/.test(s)) return 'clear';
+  if (/snow|sleet|ice/.test(s)) return 'cloudy';
+  return 'partly-cloudy';
 }
 
-interface OWMForecastResponse {
-  list: OWMForecastItem[];
+const CONDITION_SEVERITY: WeatherCondition[] = [
+  'clear',
+  'partly-cloudy',
+  'cloudy',
+  'fog',
+  'light-rain',
+  'rain',
+  'heavy-rain',
+  'thunderstorm',
+];
+
+function worstCondition(conditions: WeatherCondition[]): WeatherCondition {
+  let worst: WeatherCondition = 'clear';
+  for (const c of conditions) {
+    if (CONDITION_SEVERITY.indexOf(c) > CONDITION_SEVERITY.indexOf(worst)) {
+      worst = c;
+    }
+  }
+  return worst;
 }
 
-// Get wind direction from degrees
-function getWindDirection(deg: number | undefined): string {
-  if (deg === undefined) return 'N';
-  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const index = Math.round(deg / 45) % 8;
-  return directions[index];
+const dayFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: SITE_TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** YYYY-MM-DD in the site's timezone for an instant. */
+export function localDayKey(isoInstant: string | Date): string {
+  return dayFormatter.format(
+    typeof isoInstant === 'string' ? new Date(isoInstant) : isoInstant
+  );
 }
 
 /**
- * Fetch current weather from OpenWeatherMap.
- *
- * `coords` is optional; defaults to the legacy Fresno location. Routes
- * pass the project's coordinates so each site sees its own weather.
+ * Apportion NOAA QPF interval values ("<startISO>/PT6H", mm) into
+ * per-local-day inch totals, splitting intervals hour by hour so a
+ * period spanning midnight lands in the right days.
  */
+export function qpfInchesByLocalDay(
+  values: Array<{ validTime: string; value: number | null }>
+): Map<string, number> {
+  const byDay = new Map<string, number>();
+  for (const { validTime, value } of values) {
+    if (value == null || value <= 0) continue;
+    const [startStr, durStr] = validTime.split('/');
+    const start = new Date(startStr);
+    if (Number.isNaN(start.getTime())) continue;
+    const match = /PT(\d+)H/.exec(durStr ?? '');
+    const durationHours = Math.max(1, match ? parseInt(match[1], 10) : 1);
+    const inchesPerHour = mmToInches(value) / durationHours;
+    for (let h = 0; h < durationHours; h++) {
+      const hourStart = new Date(start.getTime() + h * 3_600_000);
+      const key = localDayKey(hourStart);
+      byDay.set(key, (byDay.get(key) ?? 0) + inchesPerHour);
+    }
+  }
+  return byDay;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Public API — same names and shapes the OWM version exported
+// ──────────────────────────────────────────────────────────────────────
+
+function requireCoords(coords?: { lat: number; lng: number }): {
+  lat: number;
+  lng: number;
+} {
+  if (
+    !coords ||
+    !Number.isFinite(coords.lat) ||
+    !Number.isFinite(coords.lng)
+  ) {
+    throw new Error(
+      'Site coordinates are required for weather — refusing to fall back to a default location.'
+    );
+  }
+  return coords;
+}
+
+/** Current conditions at the site (first hourly forecast period). */
 export async function fetchCurrentWeather(
   coords?: { lat: number; lng: number }
 ): Promise<WeatherSnapshot> {
-  const apiKey = process.env.OPENWEATHERMAP_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OPENWEATHERMAP_API_KEY environment variable is not set');
-  }
-
-  const lat = coords?.lat ?? FRESNO_LAT;
-  const lon = coords?.lng ?? FRESNO_LON;
-  const url = `${OWM_BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=imperial`;
-
-  const response = await fetch(url, {
-    headers: {
-      'Accept': 'application/json',
-    },
-    next: { revalidate: 300 }, // Cache for 5 minutes
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenWeatherMap API error: ${response.status} - ${errorText}`);
-  }
-
-  const data: OWMCurrentResponse = await response.json();
+  const { lat, lng } = requireCoords(coords);
+  const bundle = await fetchBundle(lat, lng);
+  const current = bundle.hourly[0];
+  if (!current) throw new Error('NOAA returned an empty hourly forecast');
 
   return {
-    temperature: Math.round(data.main.temp),
-    condition: mapOWMCondition(
-      data.weather[0]?.main || 'Clear',
-      data.weather[0]?.description
-    ),
-    windSpeedMph: msToMph(data.wind.speed),
-    humidity: data.main.humidity,
+    temperature: Math.round(current.temperature),
+    condition: mapNoaaCondition(current.shortForecast),
+    windSpeedMph: parseWindMph(current.windSpeed),
+    humidity: Math.round(current.relativeHumidity?.value ?? 50),
   };
 }
 
-/**
- * Fetch 7-day forecast from OpenWeatherMap
- * OpenWeatherMap free tier provides 5-day/3-hour forecast
- * We request 56 data points (7 days * 8 intervals/day)
- *
- * `coords` is optional; defaults to the legacy Fresno location used by
- * the dashboard's single-project widget. The cron pre-storm detector
- * passes per-project coords so each site gets its own forecast.
- */
+/** 7-day daily forecast, aggregated on the site's local calendar days. */
 export async function fetchForecast(
   coords?: { lat: number; lng: number }
 ): Promise<WeatherDay[]> {
-  const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+  const { lat, lng } = requireCoords(coords);
+  const bundle = await fetchBundle(lat, lng);
+  const precipByDay = qpfInchesByLocalDay(bundle.qpf);
 
-  if (!apiKey) {
-    throw new Error('OPENWEATHERMAP_API_KEY environment variable is not set');
+  interface DayAccumulator {
+    high: number;
+    low: number;
+    maxPop: number;
+    maxWindMph: number;
+    windDirection: string;
+    humiditySum: number;
+    humidityCount: number;
+    conditions: WeatherCondition[];
   }
 
-  const lat = coords?.lat ?? FRESNO_LAT;
-  const lon = coords?.lng ?? FRESNO_LON;
-
-  // Note: Free tier only provides 5 days, but we request 56 for 7 days
-  const url = `${OWM_BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=imperial&cnt=56`;
-
-  const response = await fetch(url, {
-    headers: {
-      'Accept': 'application/json',
-    },
-    next: { revalidate: 1800 }, // Cache for 30 minutes
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenWeatherMap API error: ${response.status} - ${errorText}`);
+  const days = new Map<string, DayAccumulator>();
+  for (const period of bundle.hourly) {
+    const key = localDayKey(period.startTime);
+    let acc = days.get(key);
+    if (!acc) {
+      acc = {
+        high: -Infinity,
+        low: Infinity,
+        maxPop: 0,
+        maxWindMph: 0,
+        windDirection: period.windDirection || 'N',
+        humiditySum: 0,
+        humidityCount: 0,
+        conditions: [],
+      };
+      days.set(key, acc);
+    }
+    acc.high = Math.max(acc.high, period.temperature);
+    acc.low = Math.min(acc.low, period.temperature);
+    acc.maxPop = Math.max(
+      acc.maxPop,
+      period.probabilityOfPrecipitation?.value ?? 0
+    );
+    const wind = parseWindMph(period.windSpeed);
+    if (wind >= acc.maxWindMph) {
+      acc.maxWindMph = wind;
+      acc.windDirection = period.windDirection || acc.windDirection;
+    }
+    if (period.relativeHumidity?.value != null) {
+      acc.humiditySum += period.relativeHumidity.value;
+      acc.humidityCount += 1;
+    }
+    acc.conditions.push(mapNoaaCondition(period.shortForecast));
   }
 
-  const data: OWMForecastResponse = await response.json();
-
-  // Group forecast items by day
-  const dayGroups: Map<string, OWMForecastItem[]> = new Map();
-
-  for (const item of data.list) {
-    // Extract date (YYYY-MM-DD) from dt_txt which is in format "2024-01-01 12:00:00"
-    const dateStr = item.dt_txt.split(' ')[0];
-
-    if (!dayGroups.has(dateStr)) {
-      dayGroups.set(dateStr, []);
-    }
-    dayGroups.get(dateStr)!.push(item);
-  }
-
-  // Process each day
-  const forecasts: WeatherDay[] = [];
-
-  for (const [dateStr, items] of dayGroups) {
-    // Skip if we already have 7 days
-    if (forecasts.length >= 7) break;
-
-    // Calculate aggregates for the day
-    let high = -Infinity;
-    let low = Infinity;
-    let totalPrecipMm = 0;
-    let maxPrecipChance = 0;
-    let maxWindSpeed = 0;
-    let totalHumidity = 0;
-    let maxWindDeg: number | undefined;
-
-    // Track most severe weather condition
-    const conditionCounts: Map<string, number> = new Map();
-
-    for (const item of items) {
-      // Temperature extremes
-      if (item.main.temp_max > high) high = item.main.temp_max;
-      if (item.main.temp_min < low) low = item.main.temp_min;
-
-      // Precipitation
-      if (item.rain?.['3h']) {
-        totalPrecipMm += item.rain['3h'];
-      }
-      if (item.pop !== undefined) {
-        maxPrecipChance = Math.max(maxPrecipChance, item.pop);
-      }
-
-      // Wind
-      if (item.wind.speed > maxWindSpeed) {
-        maxWindSpeed = item.wind.speed;
-        maxWindDeg = item.wind.deg;
-      }
-
-      // Humidity
-      totalHumidity += item.main.humidity;
-
-      // Track weather conditions
-      const condition = item.weather[0]?.main || 'Clear';
-      conditionCounts.set(condition, (conditionCounts.get(condition) || 0) + 1);
-    }
-
-    // Find most common weather condition
-    let mostCommonCondition = 'Clear';
-    let maxCount = 0;
-    for (const [condition, count] of conditionCounts) {
-      if (count > maxCount) {
-        maxCount = count;
-        mostCommonCondition = condition;
-      }
-    }
-
-    // Calculate averages
-    const avgHumidity = Math.round(totalHumidity / items.length);
-    const totalPrecipInches = mmToInches(totalPrecipMm);
-
-    // QPE threshold: 0.5 inches (12.7mm)
-    const isQPE = totalPrecipInches >= 0.5;
-
-    forecasts.push({
-      date: dateStr,
-      high: Math.round(high),
-      low: Math.round(low),
-      precipitationInches: Math.round(totalPrecipInches * 100) / 100,
-      precipitationChance: Math.round(maxPrecipChance * 100),
-      windSpeedMph: msToMph(maxWindSpeed),
-      windDirection: getWindDirection(maxWindDeg),
-      condition: mapOWMCondition(mostCommonCondition),
-      humidity: avgHumidity,
-      isQPE,
+  const result: WeatherDay[] = [];
+  for (const [date, acc] of [...days.entries()].sort(([a], [b]) =>
+    a.localeCompare(b)
+  )) {
+    if (result.length >= 7) break;
+    const precip = Math.round((precipByDay.get(date) ?? 0) * 100) / 100;
+    result.push({
+      date,
+      high: Math.round(acc.high),
+      low: Math.round(acc.low),
+      precipitationInches: precip,
+      precipitationChance: Math.round(acc.maxPop),
+      windSpeedMph: acc.maxWindMph,
+      windDirection: acc.windDirection,
+      condition: worstCondition(acc.conditions),
+      humidity:
+        acc.humidityCount > 0
+          ? Math.round(acc.humiditySum / acc.humidityCount)
+          : 50,
+      // Anticipation flag only — the compliance QPE determination comes
+      // from observed gauge data (src/lib/qpe/), never from forecast.
+      isQPE: precip >= QPE_THRESHOLD_INCHES,
     });
   }
-
-  // Ensure we have at least something even if API returns less data
-  return forecasts;
+  return result;
 }
 
-/**
- * Fetch both current weather and forecast
- */
-export async function fetchWeatherData(): Promise<{
-  current: WeatherSnapshot;
-  forecast: WeatherDay[];
-}> {
+/** Fetch both current weather and forecast for a site. */
+export async function fetchWeatherData(coords?: {
+  lat: number;
+  lng: number;
+}): Promise<{ current: WeatherSnapshot; forecast: WeatherDay[] }> {
   const [current, forecast] = await Promise.all([
-    fetchCurrentWeather(),
-    fetchForecast(),
+    fetchCurrentWeather(coords),
+    fetchForecast(coords),
   ]);
-
   return { current, forecast };
 }

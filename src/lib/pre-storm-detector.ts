@@ -9,58 +9,66 @@
  */
 
 import { fetchForecast } from './weather-api';
+import {
+  PRE_STORM_LEAD_DAYS,
+  PRE_STORM_POP_THRESHOLD,
+  QPE_THRESHOLD_INCHES,
+} from '@/lib/cgp/constants';
 import type { WeatherDay } from '@/types/weather';
 
-/**
- * Threshold for "this storm is likely." 70% matches the dashboard
- * widget's existing copy and the workflow doc's spec.
- */
-export const PRE_STORM_POP_THRESHOLD = 70;
-
-/**
- * Lead-time window we scan. Pre-storm inspections under CGP 2022 must
- * happen within 24 h of an expected qualifying event. We look 3 days
- * out so once-daily polling (Vercel Hobby cron) still catches storms
- * that drop into the forecast in the 24 h after our previous run —
- * a 2-day window leaves no margin and can miss late-appearing storms
- * by a few hours.
- */
-export const PRE_STORM_LEAD_DAYS = 3;
+// Thresholds live in src/lib/cgp/constants.ts; re-exported for the
+// cron route and any existing consumers.
+export { PRE_STORM_LEAD_DAYS, PRE_STORM_POP_THRESHOLD };
 
 export interface PreStormDetection {
-  /** First forecast day that crossed the PoP threshold (YYYY-MM-DD). */
+  /** First forecast day that triggered detection (YYYY-MM-DD, site-local). */
   forecastDate: string;
   /** Probability of precipitation on that day, 0–100. */
   peakPop: number;
-  /** Forecast precipitation in inches for that day. */
+  /** Forecast precipitation in inches for that day (NOAA QPF). */
   expectedPrecipitationInches: number;
+  /**
+   * What fired: 'qpf' — forecast rainfall alone reaches the QPE
+   * threshold (a qualifying event is expected); 'pop' — no qualifying
+   * QPF, but precipitation is likely enough to warrant pre-storm prep.
+   */
+  signal: 'qpf' | 'pop';
 }
 
 /**
- * Pull the forecast for the given coordinates and decide whether any
- * day in the next `PRE_STORM_LEAD_DAYS` exceeds `PRE_STORM_POP_THRESHOLD`.
- * Returns `null` when conditions are clear.
+ * Decide whether the site is in a pre-storm state within the lead
+ * window. The primary signal is QUANTITATIVE: a forecast day whose QPF
+ * reaches the QPE threshold (0.5″). Probability-of-precipitation is a
+ * secondary nudge only — the old implementation used PoP alone, which
+ * the review flagged: probabilities cannot stand in for the permit's
+ * quantitative rule.
  */
 export async function detectPreStormForCoords(
   lat: number,
   lng: number
 ): Promise<PreStormDetection | null> {
   const forecast: WeatherDay[] = await fetchForecast({ lat, lng });
-
-  // Forecast comes back in chronological order from today onward.
-  // Slice to the lead window so a high-PoP day a week out doesn't
-  // false-positive the pre-storm flow.
   const windowDays = forecast.slice(0, PRE_STORM_LEAD_DAYS);
 
+  for (const day of windowDays) {
+    if (day.precipitationInches >= QPE_THRESHOLD_INCHES) {
+      return {
+        forecastDate: day.date,
+        peakPop: day.precipitationChance,
+        expectedPrecipitationInches: day.precipitationInches,
+        signal: 'qpf',
+      };
+    }
+  }
   for (const day of windowDays) {
     if (day.precipitationChance >= PRE_STORM_POP_THRESHOLD) {
       return {
         forecastDate: day.date,
         peakPop: day.precipitationChance,
         expectedPrecipitationInches: day.precipitationInches,
+        signal: 'pop',
       };
     }
   }
-
   return null;
 }
