@@ -49,11 +49,3 @@ export function createAdminClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
-
-/**
- * @deprecated Use createAuthClient() for user-scoped queries or createAdminClient() for system operations.
- * Kept temporarily during migration to avoid breaking all routes at once.
- */
-export function createServerClient() {
-  return createAdminClient();
-}

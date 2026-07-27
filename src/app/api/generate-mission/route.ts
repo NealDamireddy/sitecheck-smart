@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     // Block 3: validate flight path against project geofence + active no-fly zones.
     // This is the planning-time check; runtime breach detection belongs to Block 5.
     try {
-      const { geofence, noFlyZones } = await fetchAirspaceContext(projectId);
+      const { geofence, noFlyZones } = await fetchAirspaceContext(auth.supabase, projectId);
       const validatableWaypoints = ordered.map((cp, i) => ({
         number: i + 1,
         lat: cp.lat,

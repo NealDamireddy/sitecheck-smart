@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const zones = await fetchNoFlyZonesForProject(projectId, { onlyActive });
+  // SEC-04: RLS-scoped client, same reasoning as the geofences route.
+  const zones = await fetchNoFlyZonesForProject(auth.supabase, projectId, { onlyActive });
   return NextResponse.json(zones);
 }
 

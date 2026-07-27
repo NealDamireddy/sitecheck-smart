@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
       body.waypoints.length > 0
     ) {
       try {
-        const { geofence, noFlyZones } = await fetchAirspaceContext(resolvedProjectId);
+        const { geofence, noFlyZones } = await fetchAirspaceContext(auth.supabase, resolvedProjectId);
         const altitude = typeof body.altitude === 'number' ? body.altitude : 120;
         const validatableWaypoints = body.waypoints.map(
           (wp: Record<string, unknown>, i: number) => ({

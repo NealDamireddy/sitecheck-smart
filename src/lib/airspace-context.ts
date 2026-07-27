@@ -12,7 +12,7 @@
  * the demo project keeps working without a database.
  */
 
-import { createServerClient } from '@/lib/supabase/server';
+import type { createAuthClient } from '@/lib/supabase/server';
 import { project as riversideProject } from '@/data/project';
 import { linearProject } from '@/data/linear-project';
 import { mockNoFlyZones } from '@/data/mock-no-fly-zones';
@@ -95,11 +95,13 @@ export function noFlyZoneToSnakeCase(z: Partial<NoFlyZone>) {
  * mock data. Returns an empty array if the project is unknown and DB has no
  * rows.
  */
+type AuthedSupabase = Awaited<ReturnType<typeof createAuthClient>>;
+
 export async function fetchGeofencesForProject(
+  supabase: AuthedSupabase,
   projectId: string
 ): Promise<Geofence[]> {
   try {
-    const supabase = createServerClient();
     const { data, error } = await supabase
       .from('geofences')
       .select('*')
@@ -125,12 +127,12 @@ export async function fetchGeofencesForProject(
  * mock data filtered by projectId.
  */
 export async function fetchNoFlyZonesForProject(
+  supabase: AuthedSupabase,
   projectId: string,
   options: { onlyActive?: boolean } = {}
 ): Promise<NoFlyZone[]> {
   const onlyActive = options.onlyActive ?? true;
   try {
-    const supabase = createServerClient();
     let query = supabase.from('nofly_zones').select('*').eq('project_id', projectId);
     if (onlyActive) query = query.eq('active', true);
     const { data, error } = await query;
@@ -152,11 +154,12 @@ export async function fetchNoFlyZonesForProject(
  * project in parallel. Returns `geofence: undefined` if none.
  */
 export async function fetchAirspaceContext(
+  supabase: AuthedSupabase,
   projectId: string
 ): Promise<{ geofence: Geofence | undefined; noFlyZones: NoFlyZone[] }> {
   const [geofences, noFlyZones] = await Promise.all([
-    fetchGeofencesForProject(projectId),
-    fetchNoFlyZonesForProject(projectId),
+    fetchGeofencesForProject(supabase, projectId),
+    fetchNoFlyZonesForProject(supabase, projectId),
   ]);
   return { geofence: geofences[0], noFlyZones };
 }

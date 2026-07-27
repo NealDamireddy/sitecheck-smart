@@ -24,7 +24,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const geofences = await fetchGeofencesForProject(projectId);
+  // SEC-04: pass the caller's RLS-scoped client — geofence reads must
+  // not ride the service role past tenant isolation.
+  const geofences = await fetchGeofencesForProject(auth.supabase, projectId);
   return NextResponse.json(geofences);
 }
 
