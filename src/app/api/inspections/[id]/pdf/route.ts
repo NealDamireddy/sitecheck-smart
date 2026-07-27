@@ -15,6 +15,7 @@
  * The route is `GET` so the browser can hit it directly via an `<a download>`.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { requireAuth } from '@/lib/auth';
@@ -39,10 +40,9 @@ interface ReportRow {
   signed_date: string | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function ensureReportForInspection(
   request: NextRequest,
-  supabase: any,
+  supabase: SupabaseClient,
   inspectionId: string,
   projectId: string,
   existingReportId: string | null

@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { INSPECTION_TYPE_LABELS } from '@/lib/constants';
 import type { InspectionType } from '@/types/drone';
+import type { Inspection } from '@/types/inspection';
 import { inspections as staticInspections } from '@/data/inspections';
 import { isDemoSession } from '@/lib/demo/start-demo';
 
@@ -38,7 +39,7 @@ const typeColors: Record<InspectionType, { bg: string; border: string; text: str
 
 export function InspectionTimeline() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [inspections, setInspections] = useState<any[]>([]);
+  const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -88,9 +89,9 @@ export function InspectionTimeline() {
         <ScrollArea className="w-full">
           <div className="relative flex items-start gap-0 pb-4 pt-2" style={{ minWidth: `${inspections.length * 160}px` }}>
             {/* Connecting line */}
-            <div className="absolute top-[26px] left-[40px] right-[40px] h-0.5 bg-[#2A2A2A]" />
+            <div className="absolute top-[26px] left-[40px] right-[40px] h-0.5 bg-border" />
 
-            {inspections.map((inspection, index) => {
+            {inspections.map((inspection) => {
               const colors = typeColors[inspection.type as InspectionType];
               const isLatest = inspection.id === latestId;
               const isHovered = hoveredId === inspection.id;
@@ -164,13 +165,13 @@ export function InspectionTimeline() {
                         <div className="flex justify-between text-[11px]">
                           <span className="text-muted-foreground">Deficient</span>
                           <span className="text-red-400">
-                            {inspection.findings?.filter((f: any) => f.status === 'deficient').length ?? 0}
+                            {inspection.findings?.filter((f) => f.status === 'deficient').length ?? 0}
                           </span>
                         </div>
                         <div className="flex justify-between text-[11px]">
                           <span className="text-muted-foreground">Needs Review</span>
                           <span className="text-purple-400">
-                            {inspection.findings?.filter((f: any) => f.status === 'needs-review').length ?? 0}
+                            {inspection.findings?.filter((f) => f.status === 'needs-review').length ?? 0}
                           </span>
                         </div>
                       </div>

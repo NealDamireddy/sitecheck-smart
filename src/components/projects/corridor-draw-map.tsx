@@ -9,7 +9,8 @@ import Map, {
   type MapMouseEvent,
 } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MAPBOX_TOKEN, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MAPBOX_TOKEN, MAPBOX_CONFIGURED, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MapUnavailable } from '@/components/map/map-unavailable';
 import { centerlineLengthFeet } from '@/lib/format';
 import { Trash2, Undo2 } from 'lucide-react';
 
@@ -69,6 +70,8 @@ export function CorridorDrawMap({
 
   const lengthFeet = useMemo(() => centerlineLengthFeet(centerline), [centerline]);
   const lengthMiles = (lengthFeet / 5280).toFixed(2);
+
+  if (!MAPBOX_CONFIGURED) return <MapUnavailable />;
 
   return (
     <div className="relative rounded-lg border border-border overflow-hidden">

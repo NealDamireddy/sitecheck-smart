@@ -24,15 +24,6 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-interface UpsertBody {
-  waypointNumber: number;
-  checkpointId: string;
-  decision: 'accept' | 'override' | 'pending';
-  overrideStatus?: string;
-  overrideNotes?: string;
-  aiAnalysisId?: string;
-}
-
 function transformReview(row: Record<string, unknown>) {
   return {
     id: row.id,

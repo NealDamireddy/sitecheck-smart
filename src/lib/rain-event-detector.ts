@@ -43,10 +43,12 @@ const LOOKBACK_DAYS = 7;
  * Detect the most recent qualifying rain event in the rolling lookback window.
  *
  * Pure read; never writes to the DB. Caller decides whether to spawn an
- * inspection record.
+ * inspection record. `coords` scopes the forecast to the project's site;
+ * without it the fetch falls back to the legacy default location.
  */
 export async function detectRainEventForProject(
-  _projectId: string
+  _projectId: string,
+  coords?: { lat: number; lng: number }
 ): Promise<DetectedRainEvent | null> {
   // Bail early if no API key — keeps the demo quiet
   if (!process.env.OPENWEATHERMAP_API_KEY) {
@@ -55,7 +57,7 @@ export async function detectRainEventForProject(
 
   let forecast: WeatherDay[];
   try {
-    forecast = await fetchForecast();
+    forecast = await fetchForecast(coords);
   } catch (err) {
     console.warn('rain-event-detector: forecast fetch failed', err);
     return null;

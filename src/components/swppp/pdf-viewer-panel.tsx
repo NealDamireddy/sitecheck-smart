@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { useCheckpointStore } from '@/stores/checkpoint-store';
 import { BMP_CATEGORY_LABELS } from '@/lib/constants';
 import type { Checkpoint } from '@/types/checkpoint';

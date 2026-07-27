@@ -42,13 +42,13 @@ under `smarts-automation/`.
 
 ```bash
 # Tests (mocked — fast). 103/103 passing across 13 files as of handoff.
-cd /Users/nealdamireddy/Documents/Sitecheck-main/smarts-automation && npm test
+cd /Users/nealdamireddy/Documents/SiteCheck/Sitecheck-main/smarts-automation && npm test
 
 # Typecheck (must be clean before any commit/run)
 npm run typecheck     # = tsc -p tsconfig.json --noEmit
 
 # LIVE headed run against real SMARTS (creds required; user runs this — agent has no creds)
-cd /Users/nealdamireddy/Documents/Sitecheck-main/smarts-automation && \
+cd /Users/nealdamireddy/Documents/SiteCheck/Sitecheck-main/smarts-automation && \
 PLAYWRIGHT_HEADED=1 SMARTS_DUMP_FORM=1 \
 SMARTS_USERNAME='you@example.com' \
 SMARTS_PASSWORD='your-password' \

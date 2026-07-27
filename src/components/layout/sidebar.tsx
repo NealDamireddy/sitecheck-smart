@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -22,6 +21,7 @@ import {
 import { useOnboardingStore } from '@/stores/onboarding-store';
 import { useProjectStore } from '@/stores/project-store';
 import { createClient } from '@/lib/supabase/client';
+import { useMounted } from '@/hooks/use-mounted';
 
 const baseNavItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -64,8 +64,7 @@ export function Sidebar() {
   // until after mount so SSR and hydration agree on the link count and
   // href. (Without this guard, server emits href="/projects//events" and
   // the client hydrates with the real id — a React hydration mismatch.)
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   // Project-scoped SMARTS entry inserted between Inspections and Reports.
   // baseNavItems order after the Sites insert:
@@ -97,7 +96,7 @@ export function Sidebar() {
       : itemsWithSmarts;
 
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-16 flex-col border-r border-border bg-[#0A0A0A] transition-all duration-300 hover:w-56 sm:flex group/sidebar">
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-16 flex-col border-r border-border bg-sidebar transition-all duration-300 hover:w-56 sm:flex group/sidebar">
       {/* Logo area */}
       <div className="flex h-14 items-center border-b border-border px-4">
         <div className="flex items-center gap-3 overflow-hidden">

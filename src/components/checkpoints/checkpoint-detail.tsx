@@ -23,7 +23,6 @@ import type { Deficiency } from '@/types/deficiency';
 import {
   BMP_CATEGORY_LABELS,
   BMP_CATEGORY_COLORS,
-  STATUS_COLORS,
 } from '@/lib/constants';
 import { checkpoints as staticCheckpoints } from '@/data/checkpoints';
 import { aiAnalyses as staticAnalyses } from '@/data/ai-analyses';

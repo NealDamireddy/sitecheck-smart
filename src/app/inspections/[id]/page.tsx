@@ -110,7 +110,10 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
   }, [detail?.inspection?.narrative]);
 
   const inspection = detail?.inspection ?? null;
-  const aiAnalyses = (detail?.aiAnalyses ?? []) as AnalysisRow[];
+  const aiAnalyses = useMemo(
+    () => (detail?.aiAnalyses ?? []) as AnalysisRow[],
+    [detail?.aiAnalyses]
+  );
   const qspReviews = (detail?.qspReviews ?? []) as ReviewRow[];
   const correctiveActions = (detail?.correctiveActions ?? []) as CorrectiveActionRow[];
 

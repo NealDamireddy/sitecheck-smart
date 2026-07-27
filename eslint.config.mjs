@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone package with its own toolchain (typecheck + vitest run
+    // inside smarts-automation/); linting it from the app root only adds
+    // noise — including its untracked recon output.
+    "smarts-automation/**",
+    // Agent scratch worktrees — not app source.
+    ".claude/**",
   ]),
 ]);
 

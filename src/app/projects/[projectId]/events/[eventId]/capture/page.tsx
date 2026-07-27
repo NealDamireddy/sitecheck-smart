@@ -38,7 +38,6 @@ import { cn } from '@/lib/utils';
 import type {
   MonitoringLocation,
   ParameterName,
-  ParameterResult,
   Sample,
   SmartsEventStatus,
 } from '@/types';

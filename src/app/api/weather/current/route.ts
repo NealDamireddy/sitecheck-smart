@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchCurrentWeather } from '@/lib/weather-api';
-import { resolveProjectId } from '@/lib/project-context';
+import { resolveProjectId, resolveProjectCoords } from '@/lib/project-context';
 
 const CACHE_DURATION_MINUTES = 15;
 
@@ -50,8 +50,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch fresh data from OpenWeatherMap
-    const weatherData = await fetchCurrentWeather();
+    // Fetch fresh data from OpenWeatherMap at the project's location
+    const coords = await resolveProjectCoords(supabase, projectId);
+    const weatherData = await fetchCurrentWeather(coords);
 
     // Upsert into cache
     const { data: upserted, error: upsertError } = await supabase

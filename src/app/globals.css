@@ -59,85 +59,90 @@
   --color-amber-800: #92400E;
   --color-amber-900: #78350F;
 
-  --color-surface: #141414;
-  --color-surface-elevated: #1C1C1C;
-  --color-surface-overlay: #222222;
+  /* Brightened navy-slate surfaces — lifted off pure black for a brighter,
+     higher-contrast feel while staying a dark theme. */
+  --color-surface: #1A2438;
+  --color-surface-elevated: #243150;
+  --color-surface-overlay: #2D3B5E;
+  --color-elevated: #243150;
 
-  --color-status-compliant: #22C55E;
-  --color-status-warning: #F59E0B;
-  --color-status-deficient: #EF4444;
-  --color-status-review: #8B5CF6;
+  --color-status-compliant: #34D399;
+  --color-status-warning: #FBBF24;
+  --color-status-deficient: #F87171;
+  --color-status-review: #A78BFA;
 }
 
-/* Always dark mode - industrial theme */
+/* Always dark mode — brightened navy-slate industrial theme.
+   Surfaces are lifted off pure black, text contrast is raised, borders
+   are visible, and the amber accent is more vibrant. */
 :root {
-  --background: #0A0A0A;
-  --foreground: #E5E5E5;
-  --card: #141414;
-  --card-foreground: #E5E5E5;
-  --popover: #1C1C1C;
-  --popover-foreground: #E5E5E5;
-  --primary: #F59E0B;
-  --primary-foreground: #0A0A0A;
-  --secondary: #1C1C1C;
-  --secondary-foreground: #A3A3A3;
-  --muted: #1C1C1C;
-  --muted-foreground: #737373;
-  --accent: #292524;
-  --accent-foreground: #F59E0B;
-  --destructive: #EF4444;
-  --border: #2A2A2A;
-  --input: #2A2A2A;
-  --ring: #F59E0B;
-  --chart-1: #F59E0B;
-  --chart-2: #22C55E;
-  --chart-3: #3B82F6;
-  --chart-4: #8B5CF6;
-  --chart-5: #EF4444;
+  --background: #0F1729;
+  --foreground: #F1F5FB;
+  --card: #1A2438;
+  --card-foreground: #F1F5FB;
+  --popover: #1F2B43;
+  --popover-foreground: #F1F5FB;
+  --primary: #FBBF24;
+  --primary-foreground: #0F1729;
+  --secondary: #243150;
+  --secondary-foreground: #C7D2E5;
+  --muted: #243150;
+  --muted-foreground: #9AABC9;
+  --accent: #2A3A5C;
+  --accent-foreground: #FBBF24;
+  --destructive: #F87171;
+  --border: #354563;
+  --input: #354563;
+  --ring: #FBBF24;
+  --chart-1: #FBBF24;
+  --chart-2: #34D399;
+  --chart-3: #60A5FA;
+  --chart-4: #A78BFA;
+  --chart-5: #F87171;
   --radius: 0.5rem;
-  --sidebar: #0A0A0A;
-  --sidebar-foreground: #A3A3A3;
-  --sidebar-primary: #F59E0B;
-  --sidebar-primary-foreground: #0A0A0A;
-  --sidebar-accent: #1C1C1C;
-  --sidebar-accent-foreground: #E5E5E5;
-  --sidebar-border: #2A2A2A;
-  --sidebar-ring: #F59E0B;
+  --sidebar: #131D31;
+  --sidebar-foreground: #9AABC9;
+  --sidebar-primary: #FBBF24;
+  --sidebar-primary-foreground: #0F1729;
+  --sidebar-accent: #243150;
+  --sidebar-accent-foreground: #F1F5FB;
+  --sidebar-border: #354563;
+  --sidebar-ring: #FBBF24;
 }
 
 /* No light mode - force dark always */
 .dark {
-  --background: #0A0A0A;
-  --foreground: #E5E5E5;
-  --card: #141414;
-  --card-foreground: #E5E5E5;
-  --popover: #1C1C1C;
-  --popover-foreground: #E5E5E5;
-  --primary: #F59E0B;
-  --primary-foreground: #0A0A0A;
-  --secondary: #1C1C1C;
-  --secondary-foreground: #A3A3A3;
-  --muted: #1C1C1C;
-  --muted-foreground: #737373;
-  --accent: #292524;
-  --accent-foreground: #F59E0B;
-  --destructive: #EF4444;
-  --border: #2A2A2A;
-  --input: #2A2A2A;
-  --ring: #F59E0B;
-  --chart-1: #F59E0B;
-  --chart-2: #22C55E;
-  --chart-3: #3B82F6;
-  --chart-4: #8B5CF6;
-  --chart-5: #EF4444;
-  --sidebar: #0A0A0A;
-  --sidebar-foreground: #A3A3A3;
-  --sidebar-primary: #F59E0B;
-  --sidebar-primary-foreground: #0A0A0A;
-  --sidebar-accent: #1C1C1C;
-  --sidebar-accent-foreground: #E5E5E5;
-  --sidebar-border: #2A2A2A;
-  --sidebar-ring: #F59E0B;
+  --background: #0F1729;
+  --foreground: #F1F5FB;
+  --card: #1A2438;
+  --card-foreground: #F1F5FB;
+  --popover: #1F2B43;
+  --popover-foreground: #F1F5FB;
+  --primary: #FBBF24;
+  --primary-foreground: #0F1729;
+  --secondary: #243150;
+  --secondary-foreground: #C7D2E5;
+  --muted: #243150;
+  --muted-foreground: #9AABC9;
+  --accent: #2A3A5C;
+  --accent-foreground: #FBBF24;
+  --destructive: #F87171;
+  --border: #354563;
+  --input: #354563;
+  --ring: #FBBF24;
+  --chart-1: #FBBF24;
+  --chart-2: #34D399;
+  --chart-3: #60A5FA;
+  --chart-4: #A78BFA;
+  --chart-5: #F87171;
+  --sidebar: #131D31;
+  --sidebar-foreground: #9AABC9;
+  --sidebar-primary: #FBBF24;
+  --sidebar-primary-foreground: #0F1729;
+  --sidebar-accent: #243150;
+  --sidebar-accent-foreground: #F1F5FB;
+  --sidebar-border: #354563;
+  --sidebar-ring: #FBBF24;
 }
 
 @layer base {
@@ -164,35 +169,35 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0A0A0A;
+  background: #0F1729;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2A2A2A;
+  background: #354563;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3A3A3A;
+  background: #475578;
 }
 
 /* Mapbox overrides for dark theme */
 .mapboxgl-popup-content {
-  background: #1C1C1C !important;
-  color: #E5E5E5 !important;
-  border: 1px solid #2A2A2A !important;
+  background: #1A2438 !important;
+  color: #F1F5FB !important;
+  border: 1px solid #354563 !important;
   border-radius: 0.5rem !important;
   padding: 12px !important;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
 }
 
 .mapboxgl-popup-tip {
-  border-top-color: #1C1C1C !important;
+  border-top-color: #1A2438 !important;
 }
 
 .mapboxgl-ctrl-group {
-  background: #1C1C1C !important;
-  border: 1px solid #2A2A2A !important;
+  background: #1A2438 !important;
+  border: 1px solid #354563 !important;
 }
 
 .mapboxgl-ctrl-group button {
@@ -201,7 +206,7 @@
 
 /* Glow effect for amber elements */
 .glow-amber {
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.22);
 }
 
 /* Pulsing animation for alerts */

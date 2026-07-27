@@ -68,10 +68,14 @@ export function CheckpointGrid() {
         >
           <PackageOpen className="h-10 w-10 text-muted-foreground/50 mb-3" />
           <p className="text-sm font-medium text-muted-foreground">
-            No checkpoints match your filters
+            {checkpoints.length === 0
+              ? 'No BMP checkpoints yet'
+              : 'No checkpoints match your filters'}
           </p>
           <p className="mt-1 text-xs text-muted-foreground/70">
-            Try adjusting your search or filter criteria
+            {checkpoints.length === 0
+              ? 'Upload a SWPPP on the SWPPP page to extract checkpoints, or select a project from the top bar'
+              : 'Try adjusting your search or filter criteria'}
           </p>
         </motion.div>
       )}

@@ -1,4 +1,4 @@
-import { formatDistanceToNow, format, differenceInHours, differenceInMinutes, differenceInSeconds } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import type { CorridorGeometry, ProjectSegment } from '@/types/project';
 
 export function formatRelativeTime(date: string | Date): string {

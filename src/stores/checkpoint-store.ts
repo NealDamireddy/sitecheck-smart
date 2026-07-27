@@ -3,7 +3,6 @@ import { Checkpoint, BMPCategory, CheckpointStatus, Zone } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { checkpoints as staticCheckpoints } from '@/data/checkpoints';
 import { isDemoSession } from '@/lib/demo/start-demo';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 /**
  * Static demo data only stands in for a real backend during a demo

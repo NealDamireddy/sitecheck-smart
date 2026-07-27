@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
+import { useMounted } from '@/hooks/use-mounted';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Monitor, Smartphone, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useOnboardingStore } from '@/stores/onboarding-store';
@@ -58,16 +59,16 @@ export function OnboardingOverlay() {
   const { viewMode, setViewMode } = useViewModeStore();
   const demoTourActive = useDemoTourStore((s) => s.active);
 
-  const [mounted, setMounted] = useState(false);
-  const directionRef = useRef(1);
-  const prevStepRef = useRef(currentStep);
-
-  useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    directionRef.current = currentStep > prevStepRef.current ? 1 : -1;
-    prevStepRef.current = currentStep;
-  }, [currentStep]);
+  const mounted = useMounted();
+  // Slide direction is plain state (refs can't be read during render).
+  // It's set alongside every step change and derived for external step
+  // jumps via the previous-step comparison below.
+  const [direction, setDirection] = useState(1);
+  const [prevStepSeen, setPrevStepSeen] = useState(currentStep);
+  if (currentStep !== prevStepSeen) {
+    setDirection(currentStep > prevStepSeen ? 1 : -1);
+    setPrevStepSeen(currentStep);
+  }
 
   if (!mounted) return null;
   // Defense-in-depth: never show the standard onboarding to a demo user,
@@ -86,13 +87,13 @@ export function OnboardingOverlay() {
     if (isLastStep) {
       completeOnboarding();
     } else {
-      directionRef.current = 1;
+      setDirection(1);
       nextStep();
     }
   };
 
   const handlePrev = () => {
-    directionRef.current = -1;
+    setDirection(-1);
     prevStep();
   };
 
@@ -101,7 +102,7 @@ export function OnboardingOverlay() {
   };
 
   const handleDotClick = (i: number) => {
-    directionRef.current = i > currentStep ? 1 : -1;
+    setDirection(i > currentStep ? 1 : -1);
     setStep(i);
   };
 
@@ -131,10 +132,10 @@ export function OnboardingOverlay() {
       <div className="relative z-10 flex w-full max-w-2xl flex-col gap-8 px-6">
 
         {/* Step content */}
-        <AnimatePresence mode="wait" custom={directionRef.current}>
+        <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={step.id}
-            custom={directionRef.current}
+            custom={direction}
             variants={slideVariants}
             initial="enter"
             animate="center"

@@ -5,7 +5,8 @@ import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Checkpoint } from '@/types/checkpoint';
 import { BMP_CATEGORY_COLORS } from '@/lib/constants';
-import { MAPBOX_TOKEN, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MAPBOX_TOKEN, MAPBOX_CONFIGURED, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MapUnavailable } from '@/components/map/map-unavailable';
 import { fitBoundsFromPoints } from '@/lib/map-utils';
 import { useProjectStore } from '@/stores/project-store';
 import { CorridorLayer } from '@/components/map/corridor-layer';
@@ -38,6 +39,8 @@ export function BmpSelectorMap({
     setHoveredId(null);
     setCursor('grab');
   }, []);
+
+  if (!MAPBOX_CONFIGURED) return <MapUnavailable />;
 
   return (
     <div className="h-[300px] rounded-lg border border-border overflow-hidden">

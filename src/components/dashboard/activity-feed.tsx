@@ -84,26 +84,35 @@ export function ActivityFeed() {
   const { isApp } = useAppMode();
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Loading is derived: we're loading until the fetch for the *current*
+  // project settles. Avoids a synchronous setState at effect start (which
+  // would double-render every project switch).
+  const [loadedForProject, setLoadedForProject] = useState<string | null>(null);
+  const loading = loadedForProject !== currentProjectId;
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     fetch(`/api/activity?projectId=${currentProjectId}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data) => {
+        if (cancelled) return;
         const demoFallback = isDemoSession() ? staticActivityEvents : [];
         setEvents(Array.isArray(data) ? data : demoFallback);
-        setLoading(false);
+        setLoadedForProject(currentProjectId);
       })
       .catch(() => {
+        if (cancelled) return;
         // Demo session → bundled demo events; real account → empty.
         setEvents(isDemoSession() ? staticActivityEvents : []);
-        setLoading(false);
+        setLoadedForProject(currentProjectId);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [currentProjectId]);
 
   // Real-time: listen for new activity events

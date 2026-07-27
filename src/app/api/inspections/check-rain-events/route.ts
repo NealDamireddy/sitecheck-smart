@@ -21,6 +21,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { checkRainEvents } from '@/lib/validations';
 import { detectRainEventForProject } from '@/lib/rain-event-detector';
+import { resolveProjectCoords } from '@/lib/project-context';
 
 interface DbInspectionRow {
   id: string;
@@ -83,7 +84,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
     }
 
-    const rainEvent = await detectRainEventForProject(projectId);
+    const coords = await resolveProjectCoords(supabase, projectId);
+    const rainEvent = await detectRainEventForProject(projectId, coords);
     if (!rainEvent) {
       return NextResponse.json({ rainEvent: null, inspection: null });
     }

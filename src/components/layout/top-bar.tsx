@@ -57,7 +57,7 @@ export function TopBar() {
 
   return (
     <header className={cn(
-      'sticky top-0 z-30 flex items-center justify-between border-b border-border bg-[#0A0A0A]/80 backdrop-blur-sm',
+      'sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm',
       isApp ? 'h-11 px-3' : 'h-14 px-3 sm:px-6'
     )}>
       {/* Project Switcher */}
@@ -89,7 +89,7 @@ export function TopBar() {
           </button>
 
           {open && (
-            <div className="absolute left-0 top-full mt-1 z-50 min-w-[280px] rounded-lg border border-border bg-[#0A0A0A] shadow-xl">
+            <div className="absolute left-0 top-full mt-1 z-50 min-w-[280px] rounded-lg border border-border bg-popover shadow-xl">
               <div className="px-3 py-2 border-b border-border">
                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Projects</p>
               </div>

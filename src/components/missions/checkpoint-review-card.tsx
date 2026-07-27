@@ -495,6 +495,9 @@ export function CheckpointReviewCard({
           >
             <X className="h-5 w-5" />
           </button>
+          {/* eslint-disable-next-line @next/next/no-img-element -- full-res
+              lightbox for a runtime storage URL; next/image optimization
+              buys nothing here and needs remotePatterns config */}
           <img
             src={photoUrl}
             alt={`Waypoint ${waypoint.number} capture`}

@@ -1,6 +1,7 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect } from 'react';
+import { useMounted } from '@/hooks/use-mounted';
 import { Sidebar } from '@/components/layout/sidebar';
 import { TopBar } from '@/components/layout/top-bar';
 import { AppPanel } from '@/components/layout/app-panel';
@@ -20,6 +21,9 @@ interface ViewModeWrapperProps {
   children: ReactNode;
 }
 
+/** Auth pages render bare — no sidebar/top-bar/banners for logged-out users. */
+const CHROMELESS_ROUTES = ['/login', '/signup'];
+
 export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
   const { viewMode } = useViewModeStore();
   const { hasCompleted, completedVersion } = useOnboardingStore();
@@ -27,6 +31,7 @@ export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
   const { inDemo } = useDemoSession();
   const loaded = useProjectStore((s) => s.loaded);
   const fetchProjects = useProjectStore((s) => s.fetchProjects);
+  const wrapperPathname = usePathname();
 
   // Bootstrap the (RLS-scoped) project list once per session. /api/projects
   // returns 401 for anonymous users; the store swallows that error so /login
@@ -40,6 +45,12 @@ export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
   // the welcome screen to flash on the way to /dashboard.
   const onboardingActive =
     !inDemo && (!hasCompleted || completedVersion < ONBOARDING_VERSION);
+
+  // Login/signup get no app chrome — a logged-out visitor shouldn't see a
+  // project switcher, notification bell, or account link behind the form.
+  if (wrapperPathname && CHROMELESS_ROUTES.some((r) => wrapperPathname.startsWith(r))) {
+    return <>{children}</>;
+  }
 
   return (
     <TooltipProvider>
@@ -123,8 +134,7 @@ function MobileBottomNav() {
   // read from localStorage). Defer the project-scoped SMARTS link until
   // after mount so SSR and hydration agree — same guard as the desktop
   // sidebar.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   // Splice SMARTS in after BMPs (idx 4), matching the desktop ordering
   // (Inspections sits between in the sidebar; mobile omits Inspections).
@@ -142,7 +152,7 @@ function MobileBottomNav() {
       : mobileNavItems;
 
   return (
-    <nav className="sticky bottom-0 z-30 flex items-center justify-around border-t border-border bg-[#0A0A0A]/95 px-1 py-2 backdrop-blur-md">
+    <nav className="sticky bottom-0 z-30 flex items-center justify-around border-t border-border bg-sidebar/95 px-1 py-2 backdrop-blur-md">
       {navItems.map((item) => {
         const isActive =
           pathname === item.href || pathname?.startsWith(item.href + '/');

@@ -33,7 +33,7 @@ function persist(state: Partial<OnboardingState>) {
   } catch { /* ignore */ }
 }
 
-export const useOnboardingStore = create<OnboardingStore>((set, get) => {
+export const useOnboardingStore = create<OnboardingStore>((set) => {
   const initial = getPersistedState();
   return {
     ...initial,

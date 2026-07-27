@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { FileText, CheckSquare, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +35,6 @@ export function DocumentPageSelector({
   }, [checkpoints]);
 
   const allPages = useMemo(() => pageGroups.map((g) => g.page), [pageGroups]);
-  const isAllSelected = selectedPages === null || (selectedPages && selectedPages.length === allPages.length);
 
   const handleTogglePage = useCallback(
     (page: number) => {

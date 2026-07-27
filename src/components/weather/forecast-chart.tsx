@@ -46,7 +46,7 @@ function CustomTooltip({
   const data = payload[0].payload;
 
   return (
-    <div className="rounded-lg border border-[#2A2A2A] bg-[#1C1C1C] px-3 py-2.5 shadow-xl">
+    <div className="rounded-lg border border-[#354563] bg-popover px-3 py-2.5 shadow-xl">
       <p className="mb-1.5 text-xs font-medium text-white">
         {data.icon} {data.date} ({label})
       </p>
@@ -124,11 +124,11 @@ export function ForecastChart() {
         <div className={cn('h-[300px] w-full', isApp && 'h-[180px]')}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#354563" vertical={false} />
               <XAxis
                 dataKey="day"
                 tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                axisLine={{ stroke: '#2A2A2A' }}
+                axisLine={{ stroke: '#354563' }}
                 tickLine={false}
               />
               <YAxis
@@ -149,9 +149,12 @@ export function ForecastChart() {
                 domain={[0, 'auto']}
                 tickFormatter={(v: number) => `${v}"`}
               />
+              {/* Hidden 0–100 axis so the % series doesn't stretch the
+                  inches axis into reading 0"–100". */}
+              <YAxis yAxisId="chance" orientation="right" hide domain={[0, 100]} />
               <Tooltip content={<CustomTooltip />} />
               <Area
-                yAxisId="precip"
+                yAxisId="chance"
                 type="monotone"
                 dataKey="precipChance"
                 fill="#3B82F6"
@@ -175,7 +178,7 @@ export function ForecastChart() {
                 stroke="#F59E0B"
                 strokeWidth={2}
                 dot={{ fill: '#F59E0B', r: 4, strokeWidth: 0 }}
-                activeDot={{ r: 6, fill: '#F59E0B', strokeWidth: 2, stroke: '#0A0A0A' }}
+                activeDot={{ r: 6, fill: '#F59E0B', strokeWidth: 2, stroke: '#0F1729' }}
               />
               <Line
                 yAxisId="temp"
@@ -185,13 +188,13 @@ export function ForecastChart() {
                 strokeWidth={2}
                 strokeDasharray="4 2"
                 dot={{ fill: '#6B7280', r: 3, strokeWidth: 0 }}
-                activeDot={{ r: 5, fill: '#6B7280', strokeWidth: 2, stroke: '#0A0A0A' }}
+                activeDot={{ r: 5, fill: '#6B7280', strokeWidth: 2, stroke: '#0F1729' }}
               />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
         {!isApp && (
-          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#2A2A2A] pt-3">
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#354563] pt-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="h-0.5 w-4 bg-amber-500" />
               High Temp

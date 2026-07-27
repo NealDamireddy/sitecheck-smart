@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CountdownTimer } from '@/components/checkpoints/countdown-timer';
 import { Deficiency } from '@/types/deficiency';
 import { formatDate } from '@/lib/format';
-import { cn } from '@/lib/utils';
 
 interface DeficiencyPanelProps {
   deficiency: Deficiency;

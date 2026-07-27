@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import Map, { Marker, Source, Layer } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MAPBOX_TOKEN, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MAPBOX_TOKEN, MAPBOX_CONFIGURED, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MapUnavailable } from '@/components/map/map-unavailable';
 import { useCheckpointStore } from '@/stores/checkpoint-store';
 import { useProjectStore } from '@/stores/project-store';
 import { fitBoundsFromPoints } from '@/lib/map-utils';
@@ -75,6 +76,8 @@ export function RouteEditorMap({
   const handleMapClick = useCallback(() => {
     onSelectWaypoint(null);
   }, [onSelectWaypoint]);
+
+  if (!MAPBOX_CONFIGURED) return <MapUnavailable />;
 
   return (
     <div

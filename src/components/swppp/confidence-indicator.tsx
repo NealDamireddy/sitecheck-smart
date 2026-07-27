@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, FileSearch, Brain, Shield, BarChart3, Sparkles, Plane, AlertCircle } from 'lucide-react';
+import { CheckCircle, FileSearch, Brain, Shield, Plane, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { ProcessingStep } from '@/stores/swppp-store';
 

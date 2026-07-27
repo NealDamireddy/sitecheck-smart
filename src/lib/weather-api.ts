@@ -103,16 +103,23 @@ function getWindDirection(deg: number | undefined): string {
 }
 
 /**
- * Fetch current weather from OpenWeatherMap
+ * Fetch current weather from OpenWeatherMap.
+ *
+ * `coords` is optional; defaults to the legacy Fresno location. Routes
+ * pass the project's coordinates so each site sees its own weather.
  */
-export async function fetchCurrentWeather(): Promise<WeatherSnapshot> {
+export async function fetchCurrentWeather(
+  coords?: { lat: number; lng: number }
+): Promise<WeatherSnapshot> {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
 
   if (!apiKey) {
     throw new Error('OPENWEATHERMAP_API_KEY environment variable is not set');
   }
 
-  const url = `${OWM_BASE_URL}/weather?lat=${FRESNO_LAT}&lon=${FRESNO_LON}&appid=${apiKey}&units=imperial`;
+  const lat = coords?.lat ?? FRESNO_LAT;
+  const lon = coords?.lng ?? FRESNO_LON;
+  const url = `${OWM_BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=imperial`;
 
   const response = await fetch(url, {
     headers: {

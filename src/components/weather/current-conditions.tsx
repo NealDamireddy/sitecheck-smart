@@ -1,14 +1,22 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Thermometer, Droplets, Wind, Eye } from 'lucide-react';
+import { Droplets, Wind, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useWeatherStore } from '@/stores/weather-store';
+import { useProjectStore } from '@/stores/project-store';
 import { WEATHER_ICONS } from '@/lib/constants';
 
 export function CurrentConditions() {
   const current = useWeatherStore((s) => s.current);
   const fetchWeather = useWeatherStore((s) => s.fetchWeather);
+  const currentProject = useProjectStore((s) => s.currentProject());
+
+  const today = new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   useEffect(() => {
     if (!current) fetchWeather();
@@ -68,8 +76,14 @@ export function CurrentConditions() {
           </div>
         </div>
 
-        <p className="mt-3 text-[10px] text-muted-foreground text-center">
-          Fresno, CA — March 29, 2026 — Updated hourly
+        {/* suppressHydrationWarning: server and client may straddle midnight/TZ */}
+        <p
+          className="mt-3 text-[10px] text-muted-foreground text-center"
+          suppressHydrationWarning
+        >
+          {[currentProject?.address ?? currentProject?.name, today, 'Updated hourly']
+            .filter(Boolean)
+            .join(' — ')}
         </p>
       </CardContent>
     </Card>

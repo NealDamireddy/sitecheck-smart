@@ -10,7 +10,8 @@ import { useCheckpointStore } from '@/stores/checkpoint-store';
 import { useProjectStore } from '@/stores/project-store';
 import { useDroneStore } from '@/stores/drone-store';
 import { STATUS_COLORS } from '@/lib/constants';
-import { MAPBOX_TOKEN, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MAPBOX_TOKEN, MAPBOX_CONFIGURED, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MapUnavailable } from '@/components/map/map-unavailable';
 import { CorridorLayer } from '@/components/map/corridor-layer';
 import { GeofenceLayer } from '@/components/map/geofence-layer';
 import { NoFlyZonesLayer } from '@/components/map/nofly-zones-layer';
@@ -213,6 +214,8 @@ export function MissionMap({
   const handleDragStart = useCallback(() => {
     if (followDrone) setFollowDrone(false);
   }, [followDrone]);
+
+  if (!MAPBOX_CONFIGURED) return <MapUnavailable />;
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-lg">

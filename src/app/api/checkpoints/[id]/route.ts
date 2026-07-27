@@ -254,7 +254,7 @@ export async function DELETE(
     const { supabase } = auth;
 
     // Check if checkpoint exists
-    const { data: existing, error: existingError } = await supabase
+    const { error: existingError } = await supabase
       .from('checkpoints')
       .select('id')
       .eq('id', id)

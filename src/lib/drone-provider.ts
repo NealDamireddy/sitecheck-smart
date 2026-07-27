@@ -26,7 +26,7 @@ function getDemoPhotoUrl(waypointNumber: number): string {
  * (DJI MSDK, MAVLink, etc.) when connecting to actual hardware.
  */
 function createStubProvider(): DroneProvider {
-  let connected = true; // Simulated connection state
+  const connected = true; // Simulated connection state
   let activeSim: TelemetrySimulator | null = null;
 
   const log = (action: string, ...args: unknown[]) => {

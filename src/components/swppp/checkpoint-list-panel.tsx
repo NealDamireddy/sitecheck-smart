@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, Filter, ExternalLink } from 'lucide-react';
+import { Search, ExternalLink } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/shared/status-badge';

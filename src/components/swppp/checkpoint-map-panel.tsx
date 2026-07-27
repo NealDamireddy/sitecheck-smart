@@ -7,7 +7,8 @@ import { MapPin } from 'lucide-react';
 import { useCheckpointStore } from '@/stores/checkpoint-store';
 import { useEffect } from 'react';
 import { STATUS_COLORS, BMP_CATEGORY_COLORS } from '@/lib/constants';
-import { MAPBOX_TOKEN, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MAPBOX_TOKEN, MAPBOX_CONFIGURED, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MapUnavailable } from '@/components/map/map-unavailable';
 import { useProjectStore } from '@/stores/project-store';
 import { fitBoundsFromPoints } from '@/lib/map-utils';
 import { CorridorLayer } from '@/components/map/corridor-layer';
@@ -63,6 +64,8 @@ export function CheckpointMapPanel({ selectedCheckpointId, onSelect, extractedCh
       bearing: 0,
     };
   }, [useExtracted, extractedCheckpoints, storeCheckpoints, project]);
+
+  if (!MAPBOX_CONFIGURED) return <MapUnavailable />;
 
   return (
     <div className="flex h-full flex-col">

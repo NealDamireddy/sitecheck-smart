@@ -34,22 +34,20 @@ function signalColor(pct: number): string {
 
 export function TelemetryPanel() {
   const telemetry = useDroneStore((s) => s.telemetry);
-  const [stale, setStale] = useState(false);
+  // Ticks every second while telemetry flows; `stale` is derived from the
+  // last-update age instead of being reset synchronously in the effect.
+  const [staleCheckAt, setStaleCheckAt] = useState(() => Date.now());
 
-  // Detect stale telemetry (>3s since last update)
   useEffect(() => {
-    if (!telemetry) {
-      setStale(false);
-      return;
-    }
-    const checkStale = setInterval(() => {
-      const age = Date.now() - new Date(telemetry.timestamp).getTime();
-      setStale(age > 3000);
-    }, 1000);
+    if (!telemetry) return;
+    const checkStale = setInterval(() => setStaleCheckAt(Date.now()), 1000);
     return () => clearInterval(checkStale);
   }, [telemetry]);
 
   if (!telemetry) return null;
+
+  const stale =
+    staleCheckAt - new Date(telemetry.timestamp).getTime() > 3000;
 
   return (
     <Card className="border-border bg-surface">

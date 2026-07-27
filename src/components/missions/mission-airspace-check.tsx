@@ -46,7 +46,11 @@ export function MissionAirspaceCheck({
   const fetchZones = useNoFlyZonesStore((s) => s.fetchZones);
   const geofencesByProject = useGeofenceStore((s) => s.geofencesByProject);
   const zonesByProject = useNoFlyZonesStore((s) => s.zonesByProject);
-  const loading = useGeofenceStore((s) => s.loading) || useNoFlyZonesStore((s) => s.loading);
+  // Both hooks must run unconditionally — `a || b` would skip the second
+  // subscription whenever the first is true and break hook ordering.
+  const geofencesLoading = useGeofenceStore((s) => s.loading);
+  const zonesLoading = useNoFlyZonesStore((s) => s.loading);
+  const loading = geofencesLoading || zonesLoading;
 
   // Fetch on mount + whenever the project changes
   useEffect(() => {
@@ -58,8 +62,10 @@ export function MissionAirspaceCheck({
   const geofence = projectId
     ? (geofencesByProject[projectId] ?? [])[0]
     : undefined;
-  const zones = projectId ? (zonesByProject[projectId] ?? []) : [];
-  const activeZones = useMemo(() => zones.filter((z) => z.active), [zones]);
+  const activeZones = useMemo(() => {
+    const zones = projectId ? (zonesByProject[projectId] ?? []) : [];
+    return zones.filter((z) => z.active);
+  }, [projectId, zonesByProject]);
 
   // Run validation against the polyline of selected checkpoints
   const result = useMemo(() => {

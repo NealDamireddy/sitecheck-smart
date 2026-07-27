@@ -7,7 +7,7 @@ import { EditableSection } from '@/components/reports/editable-section';
 import { SignatureBlock } from '@/components/reports/signature-block';
 
 export function ReportPreview() {
-  const { sections, setSections, updateSection, signed, signedBy, signedDate, sign, unsign, loading, generateReport } =
+  const { sections, updateSection, signed, signedBy, signedDate, sign, unsign, loading, generateReport } =
     useReportStore();
   const currentProject = useProjectStore((s) => s.currentProject());
   const isLinear = currentProject?.projectType === 'linear';

@@ -116,10 +116,11 @@ export function RainEventBanner() {
     checkRainEvents(projectId);
   }, [projectId, checkRainEvents]);
 
-  const countdown = useMemo(() => {
-    if (!draftInspection?.dueBy) return null;
-    return computeCountdown(draftInspection.dueBy);
-  }, [draftInspection?.dueBy]);
+  const dueBy = draftInspection?.dueBy ?? null;
+  const countdown = useMemo(
+    () => (dueBy ? computeCountdown(dueBy) : null),
+    [dueBy]
+  );
 
   // Hide when:
   //  * no rain event detected (no key, no precipitation, etc)

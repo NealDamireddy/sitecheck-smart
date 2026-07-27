@@ -23,10 +23,12 @@ export function RouteEditor({ mission, onSave }: RouteEditorProps) {
   const project = useProjectStore((s) => s.currentProject());
   const { geofence, noFlyZones } = useAirspace(project?.id);
 
-  const siteCenter = {
-    lat: project?.coordinates.lat ?? 36.7801,
-    lng: project?.coordinates.lng ?? -119.4161,
-  };
+  const projectLat = project?.coordinates.lat;
+  const projectLng = project?.coordinates.lng;
+  const siteCenter = useMemo(
+    () => ({ lat: projectLat ?? 36.7801, lng: projectLng ?? -119.4161 }),
+    [projectLat, projectLng]
+  );
 
   const [waypoints, setWaypoints] = useState<Waypoint[]>(mission.waypoints);
   const [flightPath, setFlightPath] = useState<[number, number][]>(

@@ -10,6 +10,9 @@ import { MetricCard } from '@/components/dashboard/metric-card';
 import { ActivityFeed } from '@/components/dashboard/activity-feed';
 import { InspectionPicker } from '@/components/dashboard/inspection-picker';
 import { SmartsRunStatusPanel } from '@/components/smarts/run-status-panel';
+import { CurrentConditions } from '@/components/weather/current-conditions';
+import { ForecastChart } from '@/components/weather/forecast-chart';
+import { AlertPanel } from '@/components/weather/alert-panel';
 import {
   AlertTriangle,
   Calendar,
@@ -173,7 +176,7 @@ export default function DashboardPage() {
         <h1 className={cn('font-heading text-2xl font-bold tracking-wide', isApp && 'text-lg')}>Command Dashboard</h1>
         {!isApp && (
           <p className="mt-1 text-sm text-muted-foreground">
-            Real-time overview of project compliance and inspection status
+            Today&apos;s weather and the inspection you&apos;re ready to run
           </p>
         )}
       </div>
@@ -181,8 +184,28 @@ export default function DashboardPage() {
       {/* Project Status Bar */}
       <ProjectStatusHeader compact={isApp} />
 
-      {/* Inspection-type dropdown — primary entry into the visit flow. */}
-      <InspectionPicker />
+      {/* PRIMARY: weather + the inspection to execute. On desktop, weather
+          fills the left two-thirds and the inspection picker + active
+          alerts sit on the right. In app mode everything stacks. */}
+      {isApp ? (
+        <div className="space-y-3">
+          <InspectionPicker />
+          <CurrentConditions />
+          <ForecastChart />
+          <AlertPanel />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
+            <CurrentConditions />
+            <ForecastChart />
+          </div>
+          <div className="space-y-4">
+            <InspectionPicker />
+            <AlertPanel />
+          </div>
+        </div>
+      )}
 
       {/* Latest Sync-to-SMARTS run status. */}
       <SmartsRunStatusPanel projectId={currentProjectId} />

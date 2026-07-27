@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Clock, CloudRain, Wind, Thermometer, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Clock, CloudRain, Wind, ExternalLink } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useWeatherStore } from '@/stores/weather-store';

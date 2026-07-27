@@ -1,11 +1,18 @@
 import { create } from 'zustand';
 import type { Project } from '@/types/project';
+import { project as demoProject } from '@/data/project';
+import { isDemoSession } from '@/lib/demo/start-demo';
 
 /**
  * Project list is sourced strictly from /api/projects, which is
  * RLS-filtered by the caller's org membership. There is intentionally
- * NO static fallback — that would leak demo projects to QSPs who shouldn't
- * see them and undermine per-user site isolation.
+ * NO static fallback for signed-in users — that would leak demo projects
+ * to QSPs who shouldn't see them and undermine per-user site isolation.
+ *
+ * The one exception is a demo session (sitecheck_demo cookie): the API
+ * 401s there, and the tour promises a pre-loaded sample site, so we fall
+ * back to the bundled demo project — the same demo gate every other
+ * store uses (see checkpoint-store).
  */
 
 const STORAGE_KEY = 'sitecheck-current-project';
@@ -59,7 +66,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const res = await fetch('/api/projects');
-      if (!res.ok) throw new Error('Failed to fetch projects');
+      if (!res.ok) {
+        if (isDemoSession()) {
+          set({
+            projects: [demoProject],
+            currentProjectId: demoProject.id,
+            loading: false,
+            loaded: true,
+          });
+          return;
+        }
+        throw new Error('Failed to fetch projects');
+      }
       const data = await res.json();
       const projects: Project[] = Array.isArray(data) ? data : [];
 
@@ -86,6 +104,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         }
       }
     } catch (err) {
+      if (isDemoSession()) {
+        set({
+          projects: [demoProject],
+          currentProjectId: demoProject.id,
+          loading: false,
+          loaded: true,
+        });
+        return;
+      }
       set({
         loading: false,
         loaded: true,

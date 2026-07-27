@@ -2,8 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowRight, ClipboardList, Loader2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarDays,
+  ClipboardCheck,
+  ClipboardList,
+  CloudDrizzle,
+  CloudRain,
+  Droplets,
+  Loader2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/project-store';
 import {
   useActiveInspectionStore,
@@ -23,12 +34,17 @@ import {
  *      not a checkpoint walkthrough, so no inspection draft is created)
  */
 
-const OPTIONS: { value: ActiveVisit; label: string; hint: string }[] = [
-  { value: 'weekly', label: 'Weekly visit', hint: 'Routine BMP walk-through' },
-  { value: 'monthly', label: 'Monthly visit', hint: 'Full-site BMP audit' },
-  { value: 'pre-storm', label: 'Pre-precipitation visit', hint: 'Within 48 hours of forecast' },
-  { value: 'during-storm', label: 'During precipitation visit', hint: 'SMARTS sample collection' },
-  { value: 'post-storm', label: 'Post-precipitation visit', hint: 'Within 48 hours after rain ends' },
+const OPTIONS: {
+  value: ActiveVisit;
+  label: string;
+  hint: string;
+  icon: typeof CalendarDays;
+}[] = [
+  { value: 'weekly', label: 'Weekly visit', hint: 'Routine BMP walk-through', icon: ClipboardCheck },
+  { value: 'monthly', label: 'Monthly visit', hint: 'Full-site BMP audit', icon: CalendarDays },
+  { value: 'pre-storm', label: 'Pre-precipitation', hint: 'Within 48 hours of forecast', icon: CloudDrizzle },
+  { value: 'during-storm', label: 'During precipitation', hint: 'SMARTS sample collection', icon: CloudRain },
+  { value: 'post-storm', label: 'Post-precipitation', hint: 'Within 48 hours after rain', icon: Droplets },
 ];
 
 const VISIT_TO_INSPECTION_TYPE: Record<
@@ -100,59 +116,100 @@ export function InspectionPicker() {
   };
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-amber-400" />
-            <h2 className="text-sm font-semibold">Start an inspection</h2>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{selected.hint}</p>
-          {inspectionInProgress && (
-            <p className="mt-1 text-[11px] text-amber-300">
-              An inspection is already in progress. Starting a new one will replace it.
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="sr-only" htmlFor="visit-type">
-            Visit type
-          </label>
-          <select
-            id="visit-type"
-            value={visit}
-            onChange={(e) => setVisit(e.target.value as ActiveVisit)}
-            disabled={starting}
-            className="rounded border border-border bg-elevated px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none"
-          >
-            {OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <Button
-            onClick={start}
-            disabled={!currentProjectId || starting}
-            className="min-h-[40px]"
-          >
-            {starting ? (
-              <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Starting…
-              </>
-            ) : (
-              <>
-                Start
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </>
-            )}
-          </Button>
+    <div className="rounded-xl border border-amber-500/25 bg-surface p-5 shadow-lg shadow-amber-500/5">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400">
+          <ClipboardList className="h-4 w-4" />
+        </span>
+        <div>
+          <h2 className="font-heading text-base font-bold tracking-wide text-foreground">
+            Start an inspection
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Pick the visit you&apos;re performing today
+          </p>
         </div>
       </div>
 
+      {/* Direct, tappable visit-type cards — no dropdown hunting. */}
+      <fieldset
+        disabled={starting}
+        className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {OPTIONS.map((o) => {
+          const Icon = o.icon;
+          const active = o.value === visit;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setVisit(o.value)}
+              aria-pressed={active}
+              className={cn(
+                'flex items-start gap-3 rounded-lg border p-3 text-left transition-all',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50',
+                active
+                  ? 'border-amber-500/70 bg-amber-500/10 ring-1 ring-amber-500/40'
+                  : 'border-border bg-surface-elevated hover:border-amber-500/40 hover:bg-surface-overlay'
+              )}
+            >
+              <Icon
+                className={cn(
+                  'mt-0.5 h-5 w-5 shrink-0',
+                  active ? 'text-amber-400' : 'text-muted-foreground'
+                )}
+              />
+              <span className="min-w-0">
+                <span
+                  className={cn(
+                    'block text-sm font-semibold',
+                    active ? 'text-foreground' : 'text-foreground/90'
+                  )}
+                >
+                  {o.label}
+                </span>
+                <span className="block text-[11px] leading-snug text-muted-foreground">
+                  {o.hint}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </fieldset>
+
+      {inspectionInProgress && (
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-amber-300">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          An inspection is already in progress — starting a new one will replace it.
+        </p>
+      )}
+
+      <Button
+        onClick={start}
+        disabled={!currentProjectId || starting}
+        size="lg"
+        className="mt-4 h-12 w-full text-base font-semibold"
+      >
+        {starting ? (
+          <>
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Starting…
+          </>
+        ) : (
+          <>
+            Start {selected.label.toLowerCase()}
+            <ArrowRight className="ml-1.5 h-5 w-5" />
+          </>
+        )}
+      </Button>
+
+      {!currentProjectId && (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          Select a project from the top bar to begin.
+        </p>
+      )}
+
       {error && (
-        <div className="mt-3 rounded-md border border-red-700 bg-red-900/40 p-2 text-xs text-red-200">
+        <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="mr-1 inline h-3 w-3" />
           {error}
         </div>

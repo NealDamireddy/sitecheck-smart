@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { createClient } from '@/lib/supabase/client';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Notification {
   id: string;

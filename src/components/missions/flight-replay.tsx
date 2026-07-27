@@ -96,6 +96,11 @@ export function FlightReplay({ mission }: FlightReplayProps) {
     return Math.max(0, Math.round((last - first) / 1000));
   }, [actualSamples, hasActualTrack]);
 
+  // The frame loop re-queues itself via this ref — a useCallback can't
+  // reference itself in its own initializer (and the React Compiler
+  // refuses to memoize it if it tries).
+  const animateRef = useRef<(time: number) => void>(() => {});
+
   const animate = useCallback(
     (time: number) => {
       if (!lastTimeRef.current) lastTimeRef.current = time;
@@ -128,7 +133,7 @@ export function FlightReplay({ mission }: FlightReplayProps) {
         return;
       }
 
-      animRef.current = requestAnimationFrame(animate);
+      animRef.current = requestAnimationFrame((t) => animateRef.current(t));
     },
     [
       playbackProgress,
@@ -142,9 +147,13 @@ export function FlightReplay({ mission }: FlightReplayProps) {
   );
 
   useEffect(() => {
+    animateRef.current = animate;
+  }, [animate]);
+
+  useEffect(() => {
     if (playbackState === 'playing') {
       lastTimeRef.current = 0;
-      animRef.current = requestAnimationFrame(animate);
+      animRef.current = requestAnimationFrame((t) => animateRef.current(t));
     }
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);

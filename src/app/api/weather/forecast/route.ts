@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchForecast } from '@/lib/weather-api';
 import { WeatherDay } from '@/types/weather';
-import { resolveProjectId } from '@/lib/project-context';
+import { resolveProjectId, resolveProjectCoords } from '@/lib/project-context';
 
 const CACHE_DURATION_MINUTES = 60; // 1 hour
 
@@ -57,8 +57,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch fresh data from OpenWeatherMap
-    const forecastData = await fetchForecast();
+    // Fetch fresh data from OpenWeatherMap at the project's location
+    const coords = await resolveProjectCoords(supabase, projectId);
+    const forecastData = await fetchForecast(coords);
 
     // Delete old forecasts for this project
     const { error: deleteError } = await supabase

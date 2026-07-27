@@ -17,6 +17,7 @@ function CheckpointsPageInner() {
   const { isApp } = useAppMode();
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
   const fetchCheckpoints = useCheckpointStore((s) => s.fetchCheckpoints);
+  const checkpointCount = useCheckpointStore((s) => s.checkpoints.length);
   const searchParams = useSearchParams();
   const activeInspectionId = useActiveInspectionStore((s) => s.inspectionId);
   const clearActive = useActiveInspectionStore((s) => s.clear);
@@ -44,7 +45,11 @@ function CheckpointsPageInner() {
       <div className={cn('flex flex-col gap-6 p-6', isApp && 'gap-3 p-3')}>
         <SectionHeader
           title="Checkpoint Inspector"
-          description="AI-powered BMP monitoring across 34 control points"
+          description={
+            checkpointCount > 0
+              ? `AI-powered BMP monitoring across ${checkpointCount} control point${checkpointCount === 1 ? '' : 's'}`
+              : 'AI-powered BMP monitoring'
+          }
         />
         <ActiveInspectionBanner />
         <CheckpointFilters />

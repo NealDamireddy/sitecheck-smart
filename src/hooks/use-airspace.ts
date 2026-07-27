@@ -22,22 +22,24 @@ interface UseAirspaceResult {
  * Returns the *first* geofence for the project (single-fence model for now)
  * and *all active* zones.
  */
+interface AirspaceData {
+  /** The project this data was fetched for — stale data is ignored. */
+  projectId: string;
+  geofence: Geofence | undefined;
+  noFlyZones: NoFlyZone[];
+  error: string | null;
+}
+
 export function useAirspace(projectId: string | undefined): UseAirspaceResult {
-  const [geofence, setGeofence] = useState<Geofence | undefined>(undefined);
-  const [noFlyZones, setNoFlyZones] = useState<NoFlyZone[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // All state is written asynchronously (fetch settle) and tagged with
+  // the project it belongs to; everything exposed is derived from the
+  // tag. No synchronous resets in the effect, no stale flash on switch.
+  const [data, setData] = useState<AirspaceData | null>(null);
 
   useEffect(() => {
-    if (!projectId) {
-      setGeofence(undefined);
-      setNoFlyZones([]);
-      return;
-    }
+    if (!projectId) return;
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     Promise.all([
       fetch(`/api/geofences?projectId=${encodeURIComponent(projectId)}`).then((r) =>
@@ -49,18 +51,22 @@ export function useAirspace(projectId: string | undefined): UseAirspaceResult {
     ])
       .then(([fences, zones]) => {
         if (cancelled) return;
-        setGeofence(Array.isArray(fences) && fences.length > 0 ? fences[0] : undefined);
-        setNoFlyZones(Array.isArray(zones) ? zones : []);
+        setData({
+          projectId,
+          geofence:
+            Array.isArray(fences) && fences.length > 0 ? fences[0] : undefined,
+          noFlyZones: Array.isArray(zones) ? zones : [],
+          error: null,
+        });
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load airspace');
-        setGeofence(undefined);
-        setNoFlyZones([]);
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
+        setData({
+          projectId,
+          geofence: undefined,
+          noFlyZones: [],
+          error: err instanceof Error ? err.message : 'Failed to load airspace',
+        });
       });
 
     return () => {
@@ -68,5 +74,11 @@ export function useAirspace(projectId: string | undefined): UseAirspaceResult {
     };
   }, [projectId]);
 
-  return { geofence, noFlyZones, loading, error };
+  const current = projectId && data?.projectId === projectId ? data : null;
+  return {
+    geofence: current?.geofence,
+    noFlyZones: current?.noFlyZones ?? [],
+    loading: Boolean(projectId) && current === null,
+    error: current?.error ?? null,
+  };
 }

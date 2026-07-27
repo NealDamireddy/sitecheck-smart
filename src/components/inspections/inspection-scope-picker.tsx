@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Project, ProjectSegment } from '@/types/project';
 import { formatStation, parseStation, isStationInRange } from '@/lib/format';
 
@@ -23,10 +23,19 @@ export function InspectionScopePicker({ project, value, onChange }: InspectionSc
   const [endInput, setEndInput] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Sync the free-text inputs when the controlled scope changes from
+  // outside (e.g. a preset). Adjusting state during render is React's
+  // sanctioned replacement for a props-mirroring effect.
+  const [prevStart, setPrevStart] = useState(value.stationStart);
+  const [prevEnd, setPrevEnd] = useState(value.stationEnd);
+  if (value.stationStart !== prevStart) {
+    setPrevStart(value.stationStart);
     if (value.stationStart != null) setStartInput(formatStation(value.stationStart));
+  }
+  if (value.stationEnd !== prevEnd) {
+    setPrevEnd(value.stationEnd);
     if (value.stationEnd != null) setEndInput(formatStation(value.stationEnd));
-  }, [value.stationStart, value.stationEnd]);
+  }
 
   if (project.projectType !== 'linear' || !project.corridor) {
     return null;

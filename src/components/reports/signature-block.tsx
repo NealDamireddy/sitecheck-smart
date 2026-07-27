@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { CheckCircle, XCircle, ShieldCheck, Pen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/format';
 
 interface SignatureBlockProps {

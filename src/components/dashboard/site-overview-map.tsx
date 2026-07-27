@@ -5,7 +5,8 @@ import Map, { Marker, Popup, NavigationControl } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
 
-import { MAPBOX_TOKEN, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MAPBOX_TOKEN, MAPBOX_CONFIGURED, DEFAULT_MAP_STYLE } from '@/lib/mapbox-config';
+import { MapUnavailable } from '@/components/map/map-unavailable';
 import { useAppMode } from '@/hooks/use-app-mode';
 import { cn } from '@/lib/utils';
 import { STATUS_COLORS, STATUS_LABELS, BMP_CATEGORY_LABELS } from '@/lib/constants';
@@ -90,6 +91,8 @@ export function SiteOverviewMap() {
   const handlePopupClose = useCallback(() => {
     setSelectedCheckpoint(null);
   }, []);
+
+  if (!MAPBOX_CONFIGURED) return <MapUnavailable />;
 
   return (
     <div className="relative rounded-lg border border-border bg-surface overflow-hidden">

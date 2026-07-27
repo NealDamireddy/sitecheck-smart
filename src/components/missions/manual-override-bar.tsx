@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getDroneProvider } from '@/lib/drone-provider';
-import { useDroneStore } from '@/stores/drone-store';
 import type { ManualOverrideAction } from '@/types/drone';
 import { cn } from '@/lib/utils';
 
@@ -47,7 +46,6 @@ export function ManualOverrideBar({
   const [loading, setLoading] = useState<ManualOverrideAction | null>(null);
   const [expandedAction, setExpandedAction] = useState<ManualOverrideAction | null>(null);
   const [repositionDist, setRepositionDist] = useState('5ft');
-  const { updateMission } = useDroneStore();
 
   const provider = getDroneProvider();
 

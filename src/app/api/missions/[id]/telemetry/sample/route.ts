@@ -19,7 +19,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ZodError } from 'zod';
 import { telemetrySample } from '@/lib/validations';
-import type { DroneTelemetrySample } from '@/types/drone';
 
 const MAX_SAMPLES = 1000;
 const ACTIVE_STATUSES = new Set([
@@ -30,22 +29,6 @@ const ACTIVE_STATUSES = new Set([
 
 interface RouteContext {
   params: Promise<{ id: string }>;
-}
-
-function isValidSample(s: unknown): s is DroneTelemetrySample {
-  if (!s || typeof s !== 'object') return false;
-  const obj = s as Record<string, unknown>;
-  return (
-    typeof obj.lat === 'number' &&
-    typeof obj.lng === 'number' &&
-    typeof obj.altitudeFeet === 'number' &&
-    typeof obj.speedMph === 'number' &&
-    typeof obj.headingDeg === 'number' &&
-    typeof obj.batteryPercent === 'number' &&
-    typeof obj.signalStrengthPercent === 'number' &&
-    typeof obj.gpsSatellites === 'number' &&
-    typeof obj.timestamp === 'string'
-  );
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
