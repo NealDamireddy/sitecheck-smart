@@ -69,3 +69,19 @@ Migrations are reviewed by Aryav before they land, so these are proposals rather
 **CLD-02 — in-memory rate limiter.** Fine on one box, wrong on many: each replica keeps its own counters, so the effective limit multiplies by replica count. Swap the store for Redis/ElastiCache behind the existing `FixedWindowLimiter` interface before scaling the web tier past one instance.
 
 **Container images unbuilt.** The Dockerfiles were written against the real dependency graph and reviewed, but never executed — docker was unavailable in the review environment. The CI `containers` job builds both on every PR; treat the first green run there as the actual verification.
+
+## Dependency advisories not taken
+
+**exceljs → archiver / glob / minimatch / brace-expansion (high).** `npm audit` offers exactly one fix: downgrade `exceljs` from 4.4 to **3.4.0**, a major downgrade that would break the SMARTS export path (`src/lib/smarts/excel-export.ts`). The advisory is a DoS via unbounded brace expansion — reachable only by feeding hostile input to the archiver, and the only workbooks this code writes are ones it generates itself from validated sample data. Accepted risk; revisit when exceljs ships a patched archiver.
+
+**@anthropic-ai/sdk (moderate).** Fix requires a major bump. Worth doing as a deliberate upgrade with the model-pin review (`claude-sonnet-4-20250514` is a year old), not as an audit-driven force-fix.
+
+Re-check with `npm audit --omit=dev` — dev-only advisories are noise for a deployed image, since dev dependencies are not in the runtime layer.
+
+## Known build warning
+
+`next build` emits one Turbopack NFT warning: `src/lib/smarts/sync-job.ts` does dynamic `fs` work (`existsSync`/`readFileSync`/`writeFileSync` on computed paths), so the file tracer gives up and traces the whole project into `.next/standalone` — 123 MB locally, including `src/`, `tests/` and `docs/`. The build succeeds and the container image is far smaller because `.dockerignore` keeps `tests/`, `docs/`, `e2e/` and `smarts-automation/` out of the build context entirely. Adding `turbopackIgnore` comments did **not** satisfy the tracer. The real fix is the queue-worker refactor already planned for cloud deployment: moving the job store behind a queue interface removes the dynamic `fs` from this module and the warning with it.
+
+## Next.js deprecation
+
+`next build` warns that the `middleware` file convention is deprecated in favour of `proxy`. `src/middleware.ts` is the auth wall (SEC-03 lives there), so the rename is mechanical but security-relevant — do it deliberately, with `tests/security/middleware-demo-cookie.test.ts` green on both sides of the change.
