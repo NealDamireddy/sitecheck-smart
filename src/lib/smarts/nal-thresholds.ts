@@ -11,10 +11,17 @@
  */
 
 import type { ParameterResult } from '@/types';
+import {
+  NAL_PH_MIN_SU,
+  NAL_PH_MAX_SU,
+  NAL_TURBIDITY_NTU as CGP_NAL_TURBIDITY_NTU,
+} from '@/lib/cgp/constants';
 
-export const NAL_PH_MIN = 6;
-export const NAL_PH_MAX = 9;
-export const NAL_TURBIDITY_NTU = 250;
+// Values live in src/lib/cgp/constants.ts (single source of truth for
+// every CGP threshold); re-exported here for existing consumers.
+export const NAL_PH_MIN = NAL_PH_MIN_SU;
+export const NAL_PH_MAX = NAL_PH_MAX_SU;
+export const NAL_TURBIDITY_NTU = CGP_NAL_TURBIDITY_NTU;
 
 /**
  * Minimal shape needed to evaluate NAL — accepts either a full

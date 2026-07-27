@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { deficiencyCreate } from '@/lib/validations';
 import { resolveProjectId } from '@/lib/project-context';
+import { REPAIR_START_HOURS } from '@/lib/cgp/constants';
 
 
 // Transform snake_case DB row to camelCase
@@ -152,12 +153,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform to snake_case for DB
+    const detectedDate = body.detectedDate || new Date().toISOString();
+    // CGP 2022: repairs must BEGIN within 72 h of identification. The
+    // clock starts server-side at detection; a client may only supply a
+    // TIGHTER deadline, never push it past the regulatory limit.
+    const regulatoryDeadline = new Date(
+      new Date(detectedDate).getTime() + REPAIR_START_HOURS * 3_600_000
+    ).toISOString();
+    const deadline =
+      body.deadline && body.deadline < regulatoryDeadline
+        ? body.deadline
+        : regulatoryDeadline;
+
     const dbData = toSnakeCase({
       ...body,
       id: deficiencyId,
       projectId,
       status: body.status || 'open',
-      detectedDate: body.detectedDate || new Date().toISOString(),
+      detectedDate,
+      deadline,
     });
 
     // Insert deficiency
