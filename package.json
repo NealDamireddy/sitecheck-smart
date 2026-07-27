@@ -11,7 +11,9 @@
     "db:seed:reset": "tsx scripts/seed-database.ts --reset",
     "db:seed:dry": "tsx scripts/seed-database.ts --dry-run",
     "db:migrate": "tsx scripts/apply-migrations.ts",
-    "db:migrate:dry": "tsx scripts/apply-migrations.ts --dry-run"
+    "db:migrate:dry": "tsx scripts/apply-migrations.ts --dry-run",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -53,6 +55,7 @@
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
