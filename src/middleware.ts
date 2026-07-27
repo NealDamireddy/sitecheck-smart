@@ -19,6 +19,11 @@ function isApiRoute(pathname: string): boolean {
 }
 
 function isDemoSession(request: NextRequest): boolean {
+  // SEC-03: the demo cookie is client-settable (anyone can create it in
+  // devtools), so honoring it in production would let anyone walk past
+  // the login wall for page shells. Demo sessions are a dev/preview
+  // convenience only.
+  if (process.env.NODE_ENV === 'production') return false;
   return request.cookies.get('sitecheck_demo')?.value === '1';
 }
 
