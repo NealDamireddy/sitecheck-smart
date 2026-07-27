@@ -5,6 +5,10 @@ import type { JsfSelectArgs, JsfSelectResult } from "../../src/util/primefaces.j
 export interface FakePfOpts {
   /** Result returned by page.evaluate (the JSF select resolution). */
   evaluateResult?: JsfSelectResult;
+  /** What the certification-guard's target probe sees under the point.
+   *  The guard passes an [x, y] tuple to evaluate; JSF select passes an
+   *  object — the fake dispatches on that shape. Default: empty (benign). */
+  targetDescription?: string;
 }
 
 export interface FakePf {
@@ -37,7 +41,14 @@ export function makeFakePfPage(opts: FakePfOpts = {}): FakePf {
   const evaluateArgs: JsfSelectArgs[] = [];
 
   const evaluate = vi.fn(
-    async (_fn: unknown, args: JsfSelectArgs): Promise<JsfSelectResult> => {
+    async (
+      _fn: unknown,
+      args: JsfSelectArgs | [number, number],
+    ): Promise<JsfSelectResult | string> => {
+      if (Array.isArray(args)) {
+        // Certification-guard target probe.
+        return opts.targetDescription ?? "";
+      }
       evaluateArgs.push(args);
       return opts.evaluateResult ?? SUCCESS;
     },

@@ -52,7 +52,9 @@ describe("executeAction", () => {
       reason: "analytical method",
     });
 
-    expect(f.evaluate).toHaveBeenCalledTimes(1);
+    // Two evaluate calls since the Stage 3 certification hard-stop: the
+    // first is the guard's target probe, the second the JSF resolution.
+    expect(f.evaluate).toHaveBeenCalledTimes(2);
     expect(f.evaluateArgs[0]).toEqual({
       optionText: "EPA 150.1",
       preferredId: null,
