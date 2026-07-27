@@ -83,6 +83,24 @@ New findings, all surfaced BY the tests:
 
 **Verified sound:** `capture="environment"` opens the rear camera directly; sample entry uses `type="number" inputMode="decimal"` (correct mobile keypad); confidence is surfaced numerically with a color-coded bar; checkpoint detail has real loading, error and not-found states; the demo-data fallback correctly refuses to mask a real account's missing checkpoint.
 
+## Stage 6 — Cloud portability
+
+Assessment + artifacts; no migration performed. Full write-up: **docs/DEPLOYMENT.md**.
+
+| ID | Sev | Location | Finding | Status |
+|---|---|---|---|---|
+| CLD-01 | — | `next.config.ts` | No `output: 'standalone'`, so the app could not be containerized without shipping node_modules. | **fixed** — standalone output; Vercel ignores it. |
+| CLD-02 | MEDIUM | `src/lib/rate-limit.ts` | Rate-limit counters are per process: with N replicas the effective limit is N x the intended one. | **documented** — correct for the current single-box deploy; Redis swap noted in DEPLOYMENT and FOLLOW_UP. Interface already isolated. |
+| CLD-03 | LOW | `next.config.ts` | Supabase image host would have to be hardcoded per environment. | **fixed** — derived from `NEXT_PUBLIC_SUPABASE_URL`. |
+| CLD-04 | MEDIUM | app boot | **No fail-fast env validation.** A missing `SMARTS_CREDENTIALS_KEY` surfaces the first time an inspector saves credentials, not at startup. | **open** — a Zod-parsed `env.ts` is small and high-value; the first-deploy checklist covers it manually meanwhile. |
+| CLD-05 | — | absent | No health endpoint; nothing for a load balancer or orchestrator to probe. | **fixed** — `/api/health` (200/503, `?shallow=1` liveness, 3s timeout, build metadata, no config disclosure). 8 tests. |
+| CLD-06 | MEDIUM | 66 server files | 178 `console.*` calls: cloud aggregators cannot index free text, and console bypasses any redaction. | **fixed** — `lib/logger.ts` (JSON lines, key-based secret redaction, Errors unwrapped not spread). Security test fails the build if a route reintroduces `console.*`. |
+| CLD-07 | HIGH | `lib/smarts/sync-job.ts` | Writes job state to local disk and spawns a detached child — fatal on serverless. | **documented, by design** — the bot is a separate container; deployment shape (queue-triggered task, 1 vCPU/2 GB, concurrency 1 per user, DLQ after 2) specified in DEPLOYMENT section 6. |
+| CLD-08 | HIGH | migrations 008/009 | **The real lock-in.** Every RLS policy is written against Supabase's `auth.uid()`. Moving auth to Cognito/Entra ID does not degrade isolation — it removes it (policies match nothing, app goes blank). | **documented** — two re-expression options in DEPLOYMENT section 5, with a recommendation against moving enforcement into application code for a legal-record system. |
+| CLD-09 | LOW | `Dockerfile` | `NEXT_PUBLIC_*` values are inlined at build time, so one image is bound to one Supabase project — staging and prod need separate builds. | **documented** — called out in the Dockerfile and DEPLOYMENT; surprises people expecting to repoint a container via env. |
+
+**Not verified:** the container images have not been built (docker unavailable in this environment). The CI `containers` job is what will first prove them.
+
 ## Stage 0 — Recon findings carried forward
 
 | ID | Sev | Location | Finding | Status |

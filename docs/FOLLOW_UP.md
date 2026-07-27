@@ -61,3 +61,11 @@ Migrations are reviewed by Aryav before they land, so these are proposals rather
 **UX-07 — guided walkthrough navigation.** There is a persisted progress count but no next/back between checkpoints; the inspector returns to the grid each time. A guided sequence ("7 of 32", next/skip/N-A) is the single biggest reduction in taps for the core loop, and it interacts with UX-05's persistence model — design both together.
 
 **UX-03 (remainder) — editable AI narrative.** The draft framing landed; making the narrative editable and attributing the edit to the QSP is the other half. Needs a decision on whether edits are stored alongside the AI original (audit trail) or replace it.
+
+## Deferred from Stage 6
+
+**CLD-04 — no fail-fast environment validation.** Every env var is read ad hoc via `process.env`. A missing or malformed value surfaces at first use, not at boot: a bad `SMARTS_CREDENTIALS_KEY` fails when an inspector saves credentials, a missing `NOAA_USER_AGENT` when weather is first fetched. A Zod-parsed `src/lib/env.ts` that throws at module load would turn every one of these into a deploy-time failure. Small change, high value on a new environment; the first-deploy checklist in `docs/DEPLOYMENT.md` is the manual stand-in.
+
+**CLD-02 — in-memory rate limiter.** Fine on one box, wrong on many: each replica keeps its own counters, so the effective limit multiplies by replica count. Swap the store for Redis/ElastiCache behind the existing `FixedWindowLimiter` interface before scaling the web tier past one instance.
+
+**Container images unbuilt.** The Dockerfiles were written against the real dependency graph and reviewed, but never executed — docker was unavailable in the review environment. The CI `containers` job builds both on every PR; treat the first green run there as the actual verification.
