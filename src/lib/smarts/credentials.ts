@@ -100,6 +100,13 @@ async function fetchRow(
 }
 
 function envCredentials(): { username: string; password: string } | null {
+  // SEC-08: the server-env pair is a SHARED SMARTS account. Silently
+  // submitting it for any inspector who hasn't saved their own login
+  // means filings under the wrong identity in multi-tenant use. The
+  // fallback is therefore opt-in: set SMARTS_ALLOW_ENV_FALLBACK=1 only
+  // on single-tenant/dev deployments where the shared account is the
+  // intended identity.
+  if (process.env.SMARTS_ALLOW_ENV_FALLBACK !== '1') return null;
   const username = process.env.SMARTS_USERNAME?.trim();
   const password = process.env.SMARTS_PASSWORD?.trim();
   return username && password ? { username, password } : null;
