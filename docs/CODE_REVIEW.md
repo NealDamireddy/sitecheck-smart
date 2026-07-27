@@ -34,8 +34,8 @@ Severity rubric: see the review mandate. Status is one of **fixed** (commit note
 | DRF-03 | HIGH | `src/lib/validations/parameter-result.ts` | No ND/DNQ cross-field rule in the web app validation layer. | **open** — Stage 3. |
 | CMP-01 | MEDIUM | `src/lib/weather-api.ts` + `src/lib/smarts/noaa.ts` + legacy detector | Two parallel weather stacks + two rain-event flows = two sources of truth for QPE. | **open** — Stage 3. |
 | TST-01 | HIGH | repo root | Web app had zero tests. | **in progress** — Vitest bootstrapped (`20786ab`), 45 tests and counting; full suite is Stage 5. |
-| AI-01 | MEDIUM | `src/app/api/scan-swppp/route.ts` (system prompt) | Prompt instructs the model to **fabricate GPS coordinates** inside a hardcoded demo-site bounding box (36.778…, −119.41…) when the SWPPP lacks them — every real customer's extracted checkpoints land on the demo site's map location, presented as real. | **open** — Stage 3: extraction should mark positions as unlocated and let the QSP place them, not invent coordinates in a legal record. |
-| AI-02 | MEDIUM | `src/app/api/checkpoints/[id]/analyze/route.ts` | On Claude failure the route falls back to `mockAnalyzeBmpPhoto` and **persists the fabricated analysis** to `ai_analyses` with no marker distinguishing it from a real one. | **open** — Stage 3/4: fail loudly, or persist with an explicit `model:'mock'` marker surfaced in the UI. |
+| AI-01 | MEDIUM | `src/app/api/scan-swppp/route.ts` (system prompt) | Prompt instructs the model to **fabricate GPS coordinates** inside a hardcoded demo-site bounding box (36.778…, −119.41…) when the SWPPP lacks them — every real customer's extracted checkpoints land on the demo site's map location, presented as real. | **fixed** — extraction returns null coordinates; project creation rings unlocated checkpoints around the real project center for QSP placement. Test: null-coordinate case in `tests/ai-output-validation.test.ts`. |
+| AI-02 | MEDIUM | `src/app/api/checkpoints/[id]/analyze/route.ts` | On Claude failure the route falls back to `mockAnalyzeBmpPhoto` and **persists the fabricated analysis** to `ai_analyses` with no marker distinguishing it from a real one. | **fixed** — real vision failures return 502 and persist nothing; keyless-demo mock stays, tagged `model:'mock-deterministic'` and echoed in the response (durable persistence of the marker needs an `ai_analyses.model` column — gated migration, see RLS-01 batch). Test: `tests/checkpoint-analyze-no-mock.test.ts`. |
 
 ## Non-findings (checked, held up)
 
@@ -45,3 +45,9 @@ Severity rubric: see the review mandate. Status is one of **fixed** (commit note
 - RLS enabled on every table; org-scoping correct on parent and child tables; `smarts_credentials`/`qsp_profiles`/`smarts_runs` own-row.
 - SMARTS credential encryption (AES-256-GCM, server-only key, write-only API) sound; password reaches the bot via child env only, never persisted.
 - Certify hard-stop (invariant §1.2.1): no app-layer path can trigger certification; log-guard treats any claimed certified state as tamper-evidence (`sync-job.ts`). Orchestrator-level proof scheduled for Stage 3.
+
+## User-reported defects
+
+| ID | Sev | Location | Finding | Status |
+|---|---|---|---|---|
+| CMP-02 | HIGH | weather pipeline (`src/lib/weather-api.ts`, `src/lib/smarts/noaa.ts`, `api/weather/*`, `api/cron/pre-storm-detector`, legacy rain-event detector) | Neal reports weather is inconsistent for the project location and the app never notifies on qualifying rain events. Root causes to confirm in Stage 3: dual OWM/NOAA stacks (CMP-01), QPE rule approximation, and the cron detector's trigger/config. Decision: consolidate on NOAA api.weather.gov. | **open** — scheduled as the centerpiece of Stage 3. |
