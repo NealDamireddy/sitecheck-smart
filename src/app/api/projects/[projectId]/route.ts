@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { projectWdidPatch } from '@/lib/validations/project';
 
 interface RouteContext {
   params: Promise<{ projectId: string }>;
@@ -23,14 +24,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (auth.error) return auth.error;
 
     const { projectId } = await context.params;
-    const body = (await request.json().catch(() => null)) as {
-      wdid?: string;
-    } | null;
-
-    const wdid = body?.wdid?.trim();
-    if (!wdid) {
+    const parsed = projectWdidPatch.safeParse(
+      await request.json().catch(() => null)
+    );
+    if (!parsed.success) {
       return NextResponse.json({ error: 'wdid is required' }, { status: 400 });
     }
+    const { wdid } = parsed.data;
 
     const { data, error } = await auth.supabase
       .from('projects')

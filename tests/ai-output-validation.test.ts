@@ -122,3 +122,18 @@ describe('swpppExtractionOutput', () => {
     ).toBe(false);
   });
 });
+
+describe('projectWdidPatch (SEC-11)', async () => {
+  const { projectWdidPatch } = await import('@/lib/validations/project');
+  it('accepts a normal WDID and trims it', () => {
+    const parsed = projectWdidPatch.safeParse({ wdid: ' 5S34C123456 ' });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.wdid).toBe('5S34C123456');
+  });
+  it('rejects empty, missing, and oversized values', () => {
+    expect(projectWdidPatch.safeParse({ wdid: '   ' }).success).toBe(false);
+    expect(projectWdidPatch.safeParse({}).success).toBe(false);
+    expect(projectWdidPatch.safeParse(null).success).toBe(false);
+    expect(projectWdidPatch.safeParse({ wdid: 'x'.repeat(31) }).success).toBe(false);
+  });
+});

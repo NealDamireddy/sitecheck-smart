@@ -51,3 +51,12 @@ export const projectCreate = z.object({
     widthFeet: z.number().optional(),
   }).optional(),
 });
+
+/**
+ * PATCH /api/projects/[projectId] — the only field this narrow route
+ * accepts is a WDID correction during SMARTS onboarding (SEC-11).
+ * SMARTS WDIDs are short region-coded identifiers; the cap is generous.
+ */
+export const projectWdidPatch = z.object({
+  wdid: z.string().trim().min(1, 'wdid is required').max(30),
+});
