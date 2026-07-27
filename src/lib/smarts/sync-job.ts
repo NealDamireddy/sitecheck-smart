@@ -43,9 +43,37 @@ import {
 } from '@/lib/smarts/run-audit';
 import { log } from '@/lib/logger';
 
-const BOT_DIR = resolve(process.cwd(), 'smarts-automation');
-const JOBS_DIR = resolve(BOT_DIR, 'artifacts', 'sync-jobs');
-const ARTIFACTS_ROOT = resolve(BOT_DIR, 'artifacts');
+/**
+ * Bot and artifact locations, resolved lazily and overridable by env.
+ *
+ * Why env-overridable: in a container the bot is a SEPARATE image and
+ * the artifacts directory is a mounted volume, so neither path is
+ * relative to the web app's cwd (docs/DEPLOYMENT.md). `SMARTS_BOT_DIR`
+ * and `SMARTS_ARTIFACTS_DIR` are how a deployed worker points at them.
+ *
+ * KNOWN BUILD WARNING (not fixed here): this module's dynamic `fs` calls
+ * make Next's file tracer give up and trace the whole project into
+ * .next/standalone — locally 123 MB including src/, tests/ and docs/.
+ * The build still succeeds and the container image is much smaller
+ * because .dockerignore keeps tests/, docs/, e2e/ and smarts-automation/
+ * out of the build context entirely. Moving the job store behind the
+ * queue interface (the planned cloud shape) removes the dynamic fs from
+ * this module and the warning with it. Tracked in docs/FOLLOW_UP.md.
+ */
+function botDir(): string {
+  return (
+    process.env.SMARTS_BOT_DIR ??
+    resolve(/*turbopackIgnore: true*/ process.cwd(), 'smarts-automation')
+  );
+}
+
+function artifactsRoot(): string {
+  return process.env.SMARTS_ARTIFACTS_DIR ?? resolve(botDir(), 'artifacts');
+}
+
+function jobsDir(): string {
+  return resolve(artifactsRoot(), 'sync-jobs');
+}
 
 export type SyncJobStatus = 'running' | 'filled' | 'halted' | 'error';
 
@@ -79,11 +107,11 @@ export interface SyncJobView extends SyncJobState {
 }
 
 function statePath(jobId: string): string {
-  return resolve(JOBS_DIR, `${jobId}.json`);
+  return resolve(jobsDir(), `${jobId}.json`);
 }
 
 function logPath(jobId: string): string {
-  return resolve(JOBS_DIR, `${jobId}.log`);
+  return resolve(jobsDir(), `${jobId}.log`);
 }
 
 function writeState(state: SyncJobState): void {
@@ -270,11 +298,11 @@ export async function startSyncJob(
         'No SMARTS credentials available. Save your SMARTS username and password on the My Account page.',
     };
   }
-  if (!existsSync(BOT_DIR)) {
+  if (!existsSync(botDir())) {
     return {
       ok: false,
       status: 500,
-      error: `SMARTS bot not found at ${BOT_DIR}.`,
+      error: `SMARTS bot not found at ${botDir()}.`,
     };
   }
 
@@ -287,12 +315,12 @@ export async function startSyncJob(
     };
   }
 
-  mkdirSync(JOBS_DIR, { recursive: true });
+  mkdirSync(jobsDir(), { recursive: true });
   const jobId = randomUUID();
-  const csvPath = resolve(JOBS_DIR, `${jobId}.csv`);
+  const csvPath = resolve(jobsDir(), `${jobId}.csv`);
   writeFileSync(csvPath, input.csv);
 
-  const tsxBin = resolve(BOT_DIR, 'node_modules', '.bin', 'tsx');
+  const tsxBin = resolve(botDir(), 'node_modules', '.bin', 'tsx');
   if (!existsSync(tsxBin)) {
     return {
       ok: false,
@@ -305,7 +333,7 @@ export async function startSyncJob(
   let child;
   try {
     child = spawn(tsxBin, ['src/orchestrator/cli.ts', csvPath], {
-      cwd: BOT_DIR,
+      cwd: botDir(),
       env: {
         ...process.env,
         // Explicit override — a stale server-env pair must never shadow
@@ -396,8 +424,8 @@ export async function getSyncJob(jobId: string): Promise<SyncJobView | null> {
 async function findRunningJobForEvent(
   eventId: string
 ): Promise<SyncJobState | null> {
-  if (!existsSync(JOBS_DIR)) return null;
-  for (const file of readdirSync(JOBS_DIR)) {
+  if (!existsSync(jobsDir())) return null;
+  for (const file of readdirSync(jobsDir())) {
     if (!file.endsWith('.json')) continue;
     const state = readState(file.slice(0, -'.json'.length));
     if (!state || state.eventId !== eventId || state.status !== 'running') {
@@ -432,7 +460,7 @@ export function resolveJobScreenshot(
   }
   if (!path) return null;
   const resolved = resolve(path);
-  if (!resolved.startsWith(ARTIFACTS_ROOT + '/')) return null;
+  if (!resolved.startsWith(artifactsRoot() + '/')) return null;
   if (!resolved.endsWith('.png')) return null;
   return existsSync(resolved) ? resolved : null;
 }
