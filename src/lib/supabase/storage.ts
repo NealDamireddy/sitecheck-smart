@@ -158,3 +158,57 @@ export async function uploadCheckpointPhoto(
     .getPublicUrl(path);
   return { url: data.publicUrl, path };
 }
+
+// ──────────────────────────────────────────────────────
+// SEC-01 — signed-URL serving for checkpoint photos.
+//
+// The DB stores whatever the upload produced (today a public URL; older
+// rows may differ). At read time we extract the object path and mint a
+// short-lived signed URL, so the `checkpoint-photos` bucket can be
+// flipped to private without breaking display. While the bucket is
+// still public, signed URLs work identically — the flip is a no-op for
+// this code path.
+// ──────────────────────────────────────────────────────
+
+const CHECKPOINT_PUBLIC_MARKER = `/storage/v1/object/public/${CHECKPOINT_PHOTOS_BUCKET}/`;
+
+/**
+ * Extract the storage object path from a stored qsp_photo_url value.
+ * Returns null for values that are not checkpoint-photos objects
+ * (external URLs, bundled /demo-photos assets) — those pass through
+ * unsigned.
+ */
+export function checkpointPhotoPathFromUrl(value: string | null): string | null {
+  if (!value) return null;
+  const markerIdx = value.indexOf(CHECKPOINT_PUBLIC_MARKER);
+  if (markerIdx !== -1) {
+    const path = value.slice(markerIdx + CHECKPOINT_PUBLIC_MARKER.length);
+    return path.split('?')[0] || null;
+  }
+  // Bare object path (future-proofing if we switch to storing paths).
+  if (!value.startsWith('http') && !value.startsWith('/')) return value;
+  return null;
+}
+
+/**
+ * Resolve a stored photo value to a servable URL: checkpoint-photos
+ * objects become short-lived signed URLs; anything else (or any signing
+ * failure) returns the stored value unchanged.
+ */
+export async function resolveCheckpointPhotoUrl(
+  value: string | null,
+  expiresInSec = 3600
+): Promise<string | null> {
+  const path = checkpointPhotoPathFromUrl(value);
+  if (!path || !isStorageConfigured()) return value;
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.storage
+      .from(CHECKPOINT_PHOTOS_BUCKET)
+      .createSignedUrl(path, expiresInSec);
+    if (error || !data?.signedUrl) return value;
+    return data.signedUrl;
+  } catch {
+    return value;
+  }
+}

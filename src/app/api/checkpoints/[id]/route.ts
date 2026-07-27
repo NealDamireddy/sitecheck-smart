@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { checkpointUpdate } from '@/lib/validations';
+import { resolveCheckpointPhotoUrl } from '@/lib/supabase/storage';
 
 
 // Transform snake_case DB row to camelCase
@@ -144,6 +145,11 @@ export async function GET(
 
     const result = {
       ...transformCheckpoint(checkpoint),
+      // SEC-01: serve QSP photos via short-lived signed URLs so the
+      // checkpoint-photos bucket can be private.
+      qspPhotoUrl: await resolveCheckpointPhotoUrl(
+        (checkpoint.qsp_photo_url as string | null) ?? null
+      ),
       analysis: analyses && analyses.length > 0 ? transformAnalysis(analyses[0]) : null,
       deficiencies: (deficiencies || []).map(transformDeficiency),
     };
@@ -230,7 +236,13 @@ export async function PUT(
       }
     }
 
-    const checkpoint = transformCheckpoint(data);
+    const checkpoint = {
+      ...transformCheckpoint(data),
+      // SEC-01: signed URL, same as the GET path.
+      qspPhotoUrl: await resolveCheckpointPhotoUrl(
+        (data.qsp_photo_url as string | null) ?? null
+      ),
+    };
 
     return NextResponse.json(checkpoint);
   } catch (error: unknown) {

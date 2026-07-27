@@ -16,7 +16,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { uploadCheckpointPhoto } from '@/lib/supabase/storage';
+import {
+  resolveCheckpointPhotoUrl,
+  uploadCheckpointPhoto,
+} from '@/lib/supabase/storage';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MiB
 const ALLOWED_MIME = new Set([
@@ -117,7 +120,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({
-      qspPhotoUrl: updated.qsp_photo_url,
+      // SEC-01: hand back a signed URL so display works when the bucket
+      // is private; the DB keeps the canonical stored value.
+      qspPhotoUrl: await resolveCheckpointPhotoUrl(updated.qsp_photo_url),
       qspPhotoUploadedAt: updated.qsp_photo_uploaded_at,
     });
   } catch (err: unknown) {

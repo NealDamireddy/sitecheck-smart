@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { resolveCheckpointPhotoUrl } from '@/lib/supabase/storage';
 import {
   analyzeBmpPhoto,
   mockAnalyzeBmpPhoto,
@@ -56,7 +57,9 @@ export async function POST(_request: NextRequest, context: RouteContext) {
     }
 
     const photoUrl: string | null =
-      checkpoint.qsp_photo_url ?? checkpoint.last_inspection_photo ?? null;
+      await resolveCheckpointPhotoUrl(
+        checkpoint.qsp_photo_url ?? checkpoint.last_inspection_photo ?? null
+      );
     if (!photoUrl) {
       return NextResponse.json(
         { error: 'No photo on this checkpoint yet — upload one first.' },
