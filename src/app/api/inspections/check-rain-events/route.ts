@@ -85,7 +85,17 @@ export async function POST(request: NextRequest) {
     }
 
     const coords = await resolveProjectCoords(supabase, projectId);
-    const rainEvent = await detectRainEventForProject(projectId, coords);
+    // Risk level drives the post-storm window (48 h for RL1, 24 h for
+    // RL2/3) — fetch it alongside coords so the deadline is right.
+    const { data: projectRow } = await supabase
+      .from('projects')
+      .select('risk_level')
+      .eq('id', projectId)
+      .maybeSingle();
+    const riskLevel = ([1, 2, 3].includes(Number(projectRow?.risk_level))
+      ? Number(projectRow?.risk_level)
+      : 1) as 1 | 2 | 3;
+    const rainEvent = await detectRainEventForProject(projectId, coords, riskLevel);
     if (!rainEvent) {
       return NextResponse.json({ rainEvent: null, inspection: null });
     }

@@ -1,145 +1,113 @@
 /**
- * Block 5 — Rain-event detection.
+ * Rain-event detection — OBSERVED rainfall, CGP-correct rules (CMP-02).
  *
- * Pulls from the existing OpenWeatherMap forecast in `src/lib/weather-api.ts`
- * and reports the most-recent qualifying precipitation event for a project.
+ * Rebuilt in the Stage 3 hardening pass. The previous implementation
+ * read the OpenWeatherMap *forecast* and treated it as history — it
+ * could not see rain that had already fallen, never applied the CGP's
+ * 48-hour event-separation rule, and bucketed precipitation on UTC
+ * calendar days (splitting California evening storms). Net effect: real
+ * qualifying events were never detected, so the QSP was never notified.
  *
- * Definition of a "rain event" for CGP purposes:
- *   - Total precipitation ≥ 0.5" (the QPE threshold the existing forecast
- *     code already flags via `WeatherDay.isQPE`)
- *   - Within the last 7 days
+ * Now:
+ *   * data source: NOAA station observations (src/lib/qpe/observed.ts)
+ *     — the official public record of rain that fell at the site;
+ *   * event rules: src/lib/qpe/detect.ts — ≥ 0.5″ cumulative, events
+ *     separated by ≥ 48 dry hours, pure UTC instants;
+ *   * deadline: the post-storm inspection window runs from when the
+ *     rain ENDED (last observed rainfall), per risk level — not from
+ *     when the storm started, as the old code had it (a 3-day storm's
+ *     deadline could pass before the rain stopped).
  *
- * After a qualifying event the QSP must inspect within 48 hours, so the
- * detector also returns `inspectionDueBy = startedAt + 48h`.
- *
- * If `OPENWEATHERMAP_API_KEY` is not set, the detector returns `null` so
- * the demo / unkeyed dev environment stays quiet — no banner, no toast
- * loop, no draft inspection spam.
+ * The `DetectedRainEvent` shape is kept compatible with its consumers
+ * (check-rain-events route, rain-event-store); new fields are additive.
  */
 
-import { fetchForecast } from '@/lib/weather-api';
-import type { WeatherDay } from '@/types/weather';
+import {
+  postStormWindowHours,
+  QPE_THRESHOLD_INCHES,
+} from '@/lib/cgp/constants';
+import { latestQualifyingEvent } from '@/lib/qpe/detect';
+import { fetchObservedPrecip } from '@/lib/qpe/observed';
 
 export interface DetectedRainEvent {
-  /** ISO 8601 of the first day that put us into the rain window */
+  /** ISO 8601 — first observed rainfall of the event. */
   startedAt: string;
-  /** ISO 8601 of the last contiguous rainy day, or undefined if still raining */
+  /** ISO 8601 — last observed rainfall. Absent while rain is ongoing. */
   endedAt?: string;
-  /** Sum of precipitation across the contiguous wet streak */
+  /** Cumulative observed rainfall for the event, inches. */
   totalPrecipitationInches: number;
-  /** True when totalPrecipitationInches >= 0.5 */
+  /** True when the total is ≥ QPE_THRESHOLD_INCHES (0.5″). */
   isQpe: boolean;
-  /** ISO 8601 — startedAt + 48 hours, the regulatory deadline */
+  /** ISO 8601 — post-storm inspection deadline (rain end + window). */
   inspectionDueBy: string;
-  /** Stable id derived from startedAt — used for inspection idempotency */
+  /** Stable id derived from startedAt — used for inspection idempotency. */
   id: string;
+  /** True while the 48 h separation window hasn't closed — still raining
+   *  or recently stopped; the deadline can still move later. */
+  ongoing?: boolean;
+  /** NOAA station the observations came from (e.g. "KFAT"). */
+  stationId?: string | null;
+  /** 'good' | 'sparse' — how complete the gauge record was. A null
+   *  return with sparse data means "could not determine", not "no rain". */
+  dataQuality?: 'good' | 'sparse';
 }
 
-const QPE_THRESHOLD_INCHES = 0.5;
-const INSPECTION_WINDOW_HOURS = 48;
 const LOOKBACK_DAYS = 7;
 
 /**
- * Detect the most recent qualifying rain event in the rolling lookback window.
+ * Most recent qualifying precipitation event for a project site within
+ * the last 7 days, from observed NOAA gauge data. Pure read — never
+ * writes; the caller (check-rain-events) owns inspection creation.
  *
- * Pure read; never writes to the DB. Caller decides whether to spawn an
- * inspection record. `coords` scopes the forecast to the project's site;
- * without it the fetch falls back to the legacy default location.
+ * Returns null when: no qualifying event, or no usable gauge data
+ * (`fetchObservedPrecip` quality 'none'). Sparse-but-present data is
+ * used and flagged via `dataQuality`.
  */
 export async function detectRainEventForProject(
   _projectId: string,
-  coords?: { lat: number; lng: number }
+  coords?: { lat: number; lng: number },
+  riskLevel: 1 | 2 | 3 = 1
 ): Promise<DetectedRainEvent | null> {
-  // Bail early if no API key — keeps the demo quiet
-  if (!process.env.OPENWEATHERMAP_API_KEY) {
+  if (!coords) {
+    // Without site coordinates there is nothing defensible to observe.
+    // The old code silently fell back to Fresno — one city's weather
+    // shown for every project was Neal's "inconsistent by location" bug.
     return null;
   }
 
-  let forecast: WeatherDay[];
-  try {
-    forecast = await fetchForecast(coords);
-  } catch (err) {
-    console.warn('rain-event-detector: forecast fetch failed', err);
-    return null;
-  }
-
-  if (!forecast || forecast.length === 0) {
-    return null;
-  }
-
-  // The forecast returns rolling days starting from today. For a "recent
-  // rain event" we need to look at days within `LOOKBACK_DAYS` of now —
-  // OpenWeatherMap's free tier only gives ~5 days going forward, so in
-  // practice this is "the next few rainy days" PLUS any rainy day that's
-  // already happened within the lookback. Today's row in the forecast
-  // covers the current day, which is the right semantics for the QSP:
-  // "as of now, has there been a qualifying event recently?"
   const now = new Date();
-  const lookbackCutoff = new Date(now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const observed = await fetchObservedPrecip(
+    coords.lat,
+    coords.lng,
+    LOOKBACK_DAYS,
+    now
+  );
 
-  // Walk forecast days in chronological order, accumulating contiguous
-  // rainy stretches. A "rainy" day is any day with precipitation > 0.
-  let bestEvent: DetectedRainEvent | null = null;
-  let currentRunStart: Date | null = null;
-  let currentRunPrecip = 0;
+  if (observed.quality === 'none') {
+    if (observed.error) {
+      console.warn('rain-event-detector: no usable gauge data —', observed.error);
+    }
+    return null;
+  }
 
-  const flushRun = (endDate: Date) => {
-    if (currentRunStart === null) return;
-    if (currentRunPrecip <= 0) return;
-    if (endDate < lookbackCutoff) {
-      // Outside the lookback window; ignore
-      currentRunStart = null;
-      currentRunPrecip = 0;
-      return;
-    }
-    const isQpe = currentRunPrecip >= QPE_THRESHOLD_INCHES;
-    const inspectionDueBy = new Date(
-      currentRunStart.getTime() + INSPECTION_WINDOW_HOURS * 60 * 60 * 1000
-    );
-    const candidate: DetectedRainEvent = {
-      startedAt: currentRunStart.toISOString(),
-      endedAt: endDate.toISOString(),
-      totalPrecipitationInches: Math.round(currentRunPrecip * 100) / 100,
-      isQpe,
-      inspectionDueBy: inspectionDueBy.toISOString(),
-      id: `rain-${currentRunStart.toISOString().slice(0, 10)}`,
-    };
-    if (
-      !bestEvent ||
-      candidate.totalPrecipitationInches > bestEvent.totalPrecipitationInches
-    ) {
-      bestEvent = candidate;
-    }
-    currentRunStart = null;
-    currentRunPrecip = 0;
+  const event = latestQualifyingEvent(observed.hours, now, LOOKBACK_DAYS);
+  if (!event) return null;
+
+  const windowHours = postStormWindowHours(riskLevel);
+  const rainEndMs = new Date(event.lastRainAt).getTime();
+  const inspectionDueBy = new Date(
+    rainEndMs + windowHours * 3_600_000
+  ).toISOString();
+
+  return {
+    startedAt: event.startedAt,
+    endedAt: event.ongoing ? undefined : event.lastRainAt,
+    totalPrecipitationInches: event.totalInches,
+    isQpe: event.totalInches >= QPE_THRESHOLD_INCHES,
+    inspectionDueBy,
+    id: `rain-${event.startedAt.slice(0, 10)}`,
+    ongoing: event.ongoing,
+    stationId: observed.stationId,
+    dataQuality: observed.quality === 'good' ? 'good' : 'sparse',
   };
-
-  for (const day of forecast) {
-    // `day.date` is YYYY-MM-DD. Anchor at noon UTC to avoid timezone games
-    // when computing the 48h window.
-    const dayDate = new Date(`${day.date}T12:00:00Z`);
-
-    if (day.precipitationInches > 0) {
-      if (currentRunStart === null) {
-        currentRunStart = dayDate;
-        currentRunPrecip = day.precipitationInches;
-      } else {
-        currentRunPrecip += day.precipitationInches;
-      }
-    } else {
-      flushRun(dayDate);
-    }
-  }
-  // Flush any open run at the end of the loop
-  if (forecast.length > 0) {
-    const lastDayDate = new Date(`${forecast[forecast.length - 1].date}T12:00:00Z`);
-    flushRun(lastDayDate);
-  }
-
-  // Only fire when the event qualifies (≥ QPE) — light drizzle isn't
-  // a regulator-trackable event.
-  if (!bestEvent) return null;
-  const event: DetectedRainEvent = bestEvent;
-  if (!event.isQpe) return null;
-  return event;
 }
