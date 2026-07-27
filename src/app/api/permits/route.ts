@@ -120,15 +120,19 @@ export async function POST(request: NextRequest) {
 
 // PATCH /api/permits?id=...
 export async function PATCH(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-  if (!id) {
-    return NextResponse.json({ error: 'id query parameter required' }, { status: 400 });
-  }
   try {
+    // SEC-13: authenticate before anything else. Validating the request
+    // first let an unauthenticated caller distinguish a malformed request
+    // (400) from an unauthorized one (401).
     const auth = await requireAuth();
     if (auth.error) return auth.error;
     const { supabase } = auth;
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ error: 'id query parameter required' }, { status: 400 });
+    }
     const body = permitUpdate.parse(await request.json()) as Partial<SegmentPermit>;
     const updates: Record<string, unknown> = {};
     if (body.segmentId !== undefined) updates.segment_id = body.segmentId;

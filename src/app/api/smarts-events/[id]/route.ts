@@ -158,13 +158,28 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     if (auth.error) return auth.error;
     const { supabase } = auth;
 
+    // SEC-14: confirm the row is visible to THIS caller first. Under RLS
+    // a bare delete on another tenant's row affects zero rows, and the
+    // old code still answered { success: true }.
+    const { data: existing, error: lookupError } = await supabase
+      .from('smarts_events')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (lookupError && lookupError.code !== 'PGRST116') {
+      console.error('Rain event delete lookup failed:', lookupError.message);
+      return NextResponse.json({ error: 'Failed to delete smarts event' }, { status: 500 });
+    }
+    if (!existing) {
+      return NextResponse.json({ error: 'Rain event not found' }, { status: 404 });
+    }
+
     const { error } = await supabase.from('smarts_events').delete().eq('id', id);
 
     if (error) {
-      return NextResponse.json(
-        { error: `Failed to delete smarts event: ${error.message}` },
-        { status: 500 }
-      );
+      console.error('Failed to delete smarts event:', error.message);
+      return NextResponse.json({ error: 'Failed to delete smarts event' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

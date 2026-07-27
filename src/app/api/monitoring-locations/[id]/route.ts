@@ -176,16 +176,28 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     if (auth.error) return auth.error;
     const { supabase } = auth;
 
-    const { error } = await supabase
+    // SEC-14: confirm the row is visible to THIS caller first. Under RLS
+    // a bare delete on another tenant's row affects zero rows, and the
+    // old code still answered { success: true }.
+    const { data: existing, error: lookupError } = await supabase
       .from('monitoring_locations')
-      .delete()
-      .eq('id', id);
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (lookupError && lookupError.code !== 'PGRST116') {
+      console.error('Monitoring location delete lookup failed:', lookupError.message);
+      return NextResponse.json({ error: 'Failed to delete monitoring location' }, { status: 500 });
+    }
+    if (!existing) {
+      return NextResponse.json({ error: 'Monitoring location not found' }, { status: 404 });
+    }
+
+    const { error } = await supabase.from('monitoring_locations').delete().eq('id', id);
 
     if (error) {
-      return NextResponse.json(
-        { error: `Failed to delete monitoring location: ${error.message}` },
-        { status: 500 }
-      );
+      console.error('Failed to delete monitoring location:', error.message);
+      return NextResponse.json({ error: 'Failed to delete monitoring location' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

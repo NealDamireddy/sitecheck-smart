@@ -208,13 +208,30 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     if (auth.error) return auth.error;
     const { supabase } = auth;
 
+    // SEC-14: confirm the row is visible to THIS caller before deleting.
+    // A bare delete().eq() affects zero rows under RLS when the sample
+    // belongs to another tenant — and the old code still answered
+    // { success: true }, so a QSP could be told a deletion happened that
+    // never did (and a probe could not tell "gone" from "not yours").
+    const { data: existing, error: lookupError } = await supabase
+      .from('samples')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (lookupError && lookupError.code !== 'PGRST116') {
+      console.error('Sample delete lookup failed:', lookupError.message);
+      return NextResponse.json({ error: 'Failed to delete sample' }, { status: 500 });
+    }
+    if (!existing) {
+      return NextResponse.json({ error: 'Sample not found' }, { status: 404 });
+    }
+
     const { error } = await supabase.from('samples').delete().eq('id', id);
 
     if (error) {
-      return NextResponse.json(
-        { error: `Failed to delete sample: ${error.message}` },
-        { status: 500 }
-      );
+      console.error('Failed to delete sample:', error.message);
+      return NextResponse.json({ error: 'Failed to delete sample' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
