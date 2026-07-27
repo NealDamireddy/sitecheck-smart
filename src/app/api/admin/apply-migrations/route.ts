@@ -41,6 +41,18 @@ function tokensMatch(provided: string, expected: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  // SEC-02: this endpoint executes SQL against the live database. It is a
+  // dev/local convenience only — in production builds it answers 404
+  // unless explicitly re-enabled for a one-off migration window via
+  // ALLOW_REMOTE_MIGRATIONS=1. A single leaked shared token must not be
+  // enough to run arbitrary migrations in prod.
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ALLOW_REMOTE_MIGRATIONS !== '1'
+  ) {
+    return NextResponse.json({ ok: false, error: 'Not found' }, { status: 404 });
+  }
+
   const expected = process.env.ADMIN_MIGRATION_TOKEN;
   if (!expected) {
     return NextResponse.json(
