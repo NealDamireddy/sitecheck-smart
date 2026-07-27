@@ -8,7 +8,15 @@ import { createServerClient } from '@supabase/ssr';
  * - Allows public routes (login, signup, auth callback) without auth
  */
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/auth/callback'];
+// `/auth/reset-password` is deliberately NOT public: the recovery link
+// runs through /auth/callback first, which mints a session, so the reset
+// screen sits behind the normal auth wall (ACC-01).
+const PUBLIC_ROUTES = [
+  '/login',
+  '/signup',
+  '/auth/callback',
+  '/auth/forgot-password',
+];
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((route) => pathname.startsWith(route));

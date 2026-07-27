@@ -5,6 +5,11 @@ import { Loader2, Save, Check, KeyRound, ShieldCheck, Trash2 } from 'lucide-reac
 import { SectionHeader } from '@/components/shared/section-header';
 import { PageTransition } from '@/components/shared/page-transition';
 import { Button } from '@/components/ui/button';
+import { createClient } from '@/lib/supabase/client';
+import {
+  MIN_PASSWORD_LENGTH,
+  validateNewPassword,
+} from '@/lib/auth/password-policy';
 
 interface QspProfile {
   userId: string;
@@ -191,9 +196,128 @@ export default function AccountPage() {
           </form>
         )}
 
+        <ChangePasswordCard />
+
         <SmartsCredentialsCard />
       </div>
     </PageTransition>
+  );
+}
+
+// ──────────────────────────────────────────────────────
+// SiteCheck account password (ACC-01). Supabase re-authenticates the
+// caller from the session cookie, so no current-password field is
+// needed; the shared policy lives in lib/auth/password-policy.
+// ──────────────────────────────────────────────────────
+
+function ChangePasswordCard() {
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    const check = validateNewPassword(password, confirmation);
+    if (!check.ok) {
+      setError(check.error);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+      });
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+      setPassword('');
+      setConfirmation('');
+      setSavedAt(Date.now());
+    } catch {
+      setError('Could not update your password. Try again in a moment.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const justSaved = savedAt && Date.now() - savedAt < 3000;
+
+  return (
+    <form
+      onSubmit={handleSave}
+      className="space-y-4 rounded-lg border border-border bg-surface p-4 sm:p-6"
+    >
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <KeyRound className="h-4 w-4 text-amber-400" />
+          SiteCheck password
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Changes the password you use to sign in here. At least{' '}
+          {MIN_PASSWORD_LENGTH} characters.
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            New password
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            className="w-full rounded border border-border bg-elevated px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none"
+            placeholder="••••••••"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Confirm new password
+          </label>
+          <input
+            type="password"
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            autoComplete="new-password"
+            className="w-full rounded border border-border bg-elevated px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none"
+            placeholder="••••••••"
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button type="submit" disabled={saving || password.length === 0}>
+          {saving ? (
+            <>
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Updating…
+            </>
+          ) : justSaved ? (
+            <>
+              <Check className="mr-1.5 h-4 w-4" /> Password updated
+            </>
+          ) : (
+            <>
+              <KeyRound className="mr-1.5 h-4 w-4" /> Update password
+            </>
+          )}
+        </Button>
+      </div>
+    </form>
   );
 }
 
