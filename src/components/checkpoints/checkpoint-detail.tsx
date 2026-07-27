@@ -38,6 +38,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useActiveInspectionStore } from '@/stores/active-inspection-store';
+import { FIELD_ACTION_CLASS } from '@/lib/field-ui';
 
 const priorityColors: Record<string, string> = {
   high: 'bg-red-500',
@@ -262,16 +263,16 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
                     checkpoint.status === 'compliant' || statusUpdating !== null
                   }
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+                    FIELD_ACTION_CLASS,
                     checkpoint.status === 'compliant'
                       ? 'border-green-500/40 bg-green-500/15 text-green-300'
                       : 'border-green-500/30 bg-green-500/10 text-green-300 hover:bg-green-500/20',
                   )}
                 >
                   {statusUpdating === 'compliant' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <CheckCircle2 className="h-4 w-4" />
                   )}
                   {checkpoint.status === 'compliant'
                     ? 'Compliant'
@@ -284,16 +285,16 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
                     checkpoint.status === 'deficient' || statusUpdating !== null
                   }
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+                    FIELD_ACTION_CLASS,
                     checkpoint.status === 'deficient'
                       ? 'border-red-500/40 bg-red-500/15 text-red-300'
                       : 'border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20',
                   )}
                 >
                   {statusUpdating === 'deficient' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <XCircle className="h-3.5 w-3.5" />
+                    <XCircle className="h-4 w-4" />
                   )}
                   {checkpoint.status === 'deficient'
                     ? 'Deficient'
@@ -307,16 +308,16 @@ export function CheckpointDetail({ checkpointId }: { checkpointId: string }) {
                     statusUpdating !== null
                   }
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+                    FIELD_ACTION_CLASS,
                     checkpoint.status === 'needs-review'
                       ? 'border-purple-500/40 bg-purple-500/15 text-purple-300'
                       : 'border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20',
                   )}
                 >
                   {statusUpdating === 'needs-review' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <CircleHelp className="h-3.5 w-3.5" />
+                    <CircleHelp className="h-4 w-4" />
                   )}
                   {checkpoint.status === 'needs-review'
                     ? 'Needs Review'

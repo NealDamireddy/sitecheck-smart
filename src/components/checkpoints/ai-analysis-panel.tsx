@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, Lightbulb, BookOpen, Sparkles, Loader2, RotateCcw, AlertCircle } from 'lucide-react';
+import { CheckCircle, Lightbulb, BookOpen, Sparkles, Loader2, RotateCcw, AlertCircle, Brain } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { AIAnalysis } from '@/types/drone';
@@ -160,6 +160,27 @@ export function AIAnalysisPanel({ analysis, checkpoint }: AIAnalysisPanelProps) 
       {/* Analysis Content */}
       {!isLoading && (
         <>
+          {/* UX-03: AI output is a DRAFT for the QSP to judge, never a
+              finding. The compliance status on this checkpoint is only
+              ever what the QSP sets with the Mark buttons — this banner
+              makes that relationship explicit rather than implied, and
+              calls out a low-confidence read that deserves a closer look. */}
+          <div
+            className={cn(
+              'flex items-start gap-2 rounded-md border px-3 py-2 text-xs',
+              displayAnalysis.confidence < 75
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                : 'border-border bg-muted/40 text-muted-foreground',
+            )}
+          >
+            <Brain className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              {displayAnalysis.confidence < 75
+                ? 'Low-confidence AI draft — verify against the BMP before recording a status.'
+                : 'AI draft for your review. You decide the compliance status; nothing here is recorded until you mark it.'}
+            </span>
+          </div>
+
           {/* Summary */}
           <div>
             <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">

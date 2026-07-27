@@ -401,6 +401,16 @@ function SmartsCredentialsCard() {
   }
 
   async function handleRemove() {
+    // UX-06: destructive and not obviously recoverable — the password is
+    // encrypted at rest and never shown again, so removing it means
+    // re-entering it from the QSP's own records before the next sync.
+    const confirmed = window.confirm(
+      'Remove your saved SMARTS login?\n\n' +
+        'Sync to SMARTS will stop working until you enter it again, and the ' +
+        'stored password cannot be recovered — you will need it from your own records.'
+    );
+    if (!confirmed) return;
+
     setRemoving(true);
     setError(null);
     try {

@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { FIELD_ACTION_CLASS } from '@/lib/field-ui';
+import { compressFieldPhoto, describeCompression } from '@/lib/image-compress';
 import type { AIAnalysis } from '@/types/drone';
 import type { CheckpointStatus } from '@/types/checkpoint';
 
@@ -51,6 +53,8 @@ export function CheckpointPhotoViewer({
   const [error, setError] = useState<string | null>(null);
   const [localQspUrl, setLocalQspUrl] = useState<string | null>(qspUrl ?? null);
   const [localQspAt, setLocalQspAt] = useState<string | null>(qspUploadedAt ?? null);
+  const [prepping, setPrepping] = useState(false);
+  const [sizeNote, setSizeNote] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeUrl = view === 'qsp' ? localQspUrl : droneUrl;
@@ -64,9 +68,16 @@ export function CheckpointPhotoViewer({
 
     setUploading(true);
     setError(null);
+    setPrepping(true);
     try {
+      // UX-02: downscale before upload. A raw phone photo routinely
+      // exceeds the route's 5 MiB cap and is slow on field cellular.
+      const prepared = await compressFieldPhoto(file);
+      setPrepping(false);
+      setSizeNote(describeCompression(prepared));
+
       const form = new FormData();
-      form.set('file', file);
+      form.set('file', prepared.file);
       const res = await fetch(`/api/checkpoints/${checkpointId}/photo`, {
         method: 'POST',
         body: form,
@@ -83,6 +94,7 @@ export function CheckpointPhotoViewer({
       setView('qsp');
       onUploaded?.(body);
     } catch (err) {
+      setPrepping(false);
       setError(err instanceof Error ? err.message : 'Upload failed');
       setUploading(false);
       return;
@@ -210,23 +222,34 @@ export function CheckpointPhotoViewer({
             type="button"
             onClick={onChooseFile}
             disabled={uploading || analyzing}
-            className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50"
+            className={cn(
+              FIELD_ACTION_CLASS,
+              'border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20',
+            )}
           >
             {uploading || analyzing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Upload className="h-3.5 w-3.5" />
+              <Upload className="h-4 w-4" />
             )}
-            {uploading
-              ? 'Uploading…'
-              : analyzing
-                ? 'Analyzing…'
-                : localQspUrl
-                  ? 'Replace photo'
-                  : 'Upload photo'}
+            {prepping
+              ? 'Preparing…'
+              : uploading
+                ? 'Uploading…'
+                : analyzing
+                  ? 'Analyzing…'
+                  : localQspUrl
+                    ? 'Replace photo'
+                    : 'Upload photo'}
           </button>
         </div>
       </div>
+
+      {sizeNote && !error && (
+        <div className="text-[11px] text-muted-foreground">
+          Photo resized for upload ({sizeNote})
+        </div>
+      )}
 
       {analyzing && (
         <div className="flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">

@@ -25,7 +25,7 @@ import { useMounted } from '@/hooks/use-mounted';
 
 const baseNavItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
-  { href: '/sites', icon: Building2, label: 'Sites' },
+  { href: '/sites', icon: Building2, label: 'Projects' },
   { href: '/swppp', icon: FileText, label: 'SWPPP Intelligence' },
   { href: '/missions', icon: Plane, label: 'Drone Missions' },
   { href: '/checkpoints', icon: CheckCircle, label: 'Checkpoints' },
@@ -67,8 +67,8 @@ export function Sidebar() {
   const mounted = useMounted();
 
   // Project-scoped SMARTS entry inserted between Inspections and Reports.
-  // baseNavItems order after the Sites insert:
-  //   0 Dashboard, 1 Sites, 2 SWPPP, 3 Missions, 4 Checkpoints,
+  // baseNavItems order after the Projects insert:
+  //   0 Dashboard, 1 Projects, 2 SWPPP, 3 Missions, 4 Checkpoints,
   //   5 Inspections, 6 Reports, 7 Weather
   const itemsWithSmarts =
     mounted && currentProjectId
