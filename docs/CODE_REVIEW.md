@@ -52,6 +52,22 @@ Severity rubric: see the review mandate. Status is one of **fixed** (commit note
 
 **Verified in the existing smarts-automation suite (126 tests green):** unit normalization (SU/NTU), analytical-method normalization to exact SMARTS option text, qualifier normalization, ND/DNQ rules at the bot layer, monitoring-record schema, datetime splitting.
 
+## Stage 5 — Testing
+
+Suite: `npm test` (268) · `npm run test:security` (131) · smarts-automation (126) · `npm run test:e2e` (18, gated).
+Honest coverage report: **docs/TEST_COVERAGE.md** — read that rather than assuming a green suite means proven.
+
+New findings, all surfaced BY the tests:
+
+| ID | Sev | Location | Finding | Status |
+|---|---|---|---|---|
+| SEC-13 | MEDIUM | `api/permits/route.ts` PATCH | Request validated before authentication — unauthenticated callers got 400, not 401, and could distinguish malformed from unauthorized. | **fixed** — auth is now the first gate. Covered by the unauth matrix. |
+| SEC-14 | MEDIUM | `samples/[id]`, `monitoring-locations/[id]`, `smarts-events/[id]` DELETE | Bare `delete().eq()` answered `{success:true}` even when it affected zero rows (what RLS does for a foreign row) — a QSP could be told a deletion happened that never did. | **fixed** — visibility check first, 404 when the row isn't the caller's. |
+| SEC-15 | MEDIUM | `lib/validations/analyze.ts` | Every field optional: an empty body reached the Claude prompt as `undefined`, and `status` accepted any string despite being echoed back as the compliance status. | **fixed** — required fields, length caps, status constrained to the real enum. |
+| TST-01 | HIGH | repo | Web app had zero tests. | **closed** — 268 tests; route manifest makes new routes fail until classified. |
+| TST-02 | HIGH | live DB | RLS enforcement itself is proven only by the gated E2E isolation spec, which has never been run. | **open** — needs a disposable Supabase project + `npm run db:seed:test`. This is the gap to close before telling a customer their data is isolated. |
+| TST-03 | MEDIUM | `smarts-automation/recon/` | The mandate's replay tests were not built: they would depend on captures of a real logged-in SMARTS session (SEC-12). | **deferred** — sanitize the fixtures first; see FOLLOW_UP. |
+
 ## Stage 0 — Recon findings carried forward
 
 | ID | Sev | Location | Finding | Status |
@@ -62,7 +78,7 @@ Severity rubric: see the review mandate. Status is one of **fixed** (commit note
 | DRF-02 | HIGH | `src/types/drone.ts`, `validations/inspection.ts`, migration 001 | Inspection types `routine/pre-storm/post-storm/qpe` don't match CGP's four (no during-storm); Part I–VII mapping unenforceable. | **open** — Stage 3 decision. |
 | DRF-03 | HIGH | `src/lib/validations/parameter-result.ts` | No ND/DNQ cross-field rule in the web app validation layer. | **fixed** — see Stage 3 table. |
 | CMP-01 | MEDIUM | `src/lib/weather-api.ts` + `src/lib/smarts/noaa.ts` + legacy detector | Two parallel weather stacks + two rain-event flows = two sources of truth for QPE. | **fixed** — see Stage 3 table. |
-| TST-01 | HIGH | repo root | Web app had zero tests. | **in progress** — Vitest bootstrapped (`20786ab`), 45 tests and counting; full suite is Stage 5. |
+| TST-01 | HIGH | repo root | Web app had zero tests. | **closed** — see Stage 5. |
 | AI-01 | MEDIUM | `src/app/api/scan-swppp/route.ts` (system prompt) | Prompt instructs the model to **fabricate GPS coordinates** inside a hardcoded demo-site bounding box (36.778…, −119.41…) when the SWPPP lacks them — every real customer's extracted checkpoints land on the demo site's map location, presented as real. | **fixed** — extraction returns null coordinates; project creation rings unlocated checkpoints around the real project center for QSP placement. Test: null-coordinate case in `tests/ai-output-validation.test.ts`. |
 | AI-02 | MEDIUM | `src/app/api/checkpoints/[id]/analyze/route.ts` | On Claude failure the route falls back to `mockAnalyzeBmpPhoto` and **persists the fabricated analysis** to `ai_analyses` with no marker distinguishing it from a real one. | **fixed** — real vision failures return 502 and persist nothing; keyless-demo mock stays, tagged `model:'mock-deterministic'` and echoed in the response (durable persistence of the marker needs an `ai_analyses.model` column — gated migration, see RLS-01 batch). Test: `tests/checkpoint-analyze-no-mock.test.ts`. |
 
