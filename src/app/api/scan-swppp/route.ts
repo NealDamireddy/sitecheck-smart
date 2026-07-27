@@ -225,7 +225,11 @@ ${text}
     // upstream failure is obvious.
     const anthropicStatus = (error as { status?: number })?.status;
     console.error('SWPPP scan error:', anthropicStatus ?? '', error);
-    const errorMessage = error instanceof Error ? error.message : 'Scan failed';
-    return NextResponse.json({ error: errorMessage }, { status: anthropicStatus ?? 500 });
+    // SEC-09: never echo internal error text to the client. The status
+    // code still distinguishes an upstream AI failure from a local one.
+    return NextResponse.json(
+      { error: 'SWPPP scan failed. Try again in a moment.' },
+      { status: anthropicStatus ?? 500 }
+    );
   }
 }

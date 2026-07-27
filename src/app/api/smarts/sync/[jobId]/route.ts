@@ -45,8 +45,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     });
   } catch (err: unknown) {
     console.error('SMARTS sync status error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to read sync job';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to read sync job' }, { status: 500 });
   }
 }

@@ -113,8 +113,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(deficiencies);
   } catch (error: unknown) {
     console.error('Deficiencies GET error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch deficiencies';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch deficiencies' }, { status: 500 });
   }
 }
 
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Deficiencies POST error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to create deficiency';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to create deficiency' }, { status: 500 });
   }
 }

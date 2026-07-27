@@ -98,9 +98,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows.map(transformMonitoringLocation));
   } catch (err: unknown) {
     console.error('Monitoring locations GET error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to fetch monitoring locations';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch monitoring locations' }, { status: 500 });
   }
 }
 
@@ -151,8 +150,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('Monitoring locations POST error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to create monitoring location';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to create monitoring location' }, { status: 500 });
   }
 }

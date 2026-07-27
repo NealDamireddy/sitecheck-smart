@@ -95,9 +95,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     );
   } catch (err: unknown) {
     console.error('Monitoring location GET error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to fetch monitoring location';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch monitoring location' }, { status: 500 });
   }
 }
 
@@ -162,9 +161,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('Monitoring location PATCH error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to update monitoring location';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update monitoring location' }, { status: 500 });
   }
 }
 
@@ -192,13 +190,8 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    return NextResponse.json(
-      {
-        error: `Failed to delete monitoring location: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to delete monitoring location:', err);
+    return NextResponse.json({ error: 'Failed to delete monitoring location' }, { status: 500 });
   }
 }

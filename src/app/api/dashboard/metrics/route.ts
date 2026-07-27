@@ -173,7 +173,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('Dashboard metrics error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch dashboard metrics';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch dashboard metrics' }, { status: 500 });
   }
 }

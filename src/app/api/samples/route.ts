@@ -155,8 +155,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(samples);
   } catch (err: unknown) {
     console.error('Samples GET error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to fetch samples';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch samples' }, { status: 500 });
   }
 }
 
@@ -329,7 +329,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('Samples POST error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to create sample';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to create sample' }, { status: 500 });
   }
 }

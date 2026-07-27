@@ -101,8 +101,8 @@ export async function GET(
     return NextResponse.json(deficiency);
   } catch (error: unknown) {
     console.error('Deficiency GET error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch deficiency';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch deficiency' }, { status: 500 });
   }
 }
 
@@ -201,7 +201,7 @@ export async function PUT(
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Deficiency PUT error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to update deficiency';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update deficiency' }, { status: 500 });
   }
 }

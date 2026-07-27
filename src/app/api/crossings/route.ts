@@ -110,13 +110,8 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    return NextResponse.json(
-      {
-        error: `Failed to create crossing: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to create crossing:', err);
+    return NextResponse.json({ error: 'Failed to create crossing' }, { status: 500 });
   }
 }

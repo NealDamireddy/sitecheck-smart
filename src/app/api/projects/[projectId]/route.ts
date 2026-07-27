@@ -50,8 +50,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json(data);
   } catch (err: unknown) {
     console.error('Project PATCH error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to update project';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }
 }

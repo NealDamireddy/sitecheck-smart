@@ -43,8 +43,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data ?? []);
   } catch (err: unknown) {
     console.error('SMARTS runs list error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to read SMARTS runs';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to read SMARTS runs' }, { status: 500 });
   }
 }

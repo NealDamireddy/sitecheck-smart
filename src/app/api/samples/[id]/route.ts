@@ -134,8 +134,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     return NextResponse.json(transformSample(sampleRow, prs));
   } catch (err: unknown) {
     console.error('Sample GET error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to fetch sample';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch sample' }, { status: 500 });
   }
 }
 
@@ -193,8 +193,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('Sample PATCH error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to update sample';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update sample' }, { status: 500 });
   }
 }
 
@@ -219,13 +219,8 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    return NextResponse.json(
-      {
-        error: `Failed to delete sample: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to delete sample:', err);
+    return NextResponse.json({ error: 'Failed to delete sample' }, { status: 500 });
   }
 }

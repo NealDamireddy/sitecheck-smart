@@ -87,8 +87,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ jobId: started.jobId }, { status: 202 });
   } catch (err: unknown) {
     console.error('SMARTS sync launch error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to launch SMARTS sync';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to launch SMARTS sync' }, { status: 500 });
   }
 }

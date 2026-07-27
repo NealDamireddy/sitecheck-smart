@@ -151,8 +151,8 @@ export async function GET(
     return NextResponse.json(result);
   } catch (error: unknown) {
     console.error('Checkpoint GET error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch checkpoint';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch checkpoint' }, { status: 500 });
   }
 }
 
@@ -238,8 +238,8 @@ export async function PUT(
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Checkpoint PUT error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to update checkpoint';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update checkpoint' }, { status: 500 });
   }
 }
 
@@ -280,7 +280,7 @@ export async function DELETE(
     return NextResponse.json({ success: true, id });
   } catch (error: unknown) {
     console.error('Checkpoint DELETE error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to delete checkpoint';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to delete checkpoint' }, { status: 500 });
   }
 }

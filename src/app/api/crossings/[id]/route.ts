@@ -88,14 +88,9 @@ export async function PATCH(
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    return NextResponse.json(
-      {
-        error: `Failed to update crossing: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to update crossing:', err);
+    return NextResponse.json({ error: 'Failed to update crossing' }, { status: 500 });
   }
 }
 
@@ -118,13 +113,8 @@ export async function DELETE(
     }
     return NextResponse.json({ success: true });
   } catch (err) {
-    return NextResponse.json(
-      {
-        error: `Failed to delete crossing: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to delete crossing:', err);
+    return NextResponse.json({ error: 'Failed to delete crossing' }, { status: 500 });
   }
 }

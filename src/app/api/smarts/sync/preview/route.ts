@@ -40,8 +40,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (err: unknown) {
     console.error('SMARTS sync preview error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to build sync preview';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to build sync preview' }, { status: 500 });
   }
 }

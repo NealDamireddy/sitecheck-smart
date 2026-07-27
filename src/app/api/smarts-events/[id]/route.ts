@@ -84,9 +84,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     return NextResponse.json(transformSmartsEvent(data as DbSmartsEventRow));
   } catch (err: unknown) {
     console.error('Smarts event GET error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to fetch smarts event';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch smarts event' }, { status: 500 });
   }
 }
 
@@ -144,9 +143,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('Smarts event PATCH error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to update smarts event';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update smarts event' }, { status: 500 });
   }
 }
 
@@ -171,13 +169,8 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    return NextResponse.json(
-      {
-        error: `Failed to delete smarts event: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to delete smarts event:', err);
+    return NextResponse.json({ error: 'Failed to delete smarts event' }, { status: 500 });
   }
 }

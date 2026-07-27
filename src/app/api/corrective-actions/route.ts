@@ -102,8 +102,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows.map(transformCorrectiveAction));
   } catch (err: unknown) {
     console.error('Corrective actions GET error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to fetch corrective actions';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch corrective actions' }, { status: 500 });
   }
 }
 
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('Corrective actions POST error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to create corrective action';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to create corrective action' }, { status: 500 });
   }
 }

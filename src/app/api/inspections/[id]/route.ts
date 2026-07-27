@@ -243,8 +243,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     });
   } catch (error: unknown) {
     console.error('Inspection GET error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch inspection';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch inspection' }, { status: 500 });
   }
 }
 
@@ -323,7 +323,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Inspection PATCH error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to update inspection';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update inspection' }, { status: 500 });
   }
 }

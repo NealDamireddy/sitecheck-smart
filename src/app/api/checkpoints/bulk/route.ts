@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Checkpoints bulk POST error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to create checkpoints';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to create checkpoints' }, { status: 500 });
   }
 }

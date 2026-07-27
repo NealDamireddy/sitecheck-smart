@@ -152,8 +152,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('Smarts events simulate error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to simulate smarts event';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to simulate smarts event' }, { status: 500 });
   }
 }

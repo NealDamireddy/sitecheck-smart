@@ -219,8 +219,8 @@ export async function GET(request: NextRequest) {
     );
   } catch (error: unknown) {
     console.error('Inspections GET error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch inspections';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch inspections' }, { status: 500 });
   }
 }
 
@@ -388,7 +388,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Inspections POST error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to create inspection';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to create inspection' }, { status: 500 });
   }
 }

@@ -77,8 +77,8 @@ export async function GET() {
     return NextResponse.json(transformProfile(inserted as DbQspProfileRow));
   } catch (err: unknown) {
     console.error('QSP profile GET error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to fetch profile';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
   }
 }
 
@@ -116,7 +116,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     console.error('QSP profile PUT error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to update profile';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
   }
 }

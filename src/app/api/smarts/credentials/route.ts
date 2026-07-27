@@ -25,9 +25,8 @@ export async function GET() {
     return NextResponse.json(status);
   } catch (err: unknown) {
     console.error('SMARTS credentials status error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to read credential status';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to read credential status' }, { status: 500 });
   }
 }
 
@@ -54,9 +53,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(status);
   } catch (err: unknown) {
     console.error('SMARTS credentials save error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to save credentials';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to save credentials' }, { status: 500 });
   }
 }
 
@@ -69,8 +67,7 @@ export async function DELETE() {
     return NextResponse.json(status);
   } catch (err: unknown) {
     console.error('SMARTS credentials delete error:', err);
-    const message =
-      err instanceof Error ? err.message : 'Failed to remove credentials';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to remove credentials' }, { status: 500 });
   }
 }

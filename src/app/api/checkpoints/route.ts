@@ -145,8 +145,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(checkpoints);
   } catch (error: unknown) {
     console.error('Checkpoints GET error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch checkpoints';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to fetch checkpoints' }, { status: 500 });
   }
 }
 
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error('Checkpoints POST error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to create checkpoint';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Failed to create checkpoint' }, { status: 500 });
   }
 }

@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Mission generation error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Mission generation failed';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Mission generation failed' }, { status: 500 });
   }
 }

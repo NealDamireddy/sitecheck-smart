@@ -112,14 +112,9 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    return NextResponse.json(
-      {
-        error: `Failed to create permit: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to create permit:', err);
+    return NextResponse.json({ error: 'Failed to create permit' }, { status: 500 });
   }
 }
 
@@ -164,13 +159,8 @@ export async function PATCH(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    return NextResponse.json(
-      {
-        error: `Failed to update permit: ${
-          err instanceof Error ? err.message : 'unknown error'
-        }`,
-      },
-      { status: 500 }
-    );
+    // SEC-09: never echo internal error text to the client.
+    console.error('Failed to update permit:', err);
+    return NextResponse.json({ error: 'Failed to update permit' }, { status: 500 });
   }
 }

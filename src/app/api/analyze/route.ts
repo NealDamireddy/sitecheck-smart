@@ -96,7 +96,7 @@ Return the analysis as JSON.`,
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Claude analysis error:', error);
-    const message = error instanceof Error ? error.message : 'Analysis failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEC-09: never echo internal error text to the client.
+    return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
   }
 }
