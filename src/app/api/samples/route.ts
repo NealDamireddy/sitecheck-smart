@@ -10,10 +10,10 @@
  * Upsert semantics on POST:
  *   - Lookup by (smarts_event_id, monitoring_location_id).
  *   - If no row exists, INSERT a new sample with id=body.id or generated.
- *   - If a row exists, KEEP its id, UPDATE its scalar fields, DELETE its
- *     parameter_results, then INSERT the new parameter_results — matching
- *     the inspection → findings non-atomic write pattern in
- *     src/app/api/inspections/route.ts (parent throw, children log-only).
+ *   - If a row exists, KEEP its id, UPDATE its scalar fields, then apply
+ *     the parameter_results replace plan (update/insert first, delete
+ *     stale rows last, every failure aborts the request loudly — see
+ *     src/lib/samples/replace-plan.ts).
  *
  * Status is always 201 — the contract is "ensure this sample exists with
  * these readings" and 201 covers both the insert and overwrite paths.
@@ -29,6 +29,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { sampleCreate } from '@/lib/validations';
+import {
+  planParameterReplace,
+  type ExistingParameterRow,
+} from '@/lib/samples/replace-plan';
 import type {
   Sample,
   ParameterResult,
@@ -232,53 +236,87 @@ export async function POST(request: NextRequest) {
       upserted = inserted as DbSampleRow;
     }
 
-    // 3. Replace parameter_results.
+    // 3. Replace parameter_results — loss-proof ordering (SEC-06).
     //
-    // Match the inspection→findings pattern: log-but-don't-fail on each
-    // step, even if it leaves the response with an empty parameterResults
-    // array. The DB UNIQUE(sample_id, parameter) constraint already
-    // prevents true duplicates, so worst-case is "no readings recorded
-    // this round, client retries."
+    // Update-in-place / insert-new FIRST, delete stale rows LAST, and
+    // fail the whole request loudly on any step. Recorded readings are
+    // never destroyed before their replacements are committed; the old
+    // delete-then-insert pattern could silently wipe a sample's results
+    // when the re-insert failed, while still returning 201.
     let createdResults: DbParameterResultRow[] = [];
 
     if (body.parameterResults && body.parameterResults.length > 0) {
-      // 3a. Delete old (no-op for fresh inserts).
-      const { error: delErr } = await supabase
+      const { data: existingRows, error: existingErr } = await supabase
         .from('parameter_results')
-        .delete()
+        .select('id, parameter')
         .eq('sample_id', sampleId);
-      if (delErr) {
-        console.error(
-          `Failed to delete old parameter_results for sample ${sampleId}:`,
-          delErr.message
+      if (existingErr) {
+        throw new Error(
+          `Failed to read existing parameter_results: ${existingErr.message}`
         );
       }
 
-      // 3b. Insert new.
-      const dbResults = body.parameterResults.map((pr) => ({
-        id: generateParameterResultId(),
-        project_id: projectId,
-        sample_id: sampleId,
-        parameter: pr.parameter,
-        qualifier: pr.qualifier ?? '=',
-        result: pr.result ?? null,
-        units: pr.units,
-        analytical_method: pr.analyticalMethod,
-        mdl: pr.mdl ?? null,
-        rl: pr.rl ?? null,
-        analyzed_by: pr.analyzedBy ?? 'Self',
-      }));
-      const { data: insertedResults, error: insertResultsError } = await supabase
-        .from('parameter_results')
-        .insert(dbResults)
-        .select();
-      if (insertResultsError) {
-        console.error(
-          `Failed to insert parameter_results for sample ${sampleId}:`,
-          insertResultsError.message
+      const plan = planParameterReplace(
+        (existingRows ?? []) as ExistingParameterRow[],
+        body.parameterResults.map((pr) => ({
+          parameter: pr.parameter,
+          qualifier: pr.qualifier ?? '=',
+          result: pr.result ?? null,
+          units: pr.units,
+          analytical_method: pr.analyticalMethod,
+          mdl: pr.mdl ?? null,
+          rl: pr.rl ?? null,
+          analyzed_by: pr.analyzedBy ?? 'Self',
+        }))
+      );
+
+      for (const { id, values } of plan.updates) {
+        const { data: updatedRow, error: updErr } = await supabase
+          .from('parameter_results')
+          .update(values)
+          .eq('id', id)
+          .select()
+          .single();
+        if (updErr || !updatedRow) {
+          throw new Error(
+            `Failed to update parameter_result ${id}: ${updErr?.message ?? 'no row returned'}`
+          );
+        }
+        createdResults.push(updatedRow as DbParameterResultRow);
+      }
+
+      if (plan.inserts.length > 0) {
+        const { data: insertedRows, error: insErr } = await supabase
+          .from('parameter_results')
+          .insert(
+            plan.inserts.map((values) => ({
+              id: generateParameterResultId(),
+              project_id: projectId,
+              sample_id: sampleId,
+              ...values,
+            }))
+          )
+          .select();
+        if (insErr) {
+          throw new Error(
+            `Failed to insert parameter_results: ${insErr.message}`
+          );
+        }
+        createdResults = createdResults.concat(
+          (insertedRows ?? []) as DbParameterResultRow[]
         );
-      } else {
-        createdResults = (insertedResults ?? []) as DbParameterResultRow[];
+      }
+
+      if (plan.deleteIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from('parameter_results')
+          .delete()
+          .in('id', plan.deleteIds);
+        if (delErr) {
+          throw new Error(
+            `Failed to delete stale parameter_results: ${delErr.message}`
+          );
+        }
       }
     }
 
