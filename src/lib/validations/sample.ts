@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { refineNdDnq } from './nd-dnq';
 
 const PARAMETERS = ['pH', 'Turbidity'] as const;
 const QUALIFIERS = ['=', 'ND', 'DNQ'] as const;
@@ -19,7 +20,7 @@ const parameterResultInput = z.object({
   mdl: z.number().min(0).nullable().optional(),
   rl: z.number().min(0).nullable().optional(),
   analyzedBy: z.enum(ANALYZED_BY).optional(),
-});
+}).superRefine(refineNdDnq);
 
 export const sampleCreate = z.object({
   id: z.string().optional(),
