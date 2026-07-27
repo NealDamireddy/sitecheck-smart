@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { swpppExtractionOutput } from '@/lib/validations/ai-output';
 import Anthropic from '@anthropic-ai/sdk';
 // pdf-parse@1.1.1 ships a debug branch in index.js (`if (!module.parent)`)
 // that synchronously reads ./test/data/05-versions-space.pdf on import.
@@ -197,17 +198,23 @@ ${text}
       }
     }
 
-    // Validate response shape
-    if (!result || typeof result !== 'object' || !result.siteInfo || !Array.isArray(result.checkpoints)) {
-      console.error('[scan-swppp] invalid response shape:', result);
+    // Validate the full model output shape (SEC-07). A prompt-injected
+    // SWPPP can shape the response — anything outside the contract halts
+    // here instead of flowing into checkpoint creation.
+    const validated = swpppExtractionOutput.safeParse(result);
+    if (!validated.success) {
+      console.error(
+        '[scan-swppp] Claude output failed validation:',
+        validated.error.issues
+      );
       throw new Error('Invalid response structure from Claude');
     }
 
     console.log(
-      `[scan-swppp] done — ${(result.checkpoints as unknown[]).length} checkpoints, claude=${claudeMs}ms`
+      `[scan-swppp] done — ${validated.data.checkpoints.length} checkpoints, claude=${claudeMs}ms`
     );
 
-    return NextResponse.json(result);
+    return NextResponse.json(validated.data);
   } catch (error: unknown) {
     // Anthropic SDK errors carry a `status`; log it explicitly so any
     // upstream failure is obvious.

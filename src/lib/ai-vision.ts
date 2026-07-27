@@ -11,6 +11,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { CheckpointStatus } from '@/types/checkpoint';
+import { bmpVisionAnalysisOutput } from '@/lib/validations/ai-output';
 
 const VISION_MODEL = 'claude-sonnet-4-20250514';
 const MOCK_MODEL = 'mock-deterministic';
@@ -104,7 +105,7 @@ Provide a detailed compliance analysis as JSON.`;
     throw new Error('No text response from Claude vision');
   }
 
-  let parsed: Partial<AnalyzeBmpPhotoResult>;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(extractJsonBlock(textContent.text));
   } catch (err) {
@@ -113,13 +114,22 @@ Provide a detailed compliance analysis as JSON.`;
     );
   }
 
+  // SEC-07: model output is untrusted — validate the full shape and halt
+  // on failure. The old path coerced bad fields to fabricated defaults
+  // (e.g. an unparseable status silently became the checkpoint's current
+  // status at confidence 75), which is exactly what a compliance record
+  // must never contain.
+  const validated = bmpVisionAnalysisOutput.safeParse(parsed);
+  if (!validated.success) {
+    throw new Error(
+      `Claude vision output failed validation: ${validated.error.issues
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')}`
+    );
+  }
+
   return {
-    summary: parsed.summary ?? 'Photo analyzed by Claude vision.',
-    status: (parsed.status as CheckpointStatus) ?? input.currentStatus,
-    confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 75,
-    details: Array.isArray(parsed.details) ? parsed.details : [],
-    cgpReference: parsed.cgpReference ?? '',
-    recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+    ...validated.data,
     model: VISION_MODEL,
     rawResponse: textContent.text,
   };

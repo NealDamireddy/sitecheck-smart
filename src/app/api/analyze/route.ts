@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { analyzeCheckpoint } from '@/lib/validations';
+import { bmpTextAnalysisOutput } from '@/lib/validations/ai-output';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({
@@ -59,12 +60,30 @@ Return the analysis as JSON.`,
       throw new Error('No text response from Claude');
     }
 
-    // Parse JSON from response
-    const analysis = JSON.parse(textContent.text);
+    // Parse and validate the model output (SEC-07) — model responses are
+    // untrusted; a bad shape halts loudly instead of reaching the client.
+    let rawAnalysis: unknown;
+    try {
+      rawAnalysis = JSON.parse(textContent.text);
+    } catch {
+      console.error('[analyze] Claude returned non-JSON:', textContent.text.slice(0, 300));
+      return NextResponse.json(
+        { error: 'AI analysis returned an unreadable response. Try again.' },
+        { status: 502 }
+      );
+    }
+    const validated = bmpTextAnalysisOutput.safeParse(rawAnalysis);
+    if (!validated.success) {
+      console.error('[analyze] Claude output failed validation:', validated.error.issues);
+      return NextResponse.json(
+        { error: 'AI analysis returned an invalid response. Try again.' },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
       checkpointId,
-      ...analysis,
+      ...validated.data,
       status, // preserve the original status
     });
   } catch (error: unknown) {
