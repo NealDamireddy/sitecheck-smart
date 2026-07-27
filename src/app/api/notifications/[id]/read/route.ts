@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Transform snake_case database row to camelCase
 function transformNotificationToClient(row: Record<string, unknown>) {
@@ -45,7 +46,7 @@ export async function POST(
           { status: 404 }
         );
       }
-      console.error('Error marking notification as read:', error);
+      log.error('Error marking notification as read', { error });
       return NextResponse.json(
         { error: 'Failed to update notification' },
         { status: 500 }
@@ -54,7 +55,7 @@ export async function POST(
 
     return NextResponse.json(transformNotificationToClient(notification));
   } catch (error) {
-    console.error('Unexpected error in POST /api/notifications/[id]/read:', error);
+    log.error('Unexpected error in POST /api/notifications/[id]/read', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

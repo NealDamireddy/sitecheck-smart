@@ -5,6 +5,7 @@ import { permitCreate, permitUpdate } from '@/lib/validations';
 import { linearPermits } from '@/data/linear-permits';
 import { deriveLivePermitStatus } from '@/types/permit';
 import type { SegmentPermit } from '@/types/permit';
+import { log } from '@/lib/logger';
 
 function transformPermit(row: Record<string, unknown>): SegmentPermit {
   const permit: SegmentPermit = {
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to create permit:', err);
+    log.error('Failed to create permit', { err });
     return NextResponse.json({ error: 'Failed to create permit' }, { status: 500 });
   }
 }
@@ -164,7 +165,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to update permit:', err);
+    log.error('Failed to update permit', { err });
     return NextResponse.json({ error: 'Failed to update permit' }, { status: 500 });
   }
 }

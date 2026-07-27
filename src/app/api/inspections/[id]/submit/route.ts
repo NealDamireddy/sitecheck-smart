@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { inspectionSubmit } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .single();
 
     if (error || !data) {
-      console.error('Inspection submit failed:', error);
+      log.error('Inspection submit failed', { error });
       return NextResponse.json({ error: 'Submit failed' }, { status: 500 });
     }
 
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Inspection submit unexpected error:', err);
+    log.error('Inspection submit unexpected error', { err });
     return NextResponse.json({ error: 'Submit failed' }, { status: 500 });
   }
 }

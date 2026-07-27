@@ -5,6 +5,7 @@ import { analyzeLimiter, rateLimitOrNull } from '@/lib/rate-limit';
 import { analyzeCheckpoint } from '@/lib/validations';
 import { bmpTextAnalysisOutput } from '@/lib/validations/ai-output';
 import Anthropic from '@anthropic-ai/sdk';
+import { log } from '@/lib/logger';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -71,7 +72,7 @@ Return the analysis as JSON.`,
     try {
       rawAnalysis = JSON.parse(textContent.text);
     } catch {
-      console.error('[analyze] Claude returned non-JSON:', textContent.text.slice(0, 300));
+      log.error('[analyze] Claude returned non-JSON', { detail: textContent.text.slice(0, 300) });
       return NextResponse.json(
         { error: 'AI analysis returned an unreadable response. Try again.' },
         { status: 502 }
@@ -79,7 +80,7 @@ Return the analysis as JSON.`,
     }
     const validated = bmpTextAnalysisOutput.safeParse(rawAnalysis);
     if (!validated.success) {
-      console.error('[analyze] Claude output failed validation:', validated.error.issues);
+      log.error('[analyze] Claude output failed validation', { detail: validated.error.issues });
       return NextResponse.json(
         { error: 'AI analysis returned an invalid response. Try again.' },
         { status: 502 }
@@ -95,7 +96,7 @@ Return the analysis as JSON.`,
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Claude analysis error:', error);
+    log.error('Claude analysis error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
   }

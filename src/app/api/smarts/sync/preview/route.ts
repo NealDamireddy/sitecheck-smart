@@ -14,6 +14,7 @@ import { requireAuth } from '@/lib/auth';
 import { fetchSmartsExportInput } from '@/lib/smarts/fetch-export-input';
 import { buildSyncPayload } from '@/lib/smarts/bot-bridge';
 import { smartsCredentialStatus } from '@/lib/smarts/credentials';
+import { log } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
       credentialUsername: credentials.username,
     });
   } catch (err: unknown) {
-    console.error('SMARTS sync preview error:', err);
+    log.error('SMARTS sync preview error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to build sync preview' }, { status: 500 });
   }

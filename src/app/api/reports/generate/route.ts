@@ -17,6 +17,7 @@ import {
 } from '@/lib/cgp/report-data';
 import type { ReportSectionData } from '@/types/report';
 import type { BMPCategory, CheckpointStatus } from '@/types/checkpoint';
+import { log } from '@/lib/logger';
 
 
 interface ReportSection {
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (projectError || !project) {
-      console.error('Error fetching project:', projectError);
+      log.error('Error fetching project', { projectError });
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 404 }
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
     const { data: inspections, error: inspectionError } = await inspectionQuery.limit(1);
 
     if (inspectionError) {
-      console.error('Error fetching inspection:', inspectionError);
+      log.error('Error fetching inspection', { inspectionError });
     }
 
     const inspection = inspections?.[0] || null;
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (weatherError && weatherError.code !== 'PGRST116') {
-      console.error('Error fetching weather:', weatherError);
+      log.error('Error fetching weather', { weatherError });
     }
 
     // Part 2 (BMP Observations) Yes/No answers are driven by per-checkpoint
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
       .order('detected_date', { ascending: false });
 
     if (deficienciesError) {
-      console.error('Error fetching deficiencies:', deficienciesError);
+      log.error('Error fetching deficiencies', { deficienciesError });
     }
 
     const deficiencyList = deficiencies || [];
@@ -685,7 +686,7 @@ This inspection was conducted in accordance with the requirements of:
       .single();
 
     if (reportError) {
-      console.error('Error creating report:', reportError);
+      log.error('Error creating report', { reportError });
       return NextResponse.json(
         { error: 'Failed to create report' },
         { status: 500 }
@@ -710,7 +711,7 @@ This inspection was conducted in accordance with the requirements of:
       .insert(activityEvent);
 
     if (activityError) {
-      console.error('Error creating activity event:', activityError);
+      log.error('Error creating activity event', { activityError });
     }
 
     // Transform and return
@@ -730,7 +731,7 @@ This inspection was conducted in accordance with the requirements of:
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Unexpected error in POST /api/reports/generate:', error);
+    log.error('Unexpected error in POST /api/reports/generate', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

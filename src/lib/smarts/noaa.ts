@@ -26,6 +26,8 @@
  * even when NOAA is having a bad day.
  */
 
+import { log } from '@/lib/logger';
+
 const BASE_URL = 'https://api.weather.gov';
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
 const DEFAULT_USER_AGENT = 'SiteCheck Dev (dev@example.com)';
@@ -287,10 +289,7 @@ export async function fetchNoaaSummary(
       noaaFetch(forecastHourly) as Promise<NoaaHourlyForecastResponse>,
       (noaaFetch(forecastGridData) as Promise<NoaaGridDataResponse>).catch(
         (err): NoaaGridDataResponse | null => {
-          console.warn(
-            'NOAA gridData fetch failed (continuing without QPF):',
-            err
-          );
+          log.warn('NOAA gridData fetch failed (continuing without QPF)', { err });
           return null;
         }
       ),
@@ -334,7 +333,7 @@ export async function fetchNoaaSummary(
     return summary;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown NOAA error';
-    console.warn('NOAA fetch failed:', message);
+    log.warn('NOAA fetch failed', { message });
     return {
       precipitationNext24h: 0,
       activeNow: false,

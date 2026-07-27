@@ -1,0 +1,77 @@
+# Local full-stack bring-up.
+#
+#   cp .env.example .env && $EDITOR .env      # fill in real values
+#   docker compose up --build
+#   open http://localhost:3000
+#
+# What this does NOT run: Postgres. The app targets hosted Supabase
+# (auth, RLS, storage and the database are one product here — see
+# docs/DEPLOYMENT.md for what a self-hosted swap actually costs). Point
+# .env at a development Supabase project, never production.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Public values only — these are inlined into the client bundle.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN}
+        APP_COMMIT_SHA: ${APP_COMMIT_SHA:-local}
+        APP_BUILD_TIME: ${APP_BUILD_TIME:-local}
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Server-only secrets: runtime env, never build args.
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      NOAA_USER_AGENT: ${NOAA_USER_AGENT}
+      SMARTS_CREDENTIALS_KEY: ${SMARTS_CREDENTIALS_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      ADMIN_MIGRATION_TOKEN: ${ADMIN_MIGRATION_TOKEN}
+      # Public values again at runtime, for server-side rendering.
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health?shallow=1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  # Batch worker. Built here so `docker compose build` validates it, but
+  # NOT started with the stack — it runs per job:
+  #
+  #   docker compose run --rm smarts-bot /data/jobs/<job>.csv
+  #
+  # In cloud this is a queue-triggered task, not a compose service.
+  smarts-bot:
+    build:
+      context: ./smarts-automation
+      dockerfile: Dockerfile
+    profiles: ["tools"]
+    environment:
+      SMARTS_USERNAME: ${SMARTS_USERNAME}
+      SMARTS_PASSWORD: ${SMARTS_PASSWORD}
+      SMARTS_WDID: ${SMARTS_WDID}
+      SMARTS_SITE_NAME: ${SMARTS_SITE_NAME}
+      SMARTS_EVENT_TYPE: ${SMARTS_EVENT_TYPE}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      # Screenshots and run logs are evidence of what the bot did and
+      # must outlive the container.
+      - smarts-artifacts:/data/artifacts
+    # Chromium needs more than Docker's default 64 MB /dev/shm or it
+    # crashes on heavy pages.
+    shm_size: "1gb"
+    mem_limit: 2g
+    cpus: 1.0
+
+volumes:
+  smarts-artifacts:

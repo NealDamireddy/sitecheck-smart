@@ -21,6 +21,7 @@ import { ZodError } from 'zod';
 import { waypointAnalyze } from '@/lib/validations';
 import { analyzeBmpPhoto, mockAnalyzeBmpPhoto, type AnalyzeBmpPhotoResult } from '@/lib/ai-vision';
 import type { CheckpointStatus } from '@/types/checkpoint';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string; number: string }>;
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         hint: body.hint,
       });
     } catch (err) {
-      console.warn('Claude vision failed, falling back to mock:', err);
+      log.warn('Claude vision failed, falling back to mock', { err });
       result = mockAnalyzeBmpPhoto({
         photoUrl,
         checkpointId: checkpoint.id,
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (upsertErr || !persisted) {
       // Persistence failed but we still have the analysis — return it
-      console.error('mission_ai_analyses upsert failed:', upsertErr);
+      log.error('mission_ai_analyses upsert failed', { upsertErr });
       return NextResponse.json({
         id,
         missionId,
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: err.issues }, { status: 400 });
     }
-    console.error('analyze POST failed:', err);
+    log.error('analyze POST failed', { err });
     return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
   }
 }

@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ZodError } from 'zod';
 import { missionReviewCreate } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -53,7 +54,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     }
     return NextResponse.json((data ?? []).map(transformReview));
   } catch (err) {
-    console.error('reviews GET failed:', err);
+    log.error('reviews GET failed', { err });
     return NextResponse.json([]);
   }
 }
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: err.issues }, { status: 400 });
     }
-    console.error('reviews POST failed:', err);
+    log.error('reviews POST failed', { err });
     return NextResponse.json({ error: 'Review save failed' }, { status: 500 });
   }
 }

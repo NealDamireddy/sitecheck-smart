@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSyncJob } from '@/lib/smarts/sync-job';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ jobId: string }>;
@@ -44,7 +45,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       },
     });
   } catch (err: unknown) {
-    console.error('SMARTS sync status error:', err);
+    log.error('SMARTS sync status error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to read sync job' }, { status: 500 });
   }

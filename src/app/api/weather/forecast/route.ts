@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { fetchForecast } from '@/lib/weather-api';
 import { WeatherDay } from '@/types/weather';
 import { resolveProjectId, resolveProjectCoords } from '@/lib/project-context';
+import { log } from '@/lib/logger';
 
 const CACHE_DURATION_MINUTES = 60; // 1 hour
 
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: true });
 
     if (cacheError) {
-      console.error('Error checking forecast cache:', cacheError);
+      log.error('Error checking forecast cache', { cacheError });
     }
 
     // Check if cache is fresh (less than 1 hour old)
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
       .eq('project_id', projectId);
 
     if (deleteError) {
-      console.error('Error deleting old forecasts:', deleteError);
+      log.error('Error deleting old forecasts', { deleteError });
     }
 
     // Insert new forecasts
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
       .select();
 
     if (insertError) {
-      console.error('Error caching forecast data:', insertError);
+      log.error('Error caching forecast data', { insertError });
       // Return the fetched data even if caching failed
       return NextResponse.json(forecastData);
     }
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
     const forecasts = (inserted || []).map(transformForecastToClient);
     return NextResponse.json(forecasts);
   } catch (error) {
-    console.error('Unexpected error in GET /api/weather/forecast:', error);
+    log.error('Unexpected error in GET /api/weather/forecast', { error });
 
     // If OpenWeatherMap fails, try to return stale cached data
     try {

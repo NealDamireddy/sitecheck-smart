@@ -19,6 +19,7 @@ import { requireAuth } from '@/lib/auth';
 import { smartsEventCreate } from '@/lib/validations';
 import { resolveProjectId } from '@/lib/project-context';
 import type { SmartsEvent, SmartsEventStatus, SmartsEventSource } from '@/types';
+import { log } from '@/lib/logger';
 
 interface DbSmartsEventRow {
   id: string;
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
     const rows = (data ?? []) as DbSmartsEventRow[];
     return NextResponse.json(rows.map(transformSmartsEvent));
   } catch (err: unknown) {
-    console.error('Smarts events GET error:', err);
+    log.error('Smarts events GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch smarts events' }, { status: 500 });
   }
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Smarts events POST error:', err);
+    log.error('Smarts events POST error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to create smarts event' }, { status: 500 });
   }

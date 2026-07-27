@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { geofenceUpdate } from '@/lib/validations';
 import { transformGeofence } from '@/lib/airspace-context';
 import type { Geofence } from '@/types/geofence';
+import { log } from '@/lib/logger';
 
 // PATCH /api/geofences/[id]
 export async function PATCH(
@@ -43,7 +44,7 @@ export async function PATCH(
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to update geofence:', err);
+    log.error('Failed to update geofence', { err });
     return NextResponse.json({ error: 'Failed to update geofence' }, { status: 500 });
   }
 }
@@ -68,7 +69,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (err) {
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to delete geofence:', err);
+    log.error('Failed to delete geofence', { err });
     return NextResponse.json({ error: 'Failed to delete geofence' }, { status: 500 });
   }
 }

@@ -18,6 +18,7 @@ import {
   computeComplianceForMissions,
   writeComplianceToInspection,
 } from '@/lib/inspection-compliance';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .upsert(linkRow, { onConflict: 'inspection_id,mission_id' });
 
     if (linkError) {
-      console.error('Failed to link mission to inspection:', linkError);
+      log.error('Failed to link mission to inspection', { linkError });
       return NextResponse.json(
         { error: 'Failed to link mission' },
         { status: 500 }
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('inspection missions POST failed:', err);
+    log.error('inspection missions POST failed', { err });
     return NextResponse.json({ error: 'Link failed' }, { status: 500 });
   }
 }

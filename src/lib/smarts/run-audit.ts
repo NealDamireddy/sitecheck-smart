@@ -17,6 +17,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 import type { SyncJobStatus } from '@/lib/smarts/sync-job';
+import { log } from '@/lib/logger';
 
 export type RunAuditStatus = 'running' | 'stopped_before_cert' | 'error';
 
@@ -54,11 +55,11 @@ export async function recordRunStart(record: RunStartRecord): Promise<void> {
       started_at: new Date().toISOString(),
     });
     if (error) {
-      console.error('smarts_runs start insert failed:', error.message);
+      log.error('smarts_runs start insert failed', { detail: error.message });
     }
   } catch (err) {
     // Audit logging must never break the sync flow.
-    console.error('smarts_runs start insert threw:', err);
+    log.error('smarts_runs start insert threw', { err });
   }
 }
 
@@ -84,9 +85,9 @@ export async function recordRunFinalize(
       })
       .eq('job_id', record.jobId);
     if (error) {
-      console.error('smarts_runs finalize update failed:', error.message);
+      log.error('smarts_runs finalize update failed', { detail: error.message });
     }
   } catch (err) {
-    console.error('smarts_runs finalize update threw:', err);
+    log.error('smarts_runs finalize update threw', { err });
   }
 }

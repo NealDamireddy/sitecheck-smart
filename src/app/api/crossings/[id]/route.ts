@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { crossingUpdate } from '@/lib/validations';
 import type { Crossing } from '@/types/crossing';
+import { log } from '@/lib/logger';
 
 function transformCrossing(row: Record<string, unknown>): Crossing {
   return {
@@ -89,7 +90,7 @@ export async function PATCH(
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to update crossing:', err);
+    log.error('Failed to update crossing', { err });
     return NextResponse.json({ error: 'Failed to update crossing' }, { status: 500 });
   }
 }
@@ -114,7 +115,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (err) {
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to delete crossing:', err);
+    log.error('Failed to delete crossing', { err });
     return NextResponse.json({ error: 'Failed to delete crossing' }, { status: 500 });
   }
 }

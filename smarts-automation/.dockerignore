@@ -1,0 +1,8 @@
+node_modules
+artifacts
+# Captures of a real logged-in SMARTS session — never into an image.
+recon
+smarts-automation
+run.log
+*.tsbuildinfo
+.DS_Store

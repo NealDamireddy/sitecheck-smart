@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ZodError } from 'zod';
 import { missionUpdate } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 // Transform snake_case database row to camelCase
 function transformMissionToClient(row: Record<string, unknown>) {
@@ -130,7 +131,7 @@ export async function GET(
           { status: 404 }
         );
       }
-      console.error('Error fetching mission:', missionError);
+      log.error('Error fetching mission', { missionError });
       return NextResponse.json(
         { error: 'Failed to fetch mission' },
         { status: 500 }
@@ -145,7 +146,7 @@ export async function GET(
       .order('number', { ascending: true });
 
     if (waypointsError) {
-      console.error('Error fetching waypoints:', waypointsError);
+      log.error('Error fetching waypoints', { waypointsError });
       // Continue without waypoints rather than failing
     }
 
@@ -157,7 +158,7 @@ export async function GET(
       waypoints: transformedWaypoints,
     });
   } catch (error) {
-    console.error('Unexpected error in GET /api/missions/[id]:', error);
+    log.error('Unexpected error in GET /api/missions/[id]', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -203,7 +204,7 @@ export async function PUT(
           { status: 404 }
         );
       }
-      console.error('Error updating mission:', error);
+      log.error('Error updating mission', { error });
       return NextResponse.json(
         { error: 'Failed to update mission' },
         { status: 500 }
@@ -247,7 +248,7 @@ export async function PUT(
         .insert(activityEvent);
 
       if (activityError) {
-        console.error('Error creating activity event:', activityError);
+        log.error('Error creating activity event', { activityError });
       }
     }
 
@@ -276,7 +277,7 @@ export async function PUT(
         .insert(routeEditEvent);
 
       if (routeEditError) {
-        console.error('Error creating route-edit activity event:', routeEditError);
+        log.error('Error creating route-edit activity event', { routeEditError });
       }
     }
 
@@ -285,7 +286,7 @@ export async function PUT(
     if (error instanceof ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: error.issues }, { status: 400 });
     }
-    console.error('Unexpected error in PUT /api/missions/[id]:', error);
+    log.error('Unexpected error in PUT /api/missions/[id]', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

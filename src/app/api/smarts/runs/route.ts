@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data ?? []);
   } catch (err: unknown) {
-    console.error('SMARTS runs list error:', err);
+    log.error('SMARTS runs list error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to read SMARTS runs' }, { status: 500 });
   }

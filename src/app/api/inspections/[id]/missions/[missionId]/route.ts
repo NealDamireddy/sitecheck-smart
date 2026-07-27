@@ -12,6 +12,7 @@ import {
   computeComplianceForMissions,
   writeComplianceToInspection,
 } from '@/lib/inspection-compliance';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string; missionId: string }>;
@@ -31,7 +32,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       .eq('mission_id', missionId);
 
     if (error) {
-      console.error('Failed to unlink mission:', error);
+      log.error('Failed to unlink mission', { error });
       return NextResponse.json({ error: 'Unlink failed' }, { status: 500 });
     }
 
@@ -52,7 +53,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       qspOverallCompliance: computation.qspOverallCompliance,
     });
   } catch (err) {
-    console.error('inspection missions DELETE failed:', err);
+    log.error('inspection missions DELETE failed', { err });
     return NextResponse.json({ error: 'Unlink failed' }, { status: 500 });
   }
 }

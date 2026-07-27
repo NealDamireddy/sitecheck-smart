@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { checkpointUpdate } from '@/lib/validations';
 import { resolveCheckpointPhotoUrl } from '@/lib/supabase/storage';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case DB row to camelCase
@@ -129,7 +130,7 @@ export async function GET(
       .limit(1);
 
     if (analysisError) {
-      console.error('Failed to fetch analysis:', analysisError.message);
+      log.error('Failed to fetch analysis', { detail: analysisError.message });
     }
 
     // Fetch deficiencies for this checkpoint
@@ -140,7 +141,7 @@ export async function GET(
       .order('detected_date', { ascending: false });
 
     if (deficienciesError) {
-      console.error('Failed to fetch deficiencies:', deficienciesError.message);
+      log.error('Failed to fetch deficiencies', { detail: deficienciesError.message });
     }
 
     const result = {
@@ -156,7 +157,7 @@ export async function GET(
 
     return NextResponse.json(result);
   } catch (error: unknown) {
-    console.error('Checkpoint GET error:', error);
+    log.error('Checkpoint GET error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch checkpoint' }, { status: 500 });
   }
@@ -232,7 +233,7 @@ export async function PUT(
         .insert(activityEvent);
 
       if (activityError) {
-        console.error('Failed to create activity event:', activityError.message);
+        log.error('Failed to create activity event', { detail: activityError.message });
       }
     }
 
@@ -249,7 +250,7 @@ export async function PUT(
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Checkpoint PUT error:', error);
+    log.error('Checkpoint PUT error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update checkpoint' }, { status: 500 });
   }
@@ -291,7 +292,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, id });
   } catch (error: unknown) {
-    console.error('Checkpoint DELETE error:', error);
+    log.error('Checkpoint DELETE error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to delete checkpoint' }, { status: 500 });
   }

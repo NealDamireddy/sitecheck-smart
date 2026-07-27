@@ -43,6 +43,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { smartsEventSimulate } from '@/lib/validations';
 import type { SmartsEvent, SmartsEventStatus, SmartsEventSource } from '@/types';
+import { log } from '@/lib/logger';
 
 interface DbSmartsEventRow {
   id: string;
@@ -151,7 +152,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Smarts events simulate error:', err);
+    log.error('Smarts events simulate error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to simulate smarts event' }, { status: 500 });
   }

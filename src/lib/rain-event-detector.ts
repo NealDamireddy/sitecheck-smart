@@ -28,6 +28,7 @@ import {
 } from '@/lib/cgp/constants';
 import { latestQualifyingEvent } from '@/lib/qpe/detect';
 import { fetchObservedPrecip } from '@/lib/qpe/observed';
+import { log } from '@/lib/logger';
 
 export interface DetectedRainEvent {
   /** ISO 8601 — first observed rainfall of the event. */
@@ -85,7 +86,7 @@ export async function detectRainEventForProject(
 
   if (observed.quality === 'none') {
     if (observed.error) {
-      console.warn('rain-event-detector: no usable gauge data —', observed.error);
+      log.warn('rain-event-detector: no usable gauge data —', { detail: observed.error });
     }
     return null;
   }

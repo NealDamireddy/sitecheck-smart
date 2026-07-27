@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { projectWdidPatch } from '@/lib/validations/project';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ projectId: string }>;
@@ -49,7 +50,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json(data);
   } catch (err: unknown) {
-    console.error('Project PATCH error:', err);
+    log.error('Project PATCH error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }

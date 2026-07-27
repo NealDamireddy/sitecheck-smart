@@ -28,6 +28,7 @@ import {
   type AnalyzeBmpPhotoResult,
 } from '@/lib/ai-vision';
 import type { CheckpointStatus } from '@/types/checkpoint';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -86,7 +87,7 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       // contain an invented observation. (The deterministic mock still
       // serves demo deployments with no ANTHROPIC_API_KEY — that gate
       // lives inside analyzeBmpPhoto and tags results with model:'mock'.)
-      console.error('Claude vision failed on checkpoint analyze:', err);
+      log.error('Claude vision failed on checkpoint analyze', { err });
       return NextResponse.json(
         { error: 'AI photo analysis failed — nothing was saved. Try again in a moment.' },
         { status: 502 },
@@ -131,7 +132,7 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       model: result.model,
     });
   } catch (err: unknown) {
-    console.error('Checkpoint analyze error:', err);
+    log.error('Checkpoint analyze error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to analyze checkpoint' }, { status: 500 });
   }

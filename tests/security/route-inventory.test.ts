@@ -88,6 +88,7 @@ describe('authentication coverage', () => {
     expect(exceptions).toEqual([
       '/api/admin/apply-migrations',
       '/api/cron/pre-storm-detector',
+      '/api/health',
       '/api/weather/noaa',
     ]);
   });

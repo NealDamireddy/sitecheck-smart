@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -47,7 +48,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     }
     return NextResponse.json((data ?? []).map(transformAnalysis));
   } catch (err) {
-    console.error('ai-analyses GET failed:', err);
+    log.error('ai-analyses GET failed', { err });
     return NextResponse.json([]);
   }
 }

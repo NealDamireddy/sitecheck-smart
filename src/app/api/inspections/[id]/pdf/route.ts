@@ -25,6 +25,7 @@ import type {
   PdfReportSection,
   PdfProjectInfo,
 } from '@/lib/pdf/inspection-pdf';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -175,7 +176,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       },
     });
   } catch (err) {
-    console.error('Inspection PDF error:', err);
+    log.error('Inspection PDF error', { err });
     return NextResponse.json({ error: 'Failed to render PDF' }, { status: 500 });
   }
 }

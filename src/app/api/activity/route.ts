@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { activityCreate } from '@/lib/validations';
 import { resolveProjectId } from '@/lib/project-context';
+import { log } from '@/lib/logger';
 
 const DEFAULT_LIMIT = 20;
 
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching activity events:', error);
+      log.error('Error fetching activity events', { error });
       return NextResponse.json(
         { error: 'Failed to fetch activity events' },
         { status: 500 }
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(activities);
   } catch (error) {
-    console.error('Unexpected error in GET /api/activity:', error);
+    log.error('Unexpected error in GET /api/activity', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error creating activity event:', error);
+      log.error('Error creating activity event', { error });
       return NextResponse.json(
         { error: 'Failed to create activity event' },
         { status: 500 }
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Unexpected error in POST /api/activity:', error);
+    log.error('Unexpected error in POST /api/activity', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

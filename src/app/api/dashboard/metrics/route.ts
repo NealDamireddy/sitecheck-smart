@@ -4,6 +4,7 @@ import { resolveProjectId } from '@/lib/project-context';
 import { linearCrossings } from '@/data/linear-crossings';
 import { linearPermits } from '@/data/linear-permits';
 import { deriveLivePermitStatus } from '@/types/permit';
+import { log } from '@/lib/logger';
 
 
 export async function GET(request: NextRequest) {
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (projectError) {
-      console.error('Failed to fetch project:', projectError.message);
+      log.error('Failed to fetch project', { detail: projectError.message });
     }
 
     const isLinear = project?.project_type === 'linear';
@@ -172,7 +173,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: unknown) {
-    console.error('Dashboard metrics error:', error);
+    log.error('Dashboard metrics error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch dashboard metrics' }, { status: 500 });
   }

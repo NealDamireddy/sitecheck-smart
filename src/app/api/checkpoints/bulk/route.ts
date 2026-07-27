@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { checkpointBulk } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case DB row to camelCase
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
       .insert(activityEvent);
 
     if (activityError) {
-      console.error('Failed to create activity event:', activityError.message);
+      log.error('Failed to create activity event', { detail: activityError.message });
       // Don't fail the request, just log it
     }
 
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Checkpoints bulk POST error:', error);
+    log.error('Checkpoints bulk POST error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to create checkpoints' }, { status: 500 });
   }

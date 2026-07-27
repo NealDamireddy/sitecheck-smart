@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { correctiveActionUpdate } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 const VALID_SEVERITIES = new Set(['low', 'medium', 'high']);
 const VALID_STATUSES = new Set(['open', 'in-progress', 'resolved', 'verified']);
@@ -92,7 +93,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       transformCorrectiveAction(data as DbCorrectiveActionRow)
     );
   } catch (err: unknown) {
-    console.error('Corrective action GET error:', err);
+    log.error('Corrective action GET error', { err });
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
   }
 }
@@ -141,7 +142,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .single();
 
     if (error || !data) {
-      console.error('Corrective action PATCH failed:', error);
+      log.error('Corrective action PATCH failed', { error });
       return NextResponse.json({ error: 'Update failed' }, { status: 500 });
     }
 
@@ -167,7 +168,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Corrective action PATCH error:', err);
+    log.error('Corrective action PATCH error', { err });
     return NextResponse.json({ error: 'Update failed' }, { status: 500 });
   }
 }

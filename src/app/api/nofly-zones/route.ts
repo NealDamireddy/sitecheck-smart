@@ -8,6 +8,7 @@ import {
   transformNoFlyZone,
 } from '@/lib/airspace-context';
 import type { NoFlyZone } from '@/types/nofly-zone';
+import { log } from '@/lib/logger';
 
 // GET /api/nofly-zones?projectId=...&active=true
 export async function GET(request: NextRequest) {
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to create no-fly zone:', err);
+    log.error('Failed to create no-fly zone', { err });
     return NextResponse.json({ error: 'Failed to create no-fly zone' }, { status: 500 });
   }
 }

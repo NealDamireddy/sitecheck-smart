@@ -40,6 +40,7 @@ import type {
   ParameterQualifier,
   AnalyzedBy,
 } from '@/types';
+import { log } from '@/lib/logger';
 
 interface DbSampleRow {
   id: string;
@@ -154,7 +155,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(samples);
   } catch (err: unknown) {
-    console.error('Samples GET error:', err);
+    log.error('Samples GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch samples' }, { status: 500 });
   }
@@ -328,7 +329,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Samples POST error:', err);
+    log.error('Samples POST error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to create sample' }, { status: 500 });
   }

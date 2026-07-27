@@ -1,0 +1,23 @@
+# Build context hygiene: keep secrets and bulk out of the image.
+node_modules
+.next
+.git
+.github
+.env
+.env.local
+.env.test
+.env*.local
+npm-debug.log*
+*.tsbuildinfo
+coverage
+playwright-report
+test-results
+e2e
+tests
+docs
+smarts-automation/node_modules
+smarts-automation/artifacts
+smarts-automation/recon
+smarts-automation/smarts-automation
+run.log
+.DS_Store

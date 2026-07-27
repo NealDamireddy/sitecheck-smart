@@ -11,6 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSyncJob, resolveJobScreenshot } from '@/lib/smarts/sync-job';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ jobId: string }>;
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       },
     });
   } catch (err: unknown) {
-    console.error('SMARTS sync screenshot error:', err);
+    log.error('SMARTS sync screenshot error', { err });
     return NextResponse.json(
       { error: 'Failed to read screenshot' },
       { status: 500 }

@@ -115,6 +115,14 @@ export const ROUTES: RouteSpec[] = [
     why: 'Vercel cron. Requires Authorization: Bearer $CRON_SECRET; there is no user session in a cron invocation.',
   },
   {
+    file: 'api/health/route.ts',
+    path: '/api/health',
+    verbs: ['GET'],
+    scope: 'machine',
+    auth: 'public',
+    why: 'Container liveness/readiness probe. Load balancers cannot authenticate, so it is deliberately open — and therefore returns only status, uptime and build metadata: no configuration, no connection details, no upstream error text.',
+  },
+  {
     file: 'api/weather/noaa/route.ts',
     path: '/api/weather/noaa',
     verbs: ['GET'],

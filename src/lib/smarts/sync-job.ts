@@ -41,6 +41,7 @@ import {
   recordRunFinalize,
   toRunAuditStatus,
 } from '@/lib/smarts/run-audit';
+import { log } from '@/lib/logger';
 
 const BOT_DIR = resolve(process.cwd(), 'smarts-automation');
 const JOBS_DIR = resolve(BOT_DIR, 'artifacts', 'sync-jobs');
@@ -362,7 +363,7 @@ export async function startSyncJob(
 
   child.on('exit', (code) => {
     finalize(jobId, code).catch((err) =>
-      console.error(`sync-job finalize (exit) failed for ${jobId}:`, err)
+      log.error('sync-job finalize failed on child exit', { jobId, err })
     );
   });
   child.unref();

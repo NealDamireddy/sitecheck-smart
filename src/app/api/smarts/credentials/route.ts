@@ -16,6 +16,7 @@ import {
   saveSmartsCredentials,
   smartsCredentialStatus,
 } from '@/lib/smarts/credentials';
+import { log } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -24,7 +25,7 @@ export async function GET() {
     const status = await smartsCredentialStatus(auth.supabase, auth.user.id);
     return NextResponse.json(status);
   } catch (err: unknown) {
-    console.error('SMARTS credentials status error:', err);
+    log.error('SMARTS credentials status error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to read credential status' }, { status: 500 });
   }
@@ -52,7 +53,7 @@ export async function PUT(request: NextRequest) {
     const status = await smartsCredentialStatus(auth.supabase, auth.user.id);
     return NextResponse.json(status);
   } catch (err: unknown) {
-    console.error('SMARTS credentials save error:', err);
+    log.error('SMARTS credentials save error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to save credentials' }, { status: 500 });
   }
@@ -66,7 +67,7 @@ export async function DELETE() {
     const status = await smartsCredentialStatus(auth.supabase, auth.user.id);
     return NextResponse.json(status);
   } catch (err: unknown) {
-    console.error('SMARTS credentials delete error:', err);
+    log.error('SMARTS credentials delete error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to remove credentials' }, { status: 500 });
   }

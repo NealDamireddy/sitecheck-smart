@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { noflyZoneUpdate } from '@/lib/validations';
 import { transformNoFlyZone } from '@/lib/airspace-context';
 import type { NoFlyZone } from '@/types/nofly-zone';
+import { log } from '@/lib/logger';
 
 // PATCH /api/nofly-zones/[id]
 export async function PATCH(
@@ -45,7 +46,7 @@ export async function PATCH(
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to update no-fly zone:', err);
+    log.error('Failed to update no-fly zone', { err });
     return NextResponse.json({ error: 'Failed to update no-fly zone' }, { status: 500 });
   }
 }
@@ -70,7 +71,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (err) {
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to delete no-fly zone:', err);
+    log.error('Failed to delete no-fly zone', { err });
     return NextResponse.json({ error: 'Failed to delete no-fly zone' }, { status: 500 });
   }
 }

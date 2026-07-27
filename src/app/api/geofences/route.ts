@@ -8,6 +8,7 @@ import {
   transformGeofence,
 } from '@/lib/airspace-context';
 import type { Geofence } from '@/types/geofence';
+import { log } from '@/lib/logger';
 
 // GET /api/geofences?projectId=...
 export async function GET(request: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to create geofence:', err);
+    log.error('Failed to create geofence', { err });
     return NextResponse.json({ error: 'Failed to create geofence' }, { status: 500 });
   }
 }

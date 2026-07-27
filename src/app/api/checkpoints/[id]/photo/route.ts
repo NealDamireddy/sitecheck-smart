@@ -20,6 +20,7 @@ import {
   resolveCheckpointPhotoUrl,
   uploadCheckpointPhoto,
 } from '@/lib/supabase/storage';
+import { log } from '@/lib/logger';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MiB
 const ALLOWED_MIME = new Set([
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       qspPhotoUploadedAt: updated.qsp_photo_uploaded_at,
     });
   } catch (err: unknown) {
-    console.error('Checkpoint photo upload error:', err);
+    log.error('Checkpoint photo upload error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to upload checkpoint photo' }, { status: 500 });
   }

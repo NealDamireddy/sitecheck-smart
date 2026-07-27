@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ZodError } from 'zod';
 import { waypointUpdate } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 // Transform camelCase waypoint data to snake_case for database
 function transformWaypointUpdateToDb(data: Record<string, unknown>) {
@@ -62,7 +63,7 @@ export async function PUT(
           { status: 404 }
         );
       }
-      console.error('Error updating waypoint:', error);
+      log.error('Error updating waypoint', { error });
       return NextResponse.json(
         { error: 'Failed to update waypoint' },
         { status: 500 }
@@ -90,7 +91,7 @@ export async function PUT(
     if (error instanceof ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: error.issues }, { status: 400 });
     }
-    console.error('Unexpected error in PUT /api/missions/[id]/waypoints/[number]:', error);
+    log.error('Unexpected error in PUT /api/missions/[id]/waypoints/[number]', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

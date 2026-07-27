@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { checkpointCreate } from '@/lib/validations';
 import { resolveProjectId } from '@/lib/project-context';
 import { ZodError } from 'zod';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case DB row to camelCase
@@ -144,7 +145,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(checkpoints);
   } catch (error: unknown) {
-    console.error('Checkpoints GET error:', error);
+    log.error('Checkpoints GET error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch checkpoints' }, { status: 500 });
   }
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
       .insert(activityEvent);
 
     if (activityError) {
-      console.error('Failed to create activity event:', activityError.message);
+      log.error('Failed to create activity event', { detail: activityError.message });
     }
 
     const checkpoint = transformCheckpoint(data);
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.error('Checkpoints POST error:', error);
+    log.error('Checkpoints POST error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to create checkpoint' }, { status: 500 });
   }

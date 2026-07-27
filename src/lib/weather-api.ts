@@ -31,6 +31,7 @@
 
 import { WeatherSnapshot, WeatherDay, WeatherCondition } from '@/types/weather';
 import { QPE_THRESHOLD_INCHES } from '@/lib/cgp/constants';
+import { log } from '@/lib/logger';
 
 const BASE_URL = 'https://api.weather.gov';
 const DEFAULT_USER_AGENT = 'SiteCheck Dev (dev@example.com)';
@@ -105,7 +106,7 @@ async function fetchBundle(lat: number, lng: number): Promise<SiteForecastBundle
     noaaFetch(points.properties.forecastHourly) as Promise<HourlyResponse>,
     (noaaFetch(points.properties.forecastGridData) as Promise<GridDataResponse>).catch(
       (err): GridDataResponse | null => {
-        console.warn('NOAA gridData fetch failed (forecast continues without QPF):', err);
+        log.warn('NOAA gridData fetch failed (forecast continues without QPF)', { err });
         return null;
       }
     ),

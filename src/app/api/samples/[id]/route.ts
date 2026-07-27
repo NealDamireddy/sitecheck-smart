@@ -28,6 +28,7 @@ import type {
   ParameterQualifier,
   AnalyzedBy,
 } from '@/types';
+import { log } from '@/lib/logger';
 
 interface DbSampleRow {
   id: string;
@@ -133,7 +134,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
     return NextResponse.json(transformSample(sampleRow, prs));
   } catch (err: unknown) {
-    console.error('Sample GET error:', err);
+    log.error('Sample GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch sample' }, { status: 500 });
   }
@@ -178,7 +179,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .single();
 
     if (error || !data) {
-      console.error('Sample PATCH failed:', error);
+      log.error('Sample PATCH failed', { error });
       return NextResponse.json({ error: 'Update failed' }, { status: 500 });
     }
 
@@ -192,7 +193,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Sample PATCH error:', err);
+    log.error('Sample PATCH error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update sample' }, { status: 500 });
   }
@@ -220,7 +221,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (lookupError && lookupError.code !== 'PGRST116') {
-      console.error('Sample delete lookup failed:', lookupError.message);
+      log.error('Sample delete lookup failed', { detail: lookupError.message });
       return NextResponse.json({ error: 'Failed to delete sample' }, { status: 500 });
     }
     if (!existing) {
@@ -230,14 +231,14 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const { error } = await supabase.from('samples').delete().eq('id', id);
 
     if (error) {
-      console.error('Failed to delete sample:', error.message);
+      log.error('Failed to delete sample', { detail: error.message });
       return NextResponse.json({ error: 'Failed to delete sample' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to delete sample:', err);
+    log.error('Failed to delete sample', { err });
     return NextResponse.json({ error: 'Failed to delete sample' }, { status: 500 });
   }
 }

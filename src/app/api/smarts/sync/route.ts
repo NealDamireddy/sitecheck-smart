@@ -18,6 +18,7 @@ import { fetchSmartsExportInput } from '@/lib/smarts/fetch-export-input';
 import { buildSyncPayload, SMARTS_EVENT_TYPE } from '@/lib/smarts/bot-bridge';
 import { resolveSmartsCredentials } from '@/lib/smarts/credentials';
 import { startSyncJob } from '@/lib/smarts/sync-job';
+import { log } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ jobId: started.jobId }, { status: 202 });
   } catch (err: unknown) {
-    console.error('SMARTS sync launch error:', err);
+    log.error('SMARTS sync launch error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to launch SMARTS sync' }, { status: 500 });
   }

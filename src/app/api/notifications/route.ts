@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { resolveProjectId } from '@/lib/project-context';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case database row to camelCase
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching notifications:', error);
+      log.error('Error fetching notifications', { error });
       return NextResponse.json(
         { error: 'Failed to fetch notifications' },
         { status: 500 }
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
       unreadCount,
     });
   } catch (error) {
-    console.error('Unexpected error in GET /api/notifications:', error);
+    log.error('Unexpected error in GET /api/notifications', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

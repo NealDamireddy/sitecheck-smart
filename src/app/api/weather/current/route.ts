@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchCurrentWeather } from '@/lib/weather-api';
 import { resolveProjectId, resolveProjectCoords } from '@/lib/project-context';
+import { log } from '@/lib/logger';
 
 const CACHE_DURATION_MINUTES = 15;
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (cacheError && cacheError.code !== 'PGRST116') {
-      console.error('Error checking weather cache:', cacheError);
+      log.error('Error checking weather cache', { cacheError });
     }
 
     // Check if cache is fresh (less than 15 minutes old)
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (upsertError) {
-      console.error('Error caching weather data:', upsertError);
+      log.error('Error caching weather data', { upsertError });
       // Return the fetched data even if caching failed
       return NextResponse.json({
         ...weatherData,
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(transformSnapshotToClient(upserted));
   } catch (error) {
-    console.error('Unexpected error in GET /api/weather/current:', error);
+    log.error('Unexpected error in GET /api/weather/current', { error });
 
     // If OpenWeatherMap fails, try to return stale cached data
     try {

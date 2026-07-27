@@ -7,6 +7,7 @@ import { resolveProjectId } from '@/lib/project-context';
 import { fetchAirspaceContext } from '@/lib/airspace-context';
 import { validateFlightPath } from '@/lib/geofence';
 import type { ProjectType } from '@/types/project';
+import { log } from '@/lib/logger';
 
 interface CheckpointInput {
   id: string;
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (validationErr) {
-      console.warn('Airspace validation skipped due to error:', validationErr);
+      log.warn('Airspace validation skipped due to error', { validationErr });
       // Fail-open on validation infrastructure errors so mock/demo paths still work.
     }
 
@@ -176,7 +177,7 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (auditErr) {
-      console.warn('Failed to log route-generated audit event:', auditErr);
+      log.warn('Failed to log route-generated audit event', { auditErr });
     }
 
     return NextResponse.json(mission);
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Mission generation error:', error);
+    log.error('Mission generation error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Mission generation failed' }, { status: 500 });
   }

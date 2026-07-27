@@ -5,6 +5,7 @@ import { projectCreate } from '@/lib/validations';
 import { project as riversideProject } from '@/data/project';
 import { linearProject } from '@/data/linear-project';
 import type { ProjectSegment } from '@/types/project';
+import { log } from '@/lib/logger';
 
 function transformSegment(row: Record<string, unknown>): ProjectSegment {
   return {
@@ -243,7 +244,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to create project:', err);
+    log.error('Failed to create project', { err });
     return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
   }
 }

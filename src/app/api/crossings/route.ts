@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { crossingCreate } from '@/lib/validations';
 import { linearCrossings } from '@/data/linear-crossings';
 import type { Crossing } from '@/types/crossing';
+import { log } from '@/lib/logger';
 
 function transformCrossing(row: Record<string, unknown>): Crossing {
   return {
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to create crossing:', err);
+    log.error('Failed to create crossing', { err });
     return NextResponse.json({ error: 'Failed to create crossing' }, { status: 500 });
   }
 }

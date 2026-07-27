@@ -5,6 +5,7 @@ import { missionCreate } from '@/lib/validations';
 import { resolveProjectId } from '@/lib/project-context';
 import { fetchAirspaceContext } from '@/lib/airspace-context';
 import { validateFlightPath } from '@/lib/geofence';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case database row to camelCase
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: false });
 
     if (error) {
-      console.error('Error fetching missions:', error);
+      log.error('Error fetching missions', { error });
       return NextResponse.json(
         { error: 'Failed to fetch missions' },
         { status: 500 }
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(missions);
   } catch (error) {
-    console.error('Unexpected error in GET /api/missions:', error);
+    log.error('Unexpected error in GET /api/missions', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
           );
         }
       } catch (validationErr) {
-        console.warn('Airspace validation skipped due to error:', validationErr);
+        log.warn('Airspace validation skipped due to error', { validationErr });
         // Fail-open on validation infrastructure errors so mock/demo paths still work.
       }
     }
@@ -212,7 +213,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (missionError) {
-      console.error('Error creating mission:', missionError);
+      log.error('Error creating mission', { missionError });
       return NextResponse.json(
         { error: 'Failed to create mission' },
         { status: 500 }
@@ -230,7 +231,7 @@ export async function POST(request: NextRequest) {
         .insert(waypointsData);
 
       if (waypointsError) {
-        console.error('Error creating waypoints:', waypointsError);
+        log.error('Error creating waypoints', { waypointsError });
         // Don't fail the whole request, but log the error
       }
     }
@@ -261,7 +262,7 @@ export async function POST(request: NextRequest) {
       .insert(activityEvent);
 
     if (activityError) {
-      console.error('Error creating activity event:', activityError);
+      log.error('Error creating activity event', { activityError });
       // Don't fail the whole request
     }
 
@@ -270,7 +271,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: error.issues }, { status: 400 });
     }
-    console.error('Unexpected error in POST /api/missions:', error);
+    log.error('Unexpected error in POST /api/missions', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

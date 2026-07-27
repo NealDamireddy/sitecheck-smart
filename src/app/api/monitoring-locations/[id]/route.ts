@@ -23,6 +23,7 @@ import type {
   MonitoringLocationStatus,
   DischargePointType,
 } from '@/types';
+import { log } from '@/lib/logger';
 
 interface DbMonitoringLocationRow {
   id: string;
@@ -94,7 +95,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       transformMonitoringLocation(data as DbMonitoringLocationRow)
     );
   } catch (err: unknown) {
-    console.error('Monitoring location GET error:', err);
+    log.error('Monitoring location GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch monitoring location' }, { status: 500 });
   }
@@ -149,7 +150,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .single();
 
     if (error || !data) {
-      console.error('Monitoring location PATCH failed:', error);
+      log.error('Monitoring location PATCH failed', { error });
       return NextResponse.json({ error: 'Update failed' }, { status: 500 });
     }
 
@@ -160,7 +161,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Monitoring location PATCH error:', err);
+    log.error('Monitoring location PATCH error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update monitoring location' }, { status: 500 });
   }
@@ -186,7 +187,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (lookupError && lookupError.code !== 'PGRST116') {
-      console.error('Monitoring location delete lookup failed:', lookupError.message);
+      log.error('Monitoring location delete lookup failed', { detail: lookupError.message });
       return NextResponse.json({ error: 'Failed to delete monitoring location' }, { status: 500 });
     }
     if (!existing) {
@@ -196,14 +197,14 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const { error } = await supabase.from('monitoring_locations').delete().eq('id', id);
 
     if (error) {
-      console.error('Failed to delete monitoring location:', error.message);
+      log.error('Failed to delete monitoring location', { detail: error.message });
       return NextResponse.json({ error: 'Failed to delete monitoring location' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to delete monitoring location:', err);
+    log.error('Failed to delete monitoring location', { err });
     return NextResponse.json({ error: 'Failed to delete monitoring location' }, { status: 500 });
   }
 }

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { qspProfileUpdate } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 interface DbQspProfileRow {
   user_id: string;
@@ -76,7 +77,7 @@ export async function GET() {
 
     return NextResponse.json(transformProfile(inserted as DbQspProfileRow));
   } catch (err: unknown) {
-    console.error('QSP profile GET error:', err);
+    log.error('QSP profile GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
   }
@@ -115,7 +116,7 @@ export async function PUT(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('QSP profile PUT error:', err);
+    log.error('QSP profile PUT error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { resolveProjectId } from '@/lib/project-context';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case database row to camelCase
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     if (error) {
-      console.error('Error fetching QPE events:', error);
+      log.error('Error fetching QPE events', { error });
       return NextResponse.json(
         { error: 'Failed to fetch QPE events' },
         { status: 500 }
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(events);
   } catch (error) {
-    console.error('Unexpected error in GET /api/weather/qpe-events:', error);
+    log.error('Unexpected error in GET /api/weather/qpe-events', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (eventError) {
-      console.error('Error creating QPE event:', eventError);
+      log.error('Error creating QPE event', { eventError });
       return NextResponse.json(
         { error: 'Failed to create QPE event' },
         { status: 500 }
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
       .insert(activityEvent);
 
     if (activityError) {
-      console.error('Error creating activity event:', activityError);
+      log.error('Error creating activity event', { activityError });
       // Don't fail the whole request
     }
 
@@ -150,12 +151,12 @@ export async function POST(request: NextRequest) {
       .insert(notification);
 
     if (notificationError) {
-      console.error('Error creating notification:', notificationError);
+      log.error('Error creating notification', { notificationError });
     }
 
     return NextResponse.json(transformQPEventToClient(event), { status: 201 });
   } catch (error) {
-    console.error('Unexpected error in POST /api/weather/qpe-events:', error);
+    log.error('Unexpected error in POST /api/weather/qpe-events', { error });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

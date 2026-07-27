@@ -20,6 +20,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { smartsEventUpdate } from '@/lib/validations';
 import type { SmartsEvent, SmartsEventStatus, SmartsEventSource } from '@/types';
+import { log } from '@/lib/logger';
 
 interface DbSmartsEventRow {
   id: string;
@@ -83,7 +84,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
     return NextResponse.json(transformSmartsEvent(data as DbSmartsEventRow));
   } catch (err: unknown) {
-    console.error('Smarts event GET error:', err);
+    log.error('Smarts event GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch smarts event' }, { status: 500 });
   }
@@ -133,7 +134,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .single();
 
     if (error || !data) {
-      console.error('Smarts event PATCH failed:', error);
+      log.error('Smarts event PATCH failed', { error });
       return NextResponse.json({ error: 'Update failed' }, { status: 500 });
     }
 
@@ -142,7 +143,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Smarts event PATCH error:', err);
+    log.error('Smarts event PATCH error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update smarts event' }, { status: 500 });
   }
@@ -168,7 +169,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (lookupError && lookupError.code !== 'PGRST116') {
-      console.error('Rain event delete lookup failed:', lookupError.message);
+      log.error('Rain event delete lookup failed', { detail: lookupError.message });
       return NextResponse.json({ error: 'Failed to delete smarts event' }, { status: 500 });
     }
     if (!existing) {
@@ -178,14 +179,14 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const { error } = await supabase.from('smarts_events').delete().eq('id', id);
 
     if (error) {
-      console.error('Failed to delete smarts event:', error.message);
+      log.error('Failed to delete smarts event', { detail: error.message });
       return NextResponse.json({ error: 'Failed to delete smarts event' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     // SEC-09: never echo internal error text to the client.
-    console.error('Failed to delete smarts event:', err);
+    log.error('Failed to delete smarts event', { err });
     return NextResponse.json({ error: 'Failed to delete smarts event' }, { status: 500 });
   }
 }

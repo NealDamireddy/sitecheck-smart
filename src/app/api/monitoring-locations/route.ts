@@ -25,6 +25,7 @@ import type {
   MonitoringLocationStatus,
   DischargePointType,
 } from '@/types';
+import { log } from '@/lib/logger';
 
 interface DbMonitoringLocationRow {
   id: string;
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
     const rows = (data ?? []) as DbMonitoringLocationRow[];
     return NextResponse.json(rows.map(transformMonitoringLocation));
   } catch (err: unknown) {
-    console.error('Monitoring locations GET error:', err);
+    log.error('Monitoring locations GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch monitoring locations' }, { status: 500 });
   }
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Monitoring locations POST error:', err);
+    log.error('Monitoring locations POST error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to create monitoring location' }, { status: 500 });
   }

@@ -19,6 +19,25 @@ const eslintConfig = defineConfig([
     // Agent scratch worktrees — not app source.
     ".claude/**",
   ]),
+  {
+    // Playwright fixtures take a callback named `use`; the React hooks
+    // rule sees the name and misfires. These files never touch React.
+    files: ["e2e/**/*.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
+  {
+    // Test helpers and the logger intentionally discard destructured
+    // fields; the leading underscore is the signal.
+    files: ["src/lib/logger.ts", "tests/**/*.ts", "e2e/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

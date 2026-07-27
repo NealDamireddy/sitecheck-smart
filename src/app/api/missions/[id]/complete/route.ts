@@ -23,6 +23,7 @@ import { ZodError } from 'zod';
 import { missionComplete } from '@/lib/validations';
 import { analyzeBmpPhoto, mockAnalyzeBmpPhoto } from '@/lib/ai-vision';
 import type { CheckpointStatus } from '@/types/checkpoint';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         .eq('id', missionId);
 
       if (updateErr) {
-        console.error('Mission completion update failed:', updateErr);
+        log.error('Mission completion update failed', { updateErr });
         return NextResponse.json({ error: 'Failed to complete mission' }, { status: 500 });
       }
 
@@ -170,10 +171,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           try {
             result = await analyzeBmpPhoto(input);
           } catch (err) {
-            console.warn(
-              `Vision failed for waypoint ${wp.number}, falling back to mock:`,
-              err
-            );
+            log.warn(`Vision failed for waypoint ${wp.number}, falling back to mock`, { err });
             result = mockAnalyzeBmpPhoto(input);
           }
 
@@ -198,7 +196,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
             { onConflict: 'mission_id,waypoint_number' }
           );
         } catch (err) {
-          console.error(`Per-waypoint analysis failed for #${wp.number}:`, err);
+          log.error(`Per-waypoint analysis failed for #${wp.number}`, { err });
         }
       }
     }
@@ -226,7 +224,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: err.issues }, { status: 400 });
     }
-    console.error('complete POST failed:', err);
+    log.error('complete POST failed', { err });
     return NextResponse.json({ error: 'Complete failed' }, { status: 500 });
   }
 }

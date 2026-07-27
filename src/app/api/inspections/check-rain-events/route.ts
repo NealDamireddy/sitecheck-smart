@@ -22,6 +22,7 @@ import { requireAuth } from '@/lib/auth';
 import { checkRainEvents } from '@/lib/validations';
 import { detectRainEventForProject } from '@/lib/rain-event-detector';
 import { resolveProjectCoords } from '@/lib/project-context';
+import { log } from '@/lib/logger';
 
 interface DbInspectionRow {
   id: string;
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingError && existingError.code !== 'PGRST116') {
-      console.error('check-rain-events lookup failed:', existingError);
+      log.error('check-rain-events lookup failed', { existingError });
     }
 
     if (existing) {
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError || !inserted) {
-      console.error('check-rain-events insert failed:', insertError);
+      log.error('check-rain-events insert failed', { insertError });
       // Mock fallback — return what we would have created
       return NextResponse.json({
         rainEvent,
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('check-rain-events unexpected error:', err);
+    log.error('check-rain-events unexpected error', { err });
     return NextResponse.json({ rainEvent: null, inspection: null });
   }
 }

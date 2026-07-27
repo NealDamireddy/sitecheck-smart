@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { deficiencyCreate } from '@/lib/validations';
 import { resolveProjectId } from '@/lib/project-context';
 import { REPAIR_START_HOURS } from '@/lib/cgp/constants';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case DB row to camelCase
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(deficiencies);
   } catch (error: unknown) {
-    console.error('Deficiencies GET error:', error);
+    log.error('Deficiencies GET error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch deficiencies' }, { status: 500 });
   }
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (checkpointError) {
-      console.error('Failed to fetch checkpoint:', checkpointError.message);
+      log.error('Failed to fetch checkpoint', { detail: checkpointError.message });
     }
 
     // Transform to snake_case for DB
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
       .insert(activityEvent);
 
     if (activityError) {
-      console.error('Failed to create activity event:', activityError.message);
+      log.error('Failed to create activity event', { detail: activityError.message });
     }
 
     // Create notification (warning type)
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
       .insert(notification);
 
     if (notificationError) {
-      console.error('Failed to create notification:', notificationError.message);
+      log.error('Failed to create notification', { detail: notificationError.message });
     }
 
     const deficiency = transformDeficiency(data);
@@ -234,7 +235,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Deficiencies POST error:', error);
+    log.error('Deficiencies POST error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to create deficiency' }, { status: 500 });
   }

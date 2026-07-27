@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ZodError } from 'zod';
 import { telemetrySample } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 const MAX_SAMPLES = 1000;
 const ACTIVE_STATUSES = new Set([
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: err.issues }, { status: 400 });
     }
-    console.error('telemetry/sample POST failed:', err);
+    log.error('telemetry/sample POST failed', { err });
     return NextResponse.json({ samplesPersisted: 0, mock: true });
   }
 }

@@ -19,6 +19,7 @@ import { requireAuth } from '@/lib/auth';
 import { buildSmartsExcelWorkbook } from '@/lib/smarts/excel-export';
 import { buildSyncPayload } from '@/lib/smarts/bot-bridge';
 import { fetchSmartsExportInput } from '@/lib/smarts/fetch-export-input';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       },
     });
   } catch (err: unknown) {
-    console.error('Smarts export error:', err);
+    log.error('Smarts export error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to build SMARTS export' }, { status: 500 });
   }

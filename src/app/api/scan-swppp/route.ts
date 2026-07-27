@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // handler runs. Importing the implementation directly from lib/ skips
 // index.js entirely and avoids the side-effect.
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import { log } from '@/lib/logger';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -58,9 +59,14 @@ export async function POST(request: NextRequest) {
     }
 
     const fileSizeMb = file.size / (1024 * 1024);
-    console.log(
-      `[scan-swppp] received "${file.name}" — ${fileSizeMb.toFixed(1)}MB, ${file.type}`
-    );
+    // The filename is user-supplied: it goes in context, never in the
+    // message, so the sink can index it and redaction can see it.
+    log.info('SWPPP upload received', {
+      route: '/api/scan-swppp',
+      fileName: file.name,
+      sizeMb: Number(fileSizeMb.toFixed(1)),
+      contentType: file.type,
+    });
 
     // Extract text locally with pdf-parse. This avoids Anthropic's PDF
     // limits entirely — we never send the binary document to Claude, just
@@ -74,7 +80,7 @@ export async function POST(request: NextRequest) {
       parsed = await pdfParse(buffer);
     } catch (parseError: unknown) {
       const msg = parseError instanceof Error ? parseError.message : String(parseError);
-      console.error('[scan-swppp] pdf-parse failed:', msg);
+      log.error('[scan-swppp] pdf-parse failed', { msg });
       return NextResponse.json(
         { error: `Could not parse PDF: ${msg}` },
         { status: 400 }
@@ -85,9 +91,13 @@ export async function POST(request: NextRequest) {
     const truncated = rawText.length > MAX_TEXT_CHARS;
     const text = truncated ? rawText.slice(0, MAX_TEXT_CHARS) : rawText;
 
-    console.log(
-      `[scan-swppp] extracted ${parsed.numpages} pages, ${(rawText.length / 1024).toFixed(1)}KB of text in ${parseMs}ms${truncated ? ` (truncated to ${(text.length / 1024).toFixed(1)}KB for Claude)` : ''}`
-    );
+    log.info('SWPPP text extracted', {
+      route: '/api/scan-swppp',
+      pages: parsed.numpages,
+      kbExtracted: Math.round(rawText.length / 1024),
+      parseMs,
+      truncated,
+    });
 
     if (text.length < 50) {
       return NextResponse.json(
@@ -162,7 +172,7 @@ ${text}
     // Extract text content
     const textContent = message.content.find((block) => block.type === 'text');
     if (!textContent || textContent.type !== 'text') {
-      console.error('[scan-swppp] no text block in Claude response', message);
+      log.error('[scan-swppp] no text block in Claude response', { message });
       throw new Error('No text response from Claude');
     }
 
@@ -178,19 +188,13 @@ ${text}
         try {
           result = JSON.parse(jsonMatch[0]);
         } catch (parseErr) {
-          console.error(
-            '[scan-swppp] could not parse Claude JSON. Response was:',
-            responseText.slice(0, 500)
-          );
+          log.error('[scan-swppp] could not parse Claude JSON. Response was', { detail: responseText.slice(0, 500) });
           throw new Error(
             `Could not parse JSON from Claude response: ${parseErr instanceof Error ? parseErr.message : 'unknown'}`
           );
         }
       } else {
-        console.error(
-          '[scan-swppp] no JSON object found in Claude response. Response was:',
-          responseText.slice(0, 500)
-        );
+        log.error('[scan-swppp] no JSON object found in Claude response. Response was', { detail: responseText.slice(0, 500) });
         throw new Error('Could not parse JSON from Claude response');
       }
     }
@@ -200,23 +204,18 @@ ${text}
     // here instead of flowing into checkpoint creation.
     const validated = swpppExtractionOutput.safeParse(result);
     if (!validated.success) {
-      console.error(
-        '[scan-swppp] Claude output failed validation:',
-        validated.error.issues
-      );
+      log.error('[scan-swppp] Claude output failed validation', { detail: validated.error.issues });
       throw new Error('Invalid response structure from Claude');
     }
 
-    console.log(
-      `[scan-swppp] done — ${validated.data.checkpoints.length} checkpoints, claude=${claudeMs}ms`
-    );
+    log.info(`[scan-swppp] done — ${validated.data.checkpoints.length} checkpoints, claude=${claudeMs}ms`);
 
     return NextResponse.json(validated.data);
   } catch (error: unknown) {
     // Anthropic SDK errors carry a `status`; log it explicitly so any
     // upstream failure is obvious.
     const anthropicStatus = (error as { status?: number })?.status;
-    console.error('SWPPP scan error:', anthropicStatus ?? '', error);
+    log.error('SWPPP scan error', { detail: anthropicStatus ?? '', error });
     // SEC-09: never echo internal error text to the client. The status
     // code still distinguishes an upstream AI failure from a local one.
     return NextResponse.json(

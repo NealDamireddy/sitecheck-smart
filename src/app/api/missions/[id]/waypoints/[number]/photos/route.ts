@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { uploadMissionPhoto } from '@/lib/supabase/storage';
+import { log } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string; number: string }>;
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ url, photoIndex: captureIndex, photos: nextPhotos });
   } catch (err) {
-    console.error('photos POST failed:', err);
+    log.error('photos POST failed', { err });
     return NextResponse.json({ url: FALLBACK_DEMO, photoIndex: 0, photos: [FALLBACK_DEMO], mock: true });
   }
 }

@@ -19,6 +19,7 @@ import {
   computeComplianceForMissions,
   writeComplianceToInspection,
 } from '@/lib/inspection-compliance';
+import { log } from '@/lib/logger';
 
 interface DbInspectionRow {
   id: string;
@@ -242,7 +243,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       correctiveActions,
     });
   } catch (error: unknown) {
-    console.error('Inspection GET error:', error);
+    log.error('Inspection GET error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch inspection' }, { status: 500 });
   }
@@ -290,7 +291,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .single();
 
     if (error || !data) {
-      console.error('Inspection PATCH error:', error);
+      log.error('Inspection PATCH error', { error });
       return NextResponse.json(
         { error: 'Failed to update inspection' },
         { status: 500 }
@@ -322,7 +323,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Inspection PATCH error:', error);
+    log.error('Inspection PATCH error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update inspection' }, { status: 500 });
   }

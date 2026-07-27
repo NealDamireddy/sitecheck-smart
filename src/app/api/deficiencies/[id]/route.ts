@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { deficiencyUpdate } from '@/lib/validations';
+import { log } from '@/lib/logger';
 
 
 // Transform snake_case DB row to camelCase
@@ -100,7 +101,7 @@ export async function GET(
 
     return NextResponse.json(deficiency);
   } catch (error: unknown) {
-    console.error('Deficiency GET error:', error);
+    log.error('Deficiency GET error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch deficiency' }, { status: 500 });
   }
@@ -189,7 +190,7 @@ export async function PUT(
         .insert(activityEvent);
 
       if (activityError) {
-        console.error('Failed to create activity event:', activityError.message);
+        log.error('Failed to create activity event', { detail: activityError.message });
       }
     }
 
@@ -200,7 +201,7 @@ export async function PUT(
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
-    console.error('Deficiency PUT error:', error);
+    log.error('Deficiency PUT error', { error });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to update deficiency' }, { status: 500 });
   }

@@ -14,6 +14,7 @@ import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { correctiveActionCreate } from '@/lib/validations';
 import { resolveProjectId } from '@/lib/project-context';
+import { log } from '@/lib/logger';
 
 const VALID_SEVERITIES = new Set(['low', 'medium', 'high']);
 const VALID_STATUSES = new Set(['open', 'in-progress', 'resolved', 'verified']);
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
     const rows = (data ?? []) as DbCorrectiveActionRow[];
     return NextResponse.json(rows.map(transformCorrectiveAction));
   } catch (err: unknown) {
-    console.error('Corrective actions GET error:', err);
+    log.error('Corrective actions GET error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to fetch corrective actions' }, { status: 500 });
   }
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error('Corrective actions POST error:', err);
+    log.error('Corrective actions POST error', { err });
     // SEC-09: never echo internal error text to the client.
     return NextResponse.json({ error: 'Failed to create corrective action' }, { status: 500 });
   }
