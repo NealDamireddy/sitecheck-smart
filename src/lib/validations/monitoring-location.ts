@@ -18,7 +18,9 @@ const DISCHARGE_POINT_TYPES = [
 export const monitoringLocationCreate = z.object({
   id: z.string().optional(),
   projectId: z.string().optional(),
-  name: z.string().min(1, 'name is required').max(200),
+  // SMARTS caps monitoring location names at 25 characters — a longer
+  // name is rejected at the portal, so reject it at entry instead.
+  name: z.string().min(1, 'name is required').max(25, 'SMARTS limits location names to 25 characters'),
   drainageArea: z.string().min(1, 'drainageArea is required').max(200),
   dischargePointType: z.enum(DISCHARGE_POINT_TYPES),
   isAts: z.boolean().optional(),
@@ -30,7 +32,7 @@ export const monitoringLocationCreate = z.object({
 });
 
 export const monitoringLocationUpdate = z.object({
-  name: z.string().min(1).max(200).optional(),
+  name: z.string().min(1).max(25, 'SMARTS limits location names to 25 characters').optional(),
   drainageArea: z.string().min(1).max(200).optional(),
   dischargePointType: z.enum(DISCHARGE_POINT_TYPES).optional(),
   isAts: z.boolean().optional(),

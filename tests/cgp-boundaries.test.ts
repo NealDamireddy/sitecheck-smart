@@ -143,3 +143,12 @@ describe('ND/DNQ cross-field rules (DRF-03)', () => {
     ).toBe(true);
   });
 });
+
+describe('SMARTS field caps (CMP-03)', () => {
+  it('monitoring location names cap at 25 chars', async () => {
+    const { monitoringLocationCreate } = await import('@/lib/validations/monitoring-location');
+    const base = { projectId: 'p', drainageArea: 'DA-1', dischargePointType: 'Effluent' };
+    expect(monitoringLocationCreate.safeParse({ ...base, name: 'x'.repeat(25) }).success).toBe(true);
+    expect(monitoringLocationCreate.safeParse({ ...base, name: 'x'.repeat(26) }).success).toBe(false);
+  });
+});
