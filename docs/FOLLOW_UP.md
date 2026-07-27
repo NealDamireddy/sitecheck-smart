@@ -49,3 +49,15 @@ Migrations are reviewed by Aryav before they land, so these are proposals rather
 - **Hand-maintained TS types parallel to Zod schemas** — `src/types/*` and `src/lib/validations/*` describe the same shapes twice, which is how DRF-01/02/03 happened. Infer from Zod where practical.
 - **Model pin** — everything is on `claude-sonnet-4-20250514`. Pinned (good), but worth a deliberate upgrade decision rather than drift.
 - **`smarts-automation/smarts-automation/`** — an accidental nested directory holding the live-session SMARTS recon HTML (SEC-12). Untracked. Needs a decision from Neal: scrub, encrypt, or keep sanitized copies for the Stage 5.6 replay tests.
+
+## Deferred from Stage 4 — needs a design decision, not a patch
+
+**UX-05 — offline and flaky-network behavior in the walkthrough.** Today a status change is a direct API write; a failure shows an error but nothing retries, nothing queues, and no persistent indicator tells the inspector which observations did not reach the server. On one bar of signal a QSP can believe a BMP was recorded when it was not.
+
+- *Why deferred:* the fix is an architecture choice, not a patch. Local-draft-plus-sync-queue (durable, needs conflict rules and a reconciliation UI) versus optimistic writes with a persistent unsynced banner (much simpler, weaker guarantee). That choice shapes the data model and the walkthrough UI together, and getting it wrong means rebuilding both.
+- *Interim mitigation:* the inspection progress count already persists to localStorage, so a refresh does not reset the walkthrough. Photo uploads and status writes are the exposed paths.
+- *Already written:* the failing assertion lives in `e2e/golden-path.spec.ts` ("interruption path"), so whichever design lands has a test waiting.
+
+**UX-07 — guided walkthrough navigation.** There is a persisted progress count but no next/back between checkpoints; the inspector returns to the grid each time. A guided sequence ("7 of 32", next/skip/N-A) is the single biggest reduction in taps for the core loop, and it interacts with UX-05's persistence model — design both together.
+
+**UX-03 (remainder) — editable AI narrative.** The draft framing landed; making the narrative editable and attributing the edit to the QSP is the other half. Needs a decision on whether edits are stored alongside the AI original (audit trail) or replace it.

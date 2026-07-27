@@ -68,6 +68,21 @@ New findings, all surfaced BY the tests:
 | TST-02 | HIGH | live DB | RLS enforcement itself is proven only by the gated E2E isolation spec, which has never been run. | **open** — needs a disposable Supabase project + `npm run db:seed:test`. This is the gap to close before telling a customer their data is isolated. |
 | TST-03 | MEDIUM | `smarts-automation/recon/` | The mandate's replay tests were not built: they would depend on captures of a real logged-in SMARTS session (SEC-12). | **deferred** — sanitize the fixtures first; see FOLLOW_UP. |
 
+## Stage 4 — Field UX (partial: mechanical fixes done, design work deferred)
+
+| ID | Sev | Location | Finding | Status |
+|---|---|---|---|---|
+| UX-01 | HIGH | `checkpoint-detail.tsx`, `checkpoint-photo-viewer.tsx` | The three status actions and the photo button rendered ~28px tall (`px-2.5 py-1.5 text-xs`) — under the 44px finger minimum, on the controls tapped most often, with gloves. | **fixed** — `lib/field-ui.ts` constants + `tests/field-ui.test.ts` regression guard. |
+| UX-02 | HIGH | `checkpoint-photo-viewer.tsx` | No client-side compression: a 3–12 MB phone photo could exceed the route's 5 MiB cap and be rejected after the inspector walked to the BMP; uploads were slow on field cellular. | **fixed** — downscale to 2048px with fallback-to-original; "Preparing…" state and a size note so the pause reads as progress. EXIF/GPS dropped deliberately (rationale in `lib/image-compress.ts`). |
+| UX-03 | MEDIUM | `ai-analysis-panel.tsx` | AI output presented without draft framing; low confidence not visually distinct. **Not** the §1.2 CRITICAL case — verified AI text never reaches the generated report, and the compliance status is only ever set by the QSP's own Mark buttons. | **fixed (framing)** — draft banner, low-confidence (<75) treatment. Making the narrative *editable* is design work — deferred. |
+| UX-04 | MEDIUM | `sidebar.tsx`, `app/sites/page.tsx` | Nav said "Sites" while routes, tables and types all say project. | **fixed** — unified on "Projects". (Route `/sites` left in place; renaming it is a Stage 7 cleanup.) |
+| UX-06 | MEDIUM | `account/page.tsx` | Removing SMARTS credentials — unrecoverable, since the password is never displayed again — had no confirmation. | **fixed** — explicit confirm naming the consequence. |
+| UX-05 | HIGH | walkthrough | **No offline handling.** A failed request mid-walkthrough surfaces an error but there is no retry, no queue, and no persistent "not saved" indicator. Status changes write straight to the API; on one bar of signal an inspector can believe a BMP was recorded when it was not. | **open — needs design.** The core question (local draft + sync queue vs. optimistic writes with a reconciliation banner) shapes the data model. Deferred to a Fable design pass; `e2e/golden-path.spec.ts` already contains the failing-case assertion. |
+| UX-07 | MEDIUM | walkthrough | Progress count (`reviewedCount/total`) is persisted to localStorage and survives refresh, but there is no guided next/back between checkpoints — the QSP navigates via the grid and back button each time. | **open — needs design.** |
+| UX-08 | LOW | `/checkpoints` | Top-level checkpoint list is project-scoped only via the store's current project; deep-linking a checkpoint from another project shows "not found" rather than switching context. | **open** — Stage 7. |
+
+**Verified sound:** `capture="environment"` opens the rear camera directly; sample entry uses `type="number" inputMode="decimal"` (correct mobile keypad); confidence is surfaced numerically with a color-coded bar; checkpoint detail has real loading, error and not-found states; the demo-data fallback correctly refuses to mask a real account's missing checkpoint.
+
 ## Stage 0 — Recon findings carried forward
 
 | ID | Sev | Location | Finding | Status |
