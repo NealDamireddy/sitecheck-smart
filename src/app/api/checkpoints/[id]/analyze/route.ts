@@ -11,8 +11,10 @@
  *   2. `last_inspection_photo` (the existing drone view, fallback for
  *      demo / pre-QSP-upload sites)
  *
- * Falls back to a deterministic mock when ANTHROPIC_API_KEY is not set
- * so the demo continues to work without burning credits.
+ * Demo deployments with no ANTHROPIC_API_KEY get the deterministic mock
+ * (tagged model:'mock-deterministic' inside analyzeBmpPhoto). A REAL
+ * vision failure returns 502 and persists nothing — fabricated analyses
+ * must never enter ai_analyses (AI-02).
  *
  * Returns the AIAnalysis-shaped result so the checkpoint detail page can
  * patch it into its local state without a full refetch.
@@ -23,7 +25,6 @@ import { requireAuth } from '@/lib/auth';
 import { resolveCheckpointPhotoUrl } from '@/lib/supabase/storage';
 import {
   analyzeBmpPhoto,
-  mockAnalyzeBmpPhoto,
   type AnalyzeBmpPhotoResult,
 } from '@/lib/ai-vision';
 import type { CheckpointStatus } from '@/types/checkpoint';
@@ -79,19 +80,17 @@ export async function POST(_request: NextRequest, context: RouteContext) {
           (checkpoint.status as CheckpointStatus) ?? 'needs-review',
       });
     } catch (err) {
-      console.warn(
-        'Claude vision failed on checkpoint analyze, falling back to mock:',
-        err,
+      // AI-02: a real vision failure must fail loudly. The old path
+      // silently persisted a fabricated mock analysis to ai_analyses with
+      // nothing marking it as fake — a compliance record must never
+      // contain an invented observation. (The deterministic mock still
+      // serves demo deployments with no ANTHROPIC_API_KEY — that gate
+      // lives inside analyzeBmpPhoto and tags results with model:'mock'.)
+      console.error('Claude vision failed on checkpoint analyze:', err);
+      return NextResponse.json(
+        { error: 'AI photo analysis failed — nothing was saved. Try again in a moment.' },
+        { status: 502 },
       );
-      result = mockAnalyzeBmpPhoto({
-        photoUrl,
-        checkpointId: checkpoint.id,
-        checkpointName: checkpoint.name ?? 'Unknown checkpoint',
-        bmpCategory: checkpoint.bmp_type ?? 'general',
-        cgpSection: checkpoint.cgp_section ?? '',
-        currentStatus:
-          (checkpoint.status as CheckpointStatus) ?? 'needs-review',
-      });
     }
 
     // Insert a new ai_analyses row. The detail GET sorts by created_at DESC
@@ -126,6 +125,10 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       cgpReference: persisted.cgp_reference,
       recommendations: persisted.recommendations ?? [],
       createdAt: persisted.created_at,
+      // AI-02: which engine produced this — 'mock-deterministic' only on
+      // keyless demo deployments. (Not yet persisted: ai_analyses has no
+      // model column; adding one is a gated migration — see CODE_REVIEW.)
+      model: result.model,
     });
   } catch (err: unknown) {
     console.error('Checkpoint analyze error:', err);
