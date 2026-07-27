@@ -21,7 +21,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
     const { jobId } = await context.params;
     const job = await getSyncJob(jobId);
-    if (!job) {
+    // Ownership check (SEC-05): jobs belong to the user who launched them.
+    // 404 (not 403) so the response doesn't confirm a foreign job exists.
+    if (!job || job.userId !== auth.user.id) {
       return NextResponse.json({ error: 'Sync job not found' }, { status: 404 });
     }
 
