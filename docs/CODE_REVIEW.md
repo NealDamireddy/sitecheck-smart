@@ -23,6 +23,19 @@ Severity rubric: see the review mandate. Status is one of **fixed** (commit note
 | SEC-12 | LOW | `smarts-automation/smarts-automation/recon/` | Live-session SMARTS HTML captures (real WDIDs) on disk; untracked but unencrypted, plus an accidental nested directory. | **open** — recommend: move to encrypted storage or scrub; keep sanitized copies for replay tests (Stage 5.6). Claude will not delete data without explicit approval. |
 | RLS-01 | MEDIUM | migrations 008/009 | ~9 tables lack DELETE (some UPDATE) policies — default-deny, so silent 0-row deletes rather than leaks. | **open** — needs a migration; migrations are review-gated (Aryav). Proposed in Stage 3/7. |
 
+## Stage 2 — Accounts, identity & multi-inspector model
+
+| ID | Sev | Location | Finding | Status |
+|---|---|---|---|---|
+| ACC-01 | HIGH | `src/app/login/page.tsx` (absence), repo-wide | No password-reset flow anywhere, and no in-app password change — a QSP who forgot their password was permanently locked out of their own compliance records. | **fixed** `f0ad8f1` — `/auth/forgot-password` + `/auth/reset-password` + Account-page change card; shared rules in `src/lib/auth/password-policy.ts`. Test: `tests/password-policy.test.ts`. |
+| ACC-02 | MED-HIGH | `api/reports/generate`, `api/inspections/[id]/pdf` | Practitioner block read the per-project `qsp_*` snapshot, so a license-number correction on the Account page never reached existing projects' reports. | **fixed** — `src/lib/qsp-identity.ts` resolves profile-over-project per field at generation time. Test: `tests/qsp-identity.test.ts`. |
+| ACC-03 | MEDIUM | `org_memberships`; no role checks | No invite/join flow; a two-QSP firm can't share a site. Roles stored but never enforced (`viewer` can delete projects). | **deferred** — see FOLLOW_UP (pending a real second-seat customer). |
+| ACC-04 | MEDIUM | absence | No account deletion or data export (CA privacy exposure). | **deferred** — see FOLLOW_UP. |
+| ACC-05 | LOW | `src/app/signup/page.tsx` | No resend-confirmation. (Not distinguishing "already registered" is deliberate — enumeration oracle.) | **deferred** — see FOLLOW_UP. |
+| ACC-06 | LOW | `src/app/projects/new/page.tsx` | SMARTS monitoring-locations step blocks first project creation. | **deferred** — see FOLLOW_UP. |
+
+**Held up under audit:** signup → org auto-provisioning trigger (migration 012) incl. email-confirmation timing; `/auth/callback` code exchange and its `redirect` param; session refresh consistency across middleware, server components and route handlers; logout; middleware page coverage (no gaps beyond the already-fixed demo cookie).
+
 ## Stage 0 — Recon findings carried forward
 
 | ID | Sev | Location | Finding | Status |
