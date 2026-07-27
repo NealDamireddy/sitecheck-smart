@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { smartsSyncLimiter, rateLimitOrNull } from '@/lib/rate-limit';
 import { fetchSmartsExportInput } from '@/lib/smarts/fetch-export-input';
 import { buildSyncPayload, SMARTS_EVENT_TYPE } from '@/lib/smarts/bot-bridge';
 import { resolveSmartsCredentials } from '@/lib/smarts/credentials';
@@ -22,6 +23,10 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
+
+    // SEC-10: per-user rate limit on a paid/heavy operation.
+    const limited = rateLimitOrNull(smartsSyncLimiter, auth.user.id, 'SMARTS sync');
+    if (limited) return limited;
 
     const body = (await request.json().catch(() => null)) as {
       eventId?: string;

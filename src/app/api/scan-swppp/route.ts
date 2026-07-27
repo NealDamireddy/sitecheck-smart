@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { swpppScanLimiter, rateLimitOrNull } from '@/lib/rate-limit';
 import { swpppExtractionOutput } from '@/lib/validations/ai-output';
 import Anthropic from '@anthropic-ai/sdk';
 // pdf-parse@1.1.1 ships a debug branch in index.js (`if (!module.parent)`)
@@ -37,6 +38,10 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
+
+    // SEC-10: per-user rate limit on a paid/heavy operation.
+    const limited = rateLimitOrNull(swpppScanLimiter, auth.user.id, 'SWPPP scan');
+    if (limited) return limited;
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 

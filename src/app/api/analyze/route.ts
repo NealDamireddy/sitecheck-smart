@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
+import { analyzeLimiter, rateLimitOrNull } from '@/lib/rate-limit';
 import { analyzeCheckpoint } from '@/lib/validations';
 import { bmpTextAnalysisOutput } from '@/lib/validations/ai-output';
 import Anthropic from '@anthropic-ai/sdk';
@@ -13,6 +14,10 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
+
+    // SEC-10: per-user rate limit on a paid/heavy operation.
+    const limited = rateLimitOrNull(analyzeLimiter, auth.user.id, 'AI analysis');
+    if (limited) return limited;
     const body = analyzeCheckpoint.parse(await request.json());
     const { checkpointId, checkpointName, bmpCategory, status, description, cgpSection } = body;
 
