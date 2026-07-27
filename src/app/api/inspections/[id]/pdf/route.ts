@@ -19,6 +19,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { requireAuth } from '@/lib/auth';
+import { resolveQspIdentity } from '@/lib/qsp-identity';
 import { InspectionReportPdf } from '@/lib/pdf/inspection-pdf';
 import type {
   PdfReportSection,
@@ -133,14 +134,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
       ? (report.sections as PdfReportSection[])
       : [];
 
+    // ACC-02: same live-identity resolution the report generator uses,
+    // so the PDF cover never disagrees with the report body.
+    const qspIdentity = await resolveQspIdentity(supabase, auth.user.id, project);
+
     const projectInfo: PdfProjectInfo = {
       name: project.name as string,
       address: (project.address as string) ?? null,
       wdid: (project.wdid as string) ?? null,
       permitNumber: (project.permit_number as string) ?? null,
-      qspName: (project.qsp_name as string) ?? null,
-      qspLicenseNumber: (project.qsp_license_number as string) ?? null,
-      qspCompany: (project.qsp_company as string) ?? null,
+      qspName: qspIdentity.name || null,
+      qspLicenseNumber: qspIdentity.licenseNumber || null,
+      qspCompany: qspIdentity.company || null,
     };
 
     const pdfBuffer = await renderToBuffer(

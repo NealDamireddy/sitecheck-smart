@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
+import { resolveQspIdentity } from '@/lib/qsp-identity';
 import { reportGenerate } from '@/lib/validations';
 import {
   getBmpCategoriesForRiskLevel,
@@ -85,6 +86,12 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // ACC-02: the practitioner block on a regulator-facing report must
+    // reflect the QSP's current credentials, not the copy snapshotted
+    // into the project at creation. Profile wins field by field, project
+    // copy fills any gap.
+    const qspIdentity = await resolveQspIdentity(supabase, auth.user.id, project);
 
     const isLinear = project.project_type === 'linear';
 
@@ -298,7 +305,7 @@ export async function POST(request: NextRequest) {
         : '',
       '',
       '**Inspector Information**',
-      `- Inspector Name: ${inspection?.inspector || project.qsp_name || 'N/A'}`,
+      `- Inspector Name: ${inspection?.inspector || qspIdentity.name || 'N/A'}`,
       `- Inspector Title: QSP`,
       `- Signature Date: ${inspection ? new Date(inspection.date).toISOString().slice(0, 10) : now.toISOString().slice(0, 10)}`,
       inspection?.narrative ? `\n**QSP Narrative:**\n${inspection.narrative}` : '',
@@ -407,11 +414,11 @@ This inspection was conducted in accordance with the requirements of:
     const signatureContent = `
 **Qualified SWPPP Practitioner (QSP) Information:**
 
-- Name: ${project.qsp_name}
-- License Number: ${project.qsp_license_number}
-- Company: ${project.qsp_company}
-- Phone: ${project.qsp_phone}
-- Email: ${project.qsp_email}
+- Name: ${qspIdentity.name || 'N/A'}
+- License Number: ${qspIdentity.licenseNumber || 'N/A'}
+- Company: ${qspIdentity.company || 'N/A'}
+- Phone: ${qspIdentity.phone || 'N/A'}
+- Email: ${qspIdentity.email || 'N/A'}
 
 **Signature:** _________________________
 
@@ -425,7 +432,7 @@ This inspection was conducted in accordance with the requirements of:
     // still has the same text to work from.
     // ─────────────────────────────────────────────
     const todayShort = now.toLocaleDateString();
-    const inspectorName = inspection?.inspector || project.qsp_name || 'N/A';
+    const inspectorName = inspection?.inspector || qspIdentity.name || 'N/A';
     const signatureDate = inspection
       ? new Date(inspection.date).toISOString().slice(0, 10)
       : now.toISOString().slice(0, 10);
