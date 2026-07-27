@@ -363,7 +363,26 @@ function NewProjectWizard() {
       ]);
       const today = new Date().toISOString().slice(0, 10);
 
+      // AI-01: extraction returns null coordinates when the SWPPP doesn't
+      // state them — fabricating positions in a legal record is forbidden.
+      // Unlocated checkpoints are placed on a tight ring around the
+      // project's real center so the QSP can drag each one to its true
+      // spot on the site map.
+      const projectCenter =
+        centerline.length > 0
+          ? { lat: centerline[0][1], lng: centerline[0][0] }
+          : prefillCenter ?? { lat: 36.78, lng: -119.42 };
+      const placeholderCoord = (index: number) => {
+        const angle = index * 2.4; // golden-angle spread, no overlaps
+        const radius = 0.0006 + 0.00012 * index; // ~65m ring, growing
+        return {
+          lat: projectCenter.lat + radius * Math.sin(angle),
+          lng: projectCenter.lng + radius * Math.cos(angle),
+        };
+      };
+
       const checkpointErrors: string[] = [];
+      let unlocatedIndex = 0;
       for (const cp of extractedCheckpoints) {
         const safeZone =
           cp.zone && ALLOWED_ZONES.has(cp.zone) ? cp.zone : 'central';
@@ -373,6 +392,10 @@ function NewProjectWizard() {
         // retries of this same wizard. Let the API mint a unique id and
         // surface the BMP code in the name so the QSP still sees it.
         const displayName = cp.id ? `${cp.id} — ${cp.name}` : cp.name;
+        const hasRealCoords = cp.lat != null && cp.lng != null;
+        const coords = hasRealCoords
+          ? { lat: cp.lat as number, lng: cp.lng as number }
+          : placeholderCoord(unlocatedIndex++);
         const cpRes = await fetch('/api/checkpoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -383,8 +406,8 @@ function NewProjectWizard() {
             description: cp.description || cp.name,
             cgpSection: cp.cgpSection || 'TBD',
             zone: safeZone,
-            lat: cp.lat ?? 0,
-            lng: cp.lng ?? 0,
+            lat: coords.lat,
+            lng: coords.lng,
             status: 'needs-review',
             priority: 'medium',
             installDate: today,

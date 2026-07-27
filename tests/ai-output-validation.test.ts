@@ -105,6 +105,18 @@ describe('swpppExtractionOutput', () => {
     expect(swpppExtractionOutput.safeParse(bad).success).toBe(false);
   });
 
+  it('accepts null coordinates — the model must not invent positions (AI-01)', () => {
+    const unlocated = structuredClone(validExtraction) as Record<string, unknown> & {
+      siteInfo: Record<string, unknown>;
+      checkpoints: Record<string, unknown>[];
+    };
+    unlocated.checkpoints[0].lat = null;
+    unlocated.checkpoints[0].lng = null;
+    unlocated.siteInfo.centerLat = null;
+    unlocated.siteInfo.centerLng = null;
+    expect(swpppExtractionOutput.safeParse(unlocated).success).toBe(true);
+  });
+
   it('rejects a checkpoint flood (injection bloat guard)', () => {
     const bad = {
       ...validExtraction,

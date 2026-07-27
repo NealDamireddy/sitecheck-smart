@@ -117,33 +117,25 @@ For each BMP checkpoint, extract:
 - lat: GPS latitude coordinate
 - lng: GPS longitude coordinate
 
-COORDINATE HANDLING:
-- If the document contains explicit GPS coordinates, use them.
-- If the document only describes relative positions (e.g., "north perimeter", "southwest outfall"), generate plausible coordinates within the site boundary:
-  - Latitude: 36.7780 to 36.7825
-  - Longitude: -119.4192 to -119.4140
-  - North zone: lat ~36.7818-36.7825
-  - South zone: lat ~36.7780-36.7788
-  - East zone: lng ~-119.4140 to -119.4155
-  - West zone: lng ~-119.4180 to -119.4192
-  - Central zone: lat ~36.7795-36.7810, lng ~-119.4155 to -119.4170
-  - Spread checkpoints within each zone so they don't overlap.
+COORDINATE HANDLING (this output feeds a legal inspection record — never invent positions):
+- If the document states explicit GPS coordinates for a BMP, use them exactly.
+- Otherwise set "lat" and "lng" to null. Do NOT estimate, approximate, or generate coordinates under any circumstances. The app places unlocated checkpoints near the project center for the QSP to position on the site map.
+- Still extract the "zone" (north/south/east/west/central) from relative descriptions like "north perimeter" when available — that is descriptive text, not a coordinate.
 
 Also extract site-level information:
 - projectName: The project name from the document
 - address: Site address or location description
 - totalAcres: Disturbed area in acres (estimate if not stated)
 - riskLevel: CGP risk level if mentioned (default to "Level 2" if not found)
-- centerLat: 36.7801 (site center)
-- centerLng: -119.4161 (site center)
+- centerLat / centerLng: the site's coordinates ONLY if explicitly stated in the document; otherwise null.
 
-If the document is not a SWPPP or doesn't contain BMP information, still try to extract any construction site management details and generate reasonable BMP checkpoints based on the project type and size.
+If the document is not a SWPPP or doesn't contain BMP information, still try to extract any construction site management details and generate reasonable BMP checkpoints based on the project type and size (with null coordinates).
 
 Respond ONLY with valid JSON (no markdown code fences, no commentary) matching this structure:
 {
-  "siteInfo": { "projectName": "", "address": "", "totalAcres": 0, "riskLevel": "", "centerLat": 36.7801, "centerLng": -119.4161 },
+  "siteInfo": { "projectName": "", "address": "", "totalAcres": 0, "riskLevel": "", "centerLat": null, "centerLng": null },
   "checkpoints": [
-    { "id": "", "name": "", "bmpType": "", "description": "", "cgpSection": "", "zone": "", "lat": 0, "lng": 0 }
+    { "id": "", "name": "", "bmpType": "", "description": "", "cgpSection": "", "zone": "", "lat": null, "lng": null }
   ]
 }`,
       messages: [

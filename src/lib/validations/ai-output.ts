@@ -39,15 +39,22 @@ export const bmpVisionAnalysisOutput = bmpTextAnalysisOutput.extend({
   status: z.enum(['compliant', 'deficient', 'needs-review']),
 });
 
-/** Output of the SWPPP PDF extraction (/api/scan-swppp). */
+/**
+ * Output of the SWPPP PDF extraction (/api/scan-swppp).
+ *
+ * Coordinates are nullable by design (AI-01): the model is forbidden
+ * from inventing positions for a legal record — null means "document
+ * did not state coordinates" and the app places the checkpoint near the
+ * project's real center for the QSP to position.
+ */
 export const swpppExtractionOutput = z.object({
   siteInfo: z.object({
     projectName: z.string().max(300),
     address: z.string().max(500),
     totalAcres: z.number().min(0).max(100_000),
     riskLevel: z.string().max(50),
-    centerLat: z.number().min(-90).max(90),
-    centerLng: z.number().min(-180).max(180),
+    centerLat: z.number().min(-90).max(90).nullable(),
+    centerLng: z.number().min(-180).max(180).nullable(),
   }),
   checkpoints: z
     .array(
@@ -58,8 +65,8 @@ export const swpppExtractionOutput = z.object({
         description: z.string().max(5_000),
         cgpSection: z.string().max(200),
         zone: z.string().max(50),
-        lat: z.number().min(-90).max(90),
-        lng: z.number().min(-180).max(180),
+        lat: z.number().min(-90).max(90).nullable(),
+        lng: z.number().min(-180).max(180).nullable(),
       })
     )
     .max(500),
