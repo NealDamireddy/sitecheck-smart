@@ -46,16 +46,67 @@ if (!URL || !SERVICE_KEY) {
       '  supabase/migrations/*.sql to it, then set these in .env.test.'
   );
 }
-if (URL === process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  die(
-    `E2E_SUPABASE_URL equals NEXT_PUBLIC_SUPABASE_URL (${URL}).\n` +
-      '  Refusing to seed what may be your real database.'
-  );
-}
-
 const admin: SupabaseClient = createClient(URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
+
+/**
+ * Refuse to seed a database that holds data this script did not create.
+ *
+ * The earlier version of this check compared E2E_SUPABASE_URL against the
+ * app's own NEXT_PUBLIC_SUPABASE_URL. That is the wrong property: a
+ * developer running E2E locally quite reasonably points .env.local at the
+ * test project too, which made the check fire on a correct setup while
+ * still not protecting anything. What matters is not what the database is
+ * NAMED but what is IN it — a project or user this script didn't create
+ * means real data, whatever the URL says.
+ *
+ * Everything the seed writes is prefixed `e2e-`, and its users are the two
+ * configured E2E addresses. Anything else present is someone's real work.
+ */
+async function assertDisposable(): Promise<void> {
+  if (process.argv.includes('--force')) {
+    console.log('  ⚠ --force: skipping the disposable-database check');
+    return;
+  }
+
+  const expectedEmails = new Set(
+    (['A', 'B'] as const)
+      .map((l) => process.env[`E2E_USER_${l}_EMAIL`]?.trim().toLowerCase())
+      .filter(Boolean) as string[]
+  );
+
+  const { data: userPage, error: userErr } = await admin.auth.admin.listUsers();
+  if (userErr) {
+    die(
+      `Could not read auth.users: ${userErr.message}\n` +
+        '  (A service_role key is required — an anon key cannot list users.)'
+    );
+  }
+  const foreignUsers = (userPage?.users ?? []).filter(
+    (u) => !expectedEmails.has((u.email ?? '').toLowerCase())
+  );
+
+  const { data: projectRows } = await admin.from('projects').select('id');
+  const foreignProjects = (projectRows ?? [])
+    .map((r) => String((r as { id: string }).id))
+    .filter((id) => !id.startsWith('e2e-'));
+
+  if (foreignUsers.length > 0 || foreignProjects.length > 0) {
+    die(
+      `This database contains data the seed script did not create:\n` +
+        (foreignUsers.length
+          ? `    ${foreignUsers.length} unexpected user(s), e.g. ${foreignUsers[0].email}\n`
+          : '') +
+        (foreignProjects.length
+          ? `    ${foreignProjects.length} unexpected project(s), e.g. ${foreignProjects[0]}\n`
+          : '') +
+        `  Target: ${URL}\n` +
+        '  Refusing to seed — this looks like a database somebody is using.\n' +
+        '  Use a throwaway project, or re-run with --force if you are certain.'
+    );
+  }
+}
 
 interface SeededUser {
   label: 'A' | 'B';
@@ -230,6 +281,7 @@ async function seedProject(user: { id: string; email: string }, label: 'A' | 'B'
 }
 
 async function main() {
+  await assertDisposable();
   console.log(`\nSeeding test data into ${URL}\n`);
   const seeded: SeededUser[] = [];
   for (const label of ['A', 'B'] as const) {
