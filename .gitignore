@@ -154,3 +154,4 @@ vite.config.ts.timestamp-*
 
 # Playwright saved auth sessions (contain live tokens)
 e2e/.auth/
+.env.local.bak
