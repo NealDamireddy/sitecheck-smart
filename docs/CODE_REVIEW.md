@@ -65,7 +65,7 @@ New findings, all surfaced BY the tests:
 | SEC-14 | MEDIUM | `samples/[id]`, `monitoring-locations/[id]`, `smarts-events/[id]` DELETE | Bare `delete().eq()` answered `{success:true}` even when it affected zero rows (what RLS does for a foreign row) — a QSP could be told a deletion happened that never did. | **fixed** — visibility check first, 404 when the row isn't the caller's. |
 | SEC-15 | MEDIUM | `lib/validations/analyze.ts` | Every field optional: an empty body reached the Claude prompt as `undefined`, and `status` accepted any string despite being echoed back as the compliance status. | **fixed** — required fields, length caps, status constrained to the real enum. |
 | TST-01 | HIGH | repo | Web app had zero tests. | **closed** — 268 tests; route manifest makes new routes fail until classified. |
-| TST-02 | HIGH | live DB | RLS enforcement itself is proven only by the gated E2E isolation spec, which has never been run. | **open** — needs a disposable Supabase project + `npm run db:seed:test`. This is the gap to close before telling a customer their data is isolated. |
+| TST-02 | HIGH | live DB | RLS enforcement itself is proven only by the gated E2E isolation spec, which has never been run. | **CLOSED** — executed and passing; see the live-verification section. |
 | TST-03 | MEDIUM | `smarts-automation/recon/` | The mandate's replay tests were not built: they would depend on captures of a real logged-in SMARTS session (SEC-12). | **deferred** — sanitize the fixtures first; see FOLLOW_UP. |
 
 ## Stage 4 — Field UX (partial: mechanical fixes done, design work deferred)
@@ -100,6 +100,19 @@ Assessment + artifacts; no migration performed. Full write-up: **docs/DEPLOYMENT
 | CLD-09 | LOW | `Dockerfile` | `NEXT_PUBLIC_*` values are inlined at build time, so one image is bound to one Supabase project — staging and prod need separate builds. | **documented** — called out in the Dockerfile and DEPLOYMENT; surprises people expecting to repoint a container via env. |
 
 **Not verified:** the container images have not been built (docker unavailable in this environment). The CI `containers` job is what will first prove them.
+
+## Live verification (E2E against a real Supabase project)
+
+Executed against a disposable project with all 15 migrations applied and two seeded tenants. **22/22 specs pass on Chromium and WebKit.**
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| TST-02 | HIGH | RLS enforcement was proven only by policy review, never executed. | **CLOSED** — `e2e/isolation.spec.ts` passes against live Postgres: User B cannot open, read, list or mutate User A's project; unauthenticated and cookie-cleared sessions both redirect. Schema check confirms 32 tables, RLS enabled on every one, 103 policies, zero permissive `USING (true)`, and all three `auth.uid()` helper functions present as SECURITY DEFINER. |
+| CMP-08 | HIGH | **Part 7 (Additional Corrective Actions Required) was missing from every generated report.** CGP 2022 requires it on all four inspection types, so every report the product has produced was short a required section. | **fixed** — sourced from `corrective_actions`, inserted before the certification statement, QSP-editable. Caught by the golden-path spec; the Stage 3 code audit could only suspect it. |
+| UX-09 | MEDIUM | `src/stores/onboarding-store.ts` `getPersistedState()` returns a hardcoded `hasCompleted: false` and never reads localStorage — `persist()` writes a key nothing consumes. The onboarding modal therefore reappears on **every page load**, and its overlay intercepts pointer events. A field inspector dismisses a welcome tour every time they open the app. | **open — product decision.** The code comment reads deliberate ("onboarding shows every time"), plausibly for demos, so not changed unilaterally. Three-line fix if unintended. |
+| ENV-03 | MEDIUM | `scripts/apply-migrations.ts` probes for migration 001 with `to_regclass('public.projects')`. Any database containing an unrelated table named `projects` is silently marked as migrated instead of failing, producing a confusing half-applied state. Cost three debugging round trips against a project holding a foreign prototype schema. | **open** — probe a distinctive column (`projects.wdid`) instead. Aryav-owned. |
+| TST-04 | HIGH | The E2E suite silently skipped all 18 specs while Playwright reported the run as **passed** — Playwright does not load `.env` files, so every gate variable was undefined. A green run that asserted nothing. | **fixed** — config loads `.env.test`; `webServer` keyed on the URL rather than on that variable being unset. |
+| TST-05 | MEDIUM | Signing in per spec (18 logins/run) tripped Supabase's auth rate limit; later specs failed as "stayed on /login", which looked like a WebKit auth bug. | **fixed** — `e2e/auth.setup.ts` signs in once per user and reuses `storageState`. Runtime 4.4 min → 31 s. |
 
 ## Stage 0 — Recon findings carried forward
 

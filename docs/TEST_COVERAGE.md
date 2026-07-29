@@ -26,7 +26,7 @@ No percentages. A coverage number would say the lines executed, not that the pro
 
 ## Partly proven — the logic is covered, the integration is not
 
-**RLS itself.** The policies were read line by line in Stage 1 and the route layer is tested against a fake database, but *Postgres enforcing those policies* is proven only by `e2e/isolation.spec.ts`, which needs a live test project. **Until someone runs that, "your data is isolated" rests on policy review plus route behavior, not on an executed test.** This is the single most important gap to close before telling a customer their data is safe.
+**RLS itself — NOW PROVEN.** `e2e/isolation.spec.ts` has been executed against a live Supabase project with all 15 migrations applied and two seeded tenants: User B cannot open, read, list or mutate User A's project, and both unauthenticated and cookie-cleared sessions redirect to login. Passing on Chromium and WebKit. A direct schema inspection additionally confirms 32 tables with RLS enabled on every one, 103 policies, zero permissive `USING (true)` policies, and the three `auth.uid()` helper functions present as SECURITY DEFINER. "Your data is isolated" is now backed by an executed test, not inference.
 
 **Password reset.** The rules and the recovery-redirect construction are unit-tested. That the email arrives and its link works depends on Supabase email templates and Site URL configuration — QA checklist §1.
 
