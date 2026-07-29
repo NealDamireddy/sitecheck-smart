@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DB_BMP_TYPES } from '@/lib/cgp/bmp-types';
 
 const linearRef = z.object({
   station: z.number(),
@@ -10,7 +11,10 @@ export const checkpointCreate = z.object({
   id: z.string().optional(),
   projectId: z.string().optional(),
   name: z.string().min(1).max(500),
-  bmpType: z.string().min(1).max(200),
+  // DRF-01: was z.string().max(200), which accepted arbitrary text and
+  // deferred the failure to the database. Constrained to exactly what the
+  // CHECK constraint allows.
+  bmpType: z.enum(DB_BMP_TYPES),
   status: z.string().optional(),
   // DB column is `priority TEXT NOT NULL CHECK (priority IN ('high','medium','low'))`.
   // Schema previously typed this as z.number() which mismatched both the

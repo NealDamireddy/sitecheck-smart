@@ -1,16 +1,18 @@
-export type BMPCategory =
-  | 'erosion-control'
-  | 'sediment-control'
-  | 'tracking-control'
-  | 'wind-erosion'
-  | 'materials-management'
-  | 'non-storm-water'
-  // Linear infrastructure-specific BMP types
-  | 'trench-plug'
-  | 'slope-breaker'
-  | 'water-bar'
-  | 'hdd-containment'
-  | 'stream-crossing-erosion';
+import type { AnyBmpType, DbBmpType } from '@/lib/cgp/bmp-types';
+
+/**
+ * Every BMP category the UI can display. Derived from
+ * src/lib/cgp/bmp-types.ts so this can no longer drift from the Zod
+ * schema or the database CHECK constraint (DRF-01).
+ *
+ * NOTE: this is wider than what can be PERSISTED — the five
+ * linear-infrastructure values are display-only until the CHECK
+ * constraint is widened. Use `PersistableBMPCategory` for writes.
+ */
+export type BMPCategory = AnyBmpType;
+
+/** The subset `checkpoints.bmp_type` will actually accept. */
+export type PersistableBMPCategory = DbBmpType;
 
 export type CheckpointStatus = 'compliant' | 'deficient' | 'needs-review';
 export type Priority = 'high' | 'medium' | 'low';
