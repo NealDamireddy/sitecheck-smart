@@ -114,13 +114,26 @@ Executed against a disposable project with all 15 migrations applied and two see
 | TST-04 | HIGH | The E2E suite silently skipped all 18 specs while Playwright reported the run as **passed** — Playwright does not load `.env` files, so every gate variable was undefined. A green run that asserted nothing. | **fixed** — config loads `.env.test`; `webServer` keyed on the URL rather than on that variable being unset. |
 | TST-05 | MEDIUM | Signing in per spec (18 logins/run) tripped Supabase's auth rate limit; later specs failed as "stayed on /login", which looked like a WebKit auth bug. | **fixed** — `e2e/auth.setup.ts` signs in once per user and reuses `storageState`. Runtime 4.4 min → 31 s. |
 
+## Stage 7 — Code quality, drift and dead weight
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| DRF-01 | HIGH | `bmp_type` declared three times, all disagreeing: TS 11 values, DB CHECK 6, Zod `z.string().max(200)` — i.e. any text. Typo'd or hostile values passed validation and failed at the database; the five linear values looked valid in TS and could never persist. | **fixed** — `src/lib/cgp/bmp-types.ts` is canonical; TS derives from it, Zod validates against exactly what the DB accepts, linear values are explicitly display-only. `tests/schema-drift.test.ts` parses the migration SQL so the next divergence fails the build. |
+| DRF-02 | HIGH | Inspection types (`routine/pre-storm/post-storm/qpe`) do not match CGP's four; the Part I–VII required-parts mapping cannot be enforced. | **open — still needs the Aryav decision.** Requires a CHECK-constraint migration plus changes through validations, the report generator and UI. Part 7 now generates for all types (CMP-08), so the highest-value gap is closed; the remaining work is Parts IV/V/VI keyed to a corrected type model. |
+| DRF-03 | HIGH | ND/DNQ cross-field rules unenforced in web validation. | **fixed** in Stage 3. |
+| QUA-01 | — | `any` / `@ts-ignore` / bare-catch audit of server and compliance code. | **verified clean** — none found. Three `as unknown as` casts remain, all legitimate type bridges (exceljs buffer, two Supabase row shapes). |
+| QUA-02 | — | Expected duplication across excel-export, walkthrough and report generator. | **does not exist** — the trio already shares `SmartsExportInput` and the same `normalize` helpers. No change needed. |
+| QUA-03 | LOW | 727 lines of dead code across five unreferenced modules. | **fixed** — deleted `data/linear-checkpoints.ts`, `data/report-template.ts`, `lib/inspection-transform.ts`, `lib/smarts/site-profile.ts` (stale duplicate of the bot's own), `stores/corrective-actions-store.ts` (defined, never consumed). Verified by typecheck, build, and all four suites. |
+| QUA-04 | LOW | Stale TODOs. | **left in place** — all 10+ are in `src/lib/drone-provider.ts`, marking unimplemented hardware calls in the deferred drone scope. Accurate as written. |
+| QUA-05 | — | Unused dependencies. | **none found** — every package in `package.json` has at least one consumer (`shadcn` via a CSS import in `globals.css`, `tw-animate-css` likewise). |
+
 ## Stage 0 — Recon findings carried forward
 
 | ID | Sev | Location | Finding | Status |
 |---|---|---|---|---|
 | ENV-01 | HIGH | session | Claude Code session was opened on an empty `~/Downloads/Sitecheck-main`; real repo is `~/Documents/SiteCheck/Sitecheck-main`. | **open** (process) — reopen the session in the real repo. |
 | ENV-02 | HIGH | git | Dirty tree on `feat/inspection-flow`; no review branch. | **fixed** (process) — `hardening-review` created, WIP snapshotted (`accf3f4`). |
-| DRF-01 | HIGH | `src/types/checkpoint.ts` vs migration 001 vs `src/lib/validations/checkpoint.ts` | `bmpType`: TS has 11 values, DB CHECK 6, Zod accepts any string ≤200. | **open** — Stage 7 (single source of truth), may need a migration. |
+| DRF-01 | HIGH | `src/types/checkpoint.ts` vs migration 001 vs `src/lib/validations/checkpoint.ts` | `bmpType`: TS has 11 values, DB CHECK 6, Zod accepts any string ≤200. | **fixed** — see Stage 7. |
 | DRF-02 | HIGH | `src/types/drone.ts`, `validations/inspection.ts`, migration 001 | Inspection types `routine/pre-storm/post-storm/qpe` don't match CGP's four (no during-storm); Part I–VII mapping unenforceable. | **open** — Stage 3 decision. |
 | DRF-03 | HIGH | `src/lib/validations/parameter-result.ts` | No ND/DNQ cross-field rule in the web app validation layer. | **fixed** — see Stage 3 table. |
 | CMP-01 | MEDIUM | `src/lib/weather-api.ts` + `src/lib/smarts/noaa.ts` + legacy detector | Two parallel weather stacks + two rain-event flows = two sources of truth for QPE. | **fixed** — see Stage 3 table. |

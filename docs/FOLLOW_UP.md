@@ -85,3 +85,22 @@ Re-check with `npm audit --omit=dev` — dev-only advisories are noise for a dep
 ## Next.js deprecation
 
 `next build` warns that the `middleware` file convention is deprecated in favour of `proxy`. `src/middleware.ts` is the auth wall (SEC-03 lives there), so the rename is mechanical but security-relevant — do it deliberately, with `tests/security/middleware-demo-cookie.test.ts` green on both sides of the change.
+
+## Deferred from Stage 7
+
+**Widening the `bmp_type` CHECK constraint.** The five linear-infrastructure categories (`trench-plug`, `slope-breaker`, `water-bar`, `hdd-containment`, `stream-crossing-erosion`) have labels and colors but cannot be persisted — the constraint rejects them, and the write schema now rejects them too so the failure is a clear 400 rather than a database error. To enable them, review and apply:
+
+```sql
+ALTER TABLE checkpoints DROP CONSTRAINT checkpoints_bmp_type_check;
+ALTER TABLE checkpoints ADD CONSTRAINT checkpoints_bmp_type_check
+  CHECK (bmp_type IN (
+    'erosion-control', 'sediment-control', 'tracking-control',
+    'wind-erosion', 'materials-management', 'non-storm-water',
+    'trench-plug', 'slope-breaker', 'water-bar',
+    'hdd-containment', 'stream-crossing-erosion'
+  ));
+```
+
+Then move those five values from `LINEAR_BMP_TYPES` into `DB_BMP_TYPES` in `src/lib/cgp/bmp-types.ts`; `tests/schema-drift.test.ts` will fail until you do, which is the point. Deliberately not added as a migration file — `npm run db:migrate` would apply it unreviewed, and this is only needed when the linear product goes live.
+
+**DRF-02 remains the one substantive open item.** The inspection-type enum doesn't match CGP's four types, so the required-parts mapping (Weekly → I/II/III/VII, Pre-Storm → +IV, During → +V, Post-Storm → +VI) cannot be enforced in code. Part 7 now generates for every type, so reports are no longer missing a universally-required section; what remains is Parts IV/V/VI keyed to a corrected type model. Needs a CHECK-constraint migration plus changes through validations, the generator and the UI — a reviewed change of its own, not a drive-by.
