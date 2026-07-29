@@ -174,6 +174,25 @@ export async function POST(request: NextRequest) {
 
     const deficiencyList = deficiencies || [];
 
+    // 5b. Fetch outstanding corrective actions — the data behind Part 7.
+    // CGP 2022 requires an "Additional Corrective Actions Required"
+    // section on EVERY inspection type (Weekly I/II/III/VII, Pre-Storm
+    // I-IV/VII, During I/II/III/V/VII, Post-Storm I/II/III/VI/VII), and
+    // the generator was omitting it entirely (CMP-08, caught by
+    // e2e/golden-path.spec.ts).
+    const { data: correctiveActionRows, error: correctiveActionsError } =
+      await supabase
+        .from('corrective_actions')
+        .select('*')
+        .eq('project_id', projectId)
+        .not('status', 'in', '("resolved","verified")')
+        .order('due_date', { ascending: true });
+
+    if (correctiveActionsError) {
+      log.error('Error fetching corrective actions', { correctiveActionsError });
+    }
+    const correctiveActionList = correctiveActionRows || [];
+
     // 6. Daily-Precipitation reports need pH/turbidity sample results
     // attached as Part 4. We pull samples + parameter_results for the
     // most recent SMARTS event on this project. If the inspection isn't
@@ -337,6 +356,37 @@ export async function POST(request: NextRequest) {
       '_Yes / No answers and Action / Implementation dates are captured per-question during the inspection visit; pending entries are shown as "—"._'
     );
     const bmpObservationsContent = bmpSectionLines.join('\n').trim();
+
+    // ─────────────────────────────────────────────
+    // Part 7: Additional Corrective Actions Required
+    // Required on every inspection type under CGP 2022.
+    // ─────────────────────────────────────────────
+    let correctiveActionContent =
+      '_Corrective actions identified during this inspection that are not ' +
+      'BMP repairs covered in Part 3. Repairs of BMP deficiencies must ' +
+      'begin within 72 hours of identification._\n\n';
+    if (correctiveActionList.length === 0) {
+      correctiveActionContent +=
+        'No additional corrective actions required at the time of this inspection.';
+    } else {
+      for (const action of correctiveActionList) {
+        const due = action.due_date
+          ? new Date(action.due_date as string).toISOString().slice(0, 10)
+          : 'TBD';
+        correctiveActionContent += `---\n`;
+        correctiveActionContent += `**${action.description}**\n`;
+        if (action.cgp_reference) {
+          correctiveActionContent += `- CGP reference: ${action.cgp_reference}\n`;
+        }
+        correctiveActionContent += `- Severity: ${action.severity ?? 'medium'}\n`;
+        correctiveActionContent += `- Status: ${action.status ?? 'open'}\n`;
+        correctiveActionContent += `- Action required by: ${due}\n`;
+        if (action.checkpoint_id) {
+          correctiveActionContent += `- Checkpoint: ${action.checkpoint_id}\n`;
+        }
+        correctiveActionContent += `\n`;
+      }
+    }
 
     // ─────────────────────────────────────────────
     // Part 3: Descriptions of BMP deficiencies
@@ -653,6 +703,13 @@ This inspection was conducted in accordance with the requirements of:
             editable: true,
           }]
         : []),
+      {
+        id: 'part-7-corrective-actions',
+        title: 'Part 7: Additional Corrective Actions Required',
+        content: correctiveActionContent.trim(),
+        type: 'text',
+        editable: true,
+      },
       {
         id: 'certification',
         title: 'Certification Statement',

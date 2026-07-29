@@ -40,10 +40,20 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium-desktop', use: { ...devices['Desktop Chrome'] } },
+    // Signs in each user once and saves the session; see e2e/auth.setup.ts.
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    {
+      name: 'chromium-desktop',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+    },
     // The real inspector is on a phone in a muddy field — the field
     // walkthrough specs must pass at this viewport too.
-    { name: 'mobile-safari', use: { ...devices['iPhone 13'] } },
+    {
+      name: 'mobile-safari',
+      use: { ...devices['iPhone 13'] },
+      dependencies: ['setup'],
+    },
   ],
   // Start a dev server only when the target IS this machine. A remote
   // baseURL is assumed already running. (Keyed on the URL, not on

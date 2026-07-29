@@ -5,19 +5,20 @@
  * location, one reading exceeding its NAL → verify the review surface
  * flags the exceedance → export and assert the file's content.
  */
-import { test, expect, signIn } from './fixtures';
+import { test, expect, authState, e2eConfigured, REQUIRES_ENV } from './fixtures';
 
 const PROJECT_ID = process.env.E2E_USER_A_PROJECT_ID;
 
 test.describe('storm path', () => {
+  test.use({ storageState: authState('A') });
+  test.skip(!e2eConfigured(), REQUIRES_ENV);
   test.skip(!PROJECT_ID, 'Set E2E_USER_A_PROJECT_ID (seed script prints it).');
 
-  test('NAL exceedance is flagged and reaches the export', async ({ page, userA }) => {
-    await signIn(page, userA);
+  test('NAL exceedance is flagged and reaches the export', async ({ page }) => {
 
     // 1. Simulate a rain event (demo endpoint that only ever inserts).
     const sim = await page.request.post('/api/smarts-events/simulate', {
-      data: { projectId: PROJECT_ID, mode: 'active' },
+      data: { projectId: PROJECT_ID, mode: 'starting' },
     });
     expect(sim.status()).toBeLessThan(400);
     const event = (await sim.json()) as { id: string };
@@ -79,14 +80,13 @@ test.describe('storm path', () => {
     expect(bytes.byteLength).toBeGreaterThan(0);
   });
 
-  test('ND/DNQ validation is enforced end to end', async ({ page, userA }) => {
-    await signIn(page, userA);
+  test('ND/DNQ validation is enforced end to end', async ({ page }) => {
     const locRes = await page.request.get(
       `/api/monitoring-locations?projectId=${PROJECT_ID}`
     );
     const locations = (await locRes.json()) as Array<{ id: string }>;
     const sim = await page.request.post('/api/smarts-events/simulate', {
-      data: { projectId: PROJECT_ID, mode: 'active' },
+      data: { projectId: PROJECT_ID, mode: 'starting' },
     });
     const event = (await sim.json()) as { id: string };
 

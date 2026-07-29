@@ -11,18 +11,24 @@
  * half-finished inspection lost in the field), so it is a first-class
  * spec rather than a manual check.
  */
-import { test, expect, signIn } from './fixtures';
+import { test, expect, authState, e2eConfigured, REQUIRES_ENV } from './fixtures';
 
 const PROJECT_ID = process.env.E2E_USER_A_PROJECT_ID;
 
 test.describe('golden path', () => {
+  test.use({ storageState: authState('A') });
+  test.skip(!e2eConfigured(), REQUIRES_ENV);
   test.skip(!PROJECT_ID, 'Set E2E_USER_A_PROJECT_ID (seed script prints it).');
 
-  test('weekly inspection produces a CGP-structured report', async ({ page, userA }) => {
-    await signIn(page, userA);
+  test('weekly inspection produces a CGP-structured report', async ({ page }) => {
 
     await page.goto(`/projects/${PROJECT_ID}/events`);
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    // The page has two <h1>s (the project switcher and the project name),
+    // so `level: 1` alone is a strict-mode violation. Assert on the one
+    // that proves we loaded THIS project.
+    await expect(
+      page.getByRole('heading', { name: PROJECT_ID! })
+    ).toBeVisible();
 
     // Start an inspection from the dashboard picker.
     await page.goto('/dashboard');
@@ -65,14 +71,18 @@ test.describe('golden path', () => {
 });
 
 test.describe('interruption path', () => {
+  test.use({ storageState: authState('A') });
   test.skip(!PROJECT_ID, 'Set E2E_USER_A_PROJECT_ID (seed script prints it).');
 
-  test('reloading mid-walkthrough does not lose progress', async ({ page, userA }) => {
-    await signIn(page, userA);
+  test('reloading mid-walkthrough does not lose progress', async ({ page }) => {
     await page.goto('/checkpoints');
 
     const firstCheckpoint = page.getByRole('link').filter({ hasText: /SC-|EC-|TC-/ }).first();
     await firstCheckpoint.click();
+    // click() resolves before the client-side navigation settles, so
+    // capturing page.url() immediately records the LIST url and the
+    // post-reload comparison fails against the DETAIL url.
+    await page.waitForURL(/\/checkpoints\/.+/, { timeout: 15_000 });
     const urlBeforeReload = page.url();
 
     // Enter an observation, then simulate the app being backgrounded or
