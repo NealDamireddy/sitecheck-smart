@@ -69,10 +69,57 @@ Apply `supabase/migrations/016_swppp_ingestion.sql` first — it creates
 `swppp_documents` and `bmp_checkpoint_drafts` with their RLS policies. **It is
 unapplied pending review.**
 
-## Run
+## Run locally
 
 ```bash
-.venv/bin/uvicorn app.main:app --reload --port 8000
+cd swppp-service
+.venv/bin/uvicorn app.main:app --port 8000
+```
+
+Qdrant defaults to `:memory:` — no Docker, no server. `http://localhost:8000/docs`
+gives interactive Swagger UI (paste a token via **Authorize**).
+
+> **Do not use `--reload` while testing an upload.** Reload restarts the
+> process on any file change, and the in-memory Qdrant index dies with it:
+> the BMPs survive in Postgres but search silently returns nothing.
+
+### Walk the upload path with curl
+
+Verified against the seeded E2E users; substitute your own.
+
+```bash
+EMAIL=$(grep '^E2E_USER_A_EMAIL=' ../.env.test | cut -d= -f2)
+PASS=$(grep '^E2E_USER_A_PASSWORD=' ../.env.test | cut -d= -f2)
+PROJ=$(grep '^E2E_USER_A_PROJECT_ID=' ../.env.test | cut -d= -f2)
+TOKEN=$(.venv/bin/python scripts/get_token.py "$EMAIL" "$PASS")
+
+# 1. upload -> 202 with a document_id
+curl -s -X POST "http://localhost:8000/api/v1/projects/$PROJ/swppp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@fixtures/sample_swppp.pdf;type=application/pdf"
+
+# 2. poll -> processing, then completed with bmp_count
+DOC=<document_id from step 1>
+curl -s "http://localhost:8000/api/v1/projects/$PROJ/swppp/$DOC" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 3. ask a question -> grounded answer + source chunks
+curl -s -G "http://localhost:8000/api/v1/projects/$PROJ/swppp/search" \
+  -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "q=When must silt fence be repaired?"
+```
+
+Observed on a clean run: upload 202, `completed` with `bmp_count: 10` after
+~15s, and the search answering with the document's own words —
+*"Repair when accumulated sediment reaches 1/3 of fence height"*.
+
+Omitting the `Authorization` header returns 401; using a second user's token
+against this project returns 404 on read, search and upload alike.
+
+For the whole thing in one command, without a server:
+
+```bash
+.venv/bin/python scripts/e2e_upload.py
 ```
 
 ## Test
