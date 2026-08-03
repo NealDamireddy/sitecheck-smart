@@ -37,7 +37,10 @@ class Settings(BaseSettings):
     extraction_max_tokens: int = 16_384
 
     # ── Qdrant ──────────────────────────────────────────────────────────────
-    qdrant_url: str = "http://localhost:6333"
+    #: ":memory:" runs Qdrant embedded in this process — no Docker, no server.
+    #: Fine for local development and tests; see VectorStore for the caveats
+    #: (per-process, lost on restart, single worker only).
+    qdrant_url: str = ":memory:"
     qdrant_api_key: str | None = None
     qdrant_collection: str = "swppp_chunks"
 

@@ -141,12 +141,37 @@ class Embedder:
         return await asyncio.to_thread(run)
 
 
+def _make_client(settings: Settings) -> AsyncQdrantClient:
+    """
+    Build a Qdrant client, embedded or remote.
+
+    `qdrant_url=":memory:"` runs Qdrant inside this process so the upload path
+    works with no Docker and no server. Three things it is NOT:
+
+      * durable — the index dies with the process, so a restart leaves
+        Postgres holding the BMPs while vector search returns nothing;
+      * shared — each uvicorn worker gets its own copy, so with --workers > 1
+        a search hits a different index than the upload wrote to;
+      * production.
+
+    Point QDRANT_URL at a real instance before this leaves a dev machine. The
+    compliance data lives in Postgres either way — Qdrant only ever holds a
+    derived copy of the document text, so losing it costs a re-index, never a
+    BMP.
+    """
+    if settings.qdrant_url.strip() == ":memory:":
+        logger.warning(
+            "Qdrant is running in-memory: the index is per-process and is "
+            "lost on restart. Set QDRANT_URL for anything beyond local dev."
+        )
+        return AsyncQdrantClient(location=":memory:")
+    return AsyncQdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
+
+
 class VectorStore:
     def __init__(self, settings: Settings, client: AsyncQdrantClient | None = None):
         self.settings = settings
-        self.client = client or AsyncQdrantClient(
-            url=settings.qdrant_url, api_key=settings.qdrant_api_key
-        )
+        self.client = client or _make_client(settings)
         self.embedder = Embedder(settings)
 
     async def ensure_collection(self) -> None:
@@ -249,3 +274,28 @@ class VectorStore:
                 ]
             ),
         )
+
+
+_store: VectorStore | None = None
+
+
+def get_vector_store(settings: Settings) -> VectorStore:
+    """
+    The process-wide VectorStore. Always use this, never `VectorStore(...)`.
+
+    With an in-memory Qdrant, every client instance is a SEPARATE database.
+    Constructing a VectorStore per request — which is what the route and the
+    pipeline did — meant the upload indexed into one instance and the search
+    queried another, so search returned nothing while looking perfectly
+    healthy. Sharing one instance is also correct for a remote Qdrant, where
+    it reuses the connection pool instead of opening a client per request.
+
+    Keyed on the identity of `settings` rather than its value: Settings is not
+    hashable, and `get_settings()` is itself cached, so in normal operation
+    this is a true singleton while a test passing its own Settings still gets
+    a fresh store.
+    """
+    global _store
+    if _store is None or _store.settings is not settings:
+        _store = VectorStore(settings)
+    return _store

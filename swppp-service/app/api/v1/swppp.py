@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from app.core.auth import Caller, require_caller
 from app.core.config import Settings, get_settings
 from app.services.pipeline import process_swppp_document
-from app.services.vector import VectorStore
+from app.services.vector import get_vector_store
 
 router = APIRouter(prefix="/api/v1/projects", tags=["SWPPP"])
 
@@ -120,7 +120,7 @@ async def search_swppp(
     if not q.strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Query must not be empty")
 
-    hits = await VectorStore(settings).search(project_id=project_id, query=q, limit=5)
+    hits = await get_vector_store(settings).search(project_id=project_id, query=q, limit=5)
     if not hits:
         return SearchResponse(
             query=q,

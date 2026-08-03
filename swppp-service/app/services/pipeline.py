@@ -23,7 +23,7 @@ from supabase import Client
 from app.core.config import Settings
 from app.services.extraction import ExtractionError, extract_swppp
 from app.services.pdf import PdfConversionError, pdf_to_markdown
-from app.services.vector import VectorStore, chunk_markdown
+from app.services.vector import VectorStore, chunk_markdown, get_vector_store
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,9 @@ async def process_swppp_document(
     subject to the same policies as the web app: this cannot write a row into
     another tenant's project even if `project_id` were wrong.
     """
-    store = vector_store or VectorStore(settings)
+    # Shared instance: a per-call VectorStore would give an in-memory
+    # Qdrant its own private database (see get_vector_store).
+    store = vector_store or get_vector_store(settings)
 
     try:
         conversion = await pdf_to_markdown(data, settings=settings)
