@@ -136,27 +136,86 @@ def test_locations_default_to_empty_not_invented():
 
 # ── Strict tool schema ──────────────────────────────────────────────────────
 
+def _objects(node, out=None):
+    """Every object node in the schema, including nested $defs."""
+    out = [] if out is None else out
+    if isinstance(node, dict):
+        if node.get("type") == "object" and "properties" in node:
+            out.append(node)
+        for v in node.values():
+            _objects(v, out)
+    elif isinstance(node, list):
+        for i in node:
+            _objects(i, out)
+    return out
+
+
 def test_strict_schema_hardens_every_nested_object():
     """
-    Anthropic needs additionalProperties:false on *each* object. Pydantic emits
-    nested models under $defs; hardening only the top level would silently
-    leave the BMP items unconstrained — the part that matters most.
+    additionalProperties:false on *each* object. Pydantic emits nested models
+    under $defs, so hardening only the top level would leave the BMP items
+    unconstrained — the part that matters most.
     """
     schema = _strict_schema(SWPPPExtractionResponse)
+    objects = _objects(schema)
+    assert objects, "no object nodes found — the test would pass vacuously"
+    for node in objects:
+        assert node.get("additionalProperties") is False
 
-    def check(node):
-        if isinstance(node, dict):
-            if node.get("type") == "object" and "properties" in node:
-                assert node.get("additionalProperties") is False
-                assert "required" in node
-            for v in node.values():
-                check(v)
-        elif isinstance(node, list):
-            for i in node:
-                check(i)
 
-    check(schema)
-    assert schema.get("$defs"), "expected nested $defs to exercise the walk"
+def test_every_property_is_required():
+    """
+    REGRESSION: this shipped broken and only a live call revealed it.
+
+    Pydantic marks a field optional whenever it has a default, so it emitted
+    required:["risk_level"] and nothing else. Under strict mode that made
+    omitting `checkpoints` legal, and the model returned exactly
+    {"risk_level": "LUP"} — 51 output tokens, zero BMPs. Strictness applied to
+    a permissive schema made it EASIER to return nothing.
+
+    In strict tool use every key is required; optionality is expressed by the
+    nullable type. The original assertion here was `"required" in node`, which
+    passed against the broken schema — hence the stronger form.
+    """
+    for node in _objects(_strict_schema(SWPPPExtractionResponse)):
+        assert set(node["required"]) == set(node["properties"]), (
+            f"required != properties; missing "
+            f"{set(node['properties']) - set(node['required'])}"
+        )
+
+
+def test_optional_fields_are_nullable_rather_than_absent():
+    """The corollary: a field we allow to be unknown must accept null."""
+    schema = _strict_schema(SWPPPExtractionResponse)
+    for field in ("site_wdid", "qsp_name"):
+        prop = schema["properties"][field]
+        types = {s.get("type") for s in prop.get("anyOf", [])} or {prop.get("type")}
+        assert "null" in types, f"{field} is required but cannot be null"
+
+
+def test_unsupported_keywords_are_stripped():
+    """
+    400: "For 'array' type, property 'maxItems' is not supported". Pydantic
+    emits maxItems/maxLength from our SEC-07 caps. Stripping them from the
+    wire schema is safe because model_validate() re-checks every cap.
+    """
+    import json
+
+    blob = json.dumps(_strict_schema(SWPPPExtractionResponse))
+    for keyword in ("maxItems", "minItems", "maxLength", "minLength", "pattern"):
+        assert keyword not in blob, f"{keyword} will be rejected by the API"
+
+
+def test_caps_are_still_enforced_after_stripping():
+    """The caps left the schema but must not have left the validation."""
+    with pytest.raises(ValidationError):
+        BMPItemSchema(
+            bmp_category=BmpCategory.EROSION_CONTROL,
+            bmp_code="EC-1",
+            title="x" * 500,
+            inspection_frequency="Weekly",
+            maintenance_threshold="ok",
+        )
 
 
 # ── Chunking ────────────────────────────────────────────────────────────────

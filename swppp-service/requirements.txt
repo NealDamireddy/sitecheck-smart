@@ -16,5 +16,6 @@ fastembed>=0.4                 # local embeddings; no customer data egress
 
 # Layout-aware PDF -> Markdown (the reason this service exists).
 # Heavy (marker pulls torch); installed separately so tests run without them.
-# marker-pdf>=1.0
+pymupdf4llm>=0.0.17            # default backend: fast, no torch
+# marker-pdf>=1.0               # best fidelity, multi-GB (pulls torch)
 # unstructured[pdf]>=0.16

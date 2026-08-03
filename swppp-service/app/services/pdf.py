@@ -35,6 +35,29 @@ class ConversionResult:
     backend: str
 
 
+def _convert_with_pymupdf(data: bytes) -> ConversionResult:
+    """
+    PyMuPDF4LLM. Installs in seconds with no ML dependencies and still emits
+    real Markdown tables, which is the property that matters here — it is
+    `pdf-parse`'s flat text stream that this service exists to replace, and
+    pymupdf already clears that bar. Reach for marker when a specific document
+    defeats it.
+    """
+    import fitz  # PyMuPDF
+    import pymupdf4llm
+
+    doc = fitz.open(stream=data, filetype="pdf")
+    try:
+        page_count = doc.page_count
+    finally:
+        doc.close()
+
+    markdown = pymupdf4llm.to_markdown(
+        fitz.open(stream=data, filetype="pdf"), show_progress=False
+    )
+    return ConversionResult(markdown=markdown, page_count=page_count, backend="pymupdf")
+
+
 def _convert_with_marker(data: bytes) -> ConversionResult:
     from marker.converters.pdf import PdfConverter
     from marker.models import create_model_dict
@@ -92,14 +115,16 @@ async def pdf_to_markdown(data: bytes, *, settings: Settings) -> ConversionResul
     if not data.startswith(b"%PDF-"):
         raise PdfConversionError("Not a PDF (missing %PDF- header)")
 
-    primary = (
-        _convert_with_marker
-        if settings.pdf_backend == "marker"
-        else _convert_with_unstructured
-    )
-    fallback = (
-        _convert_with_unstructured if primary is _convert_with_marker else None
-    )
+    backends = {
+        "pymupdf": _convert_with_pymupdf,
+        "marker": _convert_with_marker,
+        "unstructured": _convert_with_unstructured,
+    }
+    primary = backends[settings.pdf_backend]
+    # Fall back to whichever of the others is installed. A missing optional
+    # dependency should degrade the conversion, not fail the upload.
+    fallback_order = [b for name, b in backends.items() if name != settings.pdf_backend]
+    fallback = fallback_order[0] if fallback_order else None
 
     try:
         result = await asyncio.to_thread(primary, data)

@@ -50,30 +50,58 @@ worse than a missing one.
 - Call the tool exactly once, with every BMP you found."""
 
 
+#: Validation keywords strict tool use rejects. Pydantic emits them from our
+#: field constraints (`max_length` on a list becomes `maxItems`, on a str
+#: becomes `maxLength`), and sending one returns:
+#:   400 tools.0.custom: For 'array' type, property 'maxItems' is not supported
+#:
+#: Stripping them costs nothing: `model_validate()` re-checks every constraint
+#: against the returned input, so the SEC-07 length caps are still enforced —
+#: they are simply enforced on our side rather than declared to the API.
+_UNSUPPORTED_KEYWORDS = frozenset(
+    {
+        "maxItems", "minItems", "uniqueItems",
+        "maxLength", "minLength", "pattern", "format",
+        "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
+    }
+)
+
+
 def _strict_schema(model: type) -> dict[str, Any]:
     """
     Pydantic JSON Schema, hardened for strict tool use.
 
-    Anthropic requires `additionalProperties: false` on every object and an
-    explicit `required` list. Pydantic emits neither for nested `$defs`, so we
-    walk the whole tree rather than only the top level — missing a nested
-    object silently drops strictness for exactly the part we care about most
-    (the BMP items).
+    Two passes over the whole tree, including nested `$defs` — hardening only
+    the top level would silently leave the BMP items unconstrained, which is
+    the part that matters most:
+
+      1. add `additionalProperties: false` + an explicit `required` list
+      2. drop the validation keywords the API rejects
     """
     schema = model.model_json_schema()
 
-    def harden(node: Any) -> None:
+    def walk(node: Any) -> None:
         if isinstance(node, dict):
             if node.get("type") == "object" and "properties" in node:
                 node["additionalProperties"] = False
-                node.setdefault("required", sorted(node["properties"].keys()))
+                # EVERY property must be required, overwriting what Pydantic
+                # emitted. Pydantic marks a field optional whenever it has a
+                # default, so it produced required:["risk_level"] alone — and
+                # under strict mode that made omitting `checkpoints` legal.
+                # The model duly returned {"risk_level": "..."} and nothing
+                # else: strictness applied to a permissive schema made it
+                # EASIER to return nothing. Optionality is expressed by the
+                # nullable type (`str | None`), never by absence from this list.
+                node["required"] = sorted(node["properties"].keys())
+            for keyword in _UNSUPPORTED_KEYWORDS & node.keys():
+                del node[keyword]
             for value in node.values():
-                harden(value)
+                walk(value)
         elif isinstance(node, list):
             for item in node:
-                harden(item)
+                walk(item)
 
-    harden(schema)
+    walk(schema)
     return schema
 
 

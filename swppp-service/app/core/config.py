@@ -52,9 +52,16 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 128
 
     # ── PDF conversion ──────────────────────────────────────────────────────
-    # "marker" is the highest-fidelity table extractor; "unstructured" is the
-    # fallback. Both are layout-aware — the point of this service.
-    pdf_backend: Literal["marker", "unstructured"] = "marker"
+    # All three are layout-aware and emit Markdown tables — the point of this
+    # service. They trade install weight against table fidelity:
+    #
+    #   pymupdf  ~50 MB, installs in seconds, no ML deps. Good tables.
+    #            Start here: it makes the pipeline testable immediately.
+    #   marker   multi-GB (pulls torch), slow first run. Best fidelity on
+    #            messy scans and merged cells. Worth it once you have a real
+    #            SWPPP that pymupdf gets wrong.
+    #   unstructured  middle ground; hi_res needs poppler + tesseract.
+    pdf_backend: Literal["pymupdf", "marker", "unstructured"] = "pymupdf"
     max_pdf_bytes: int = 50 * 1024 * 1024
 
     @property
