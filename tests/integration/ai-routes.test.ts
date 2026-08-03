@@ -110,10 +110,62 @@ describe('POST /api/analyze', () => {
     expect((await postAnalyze()).status).toBe(502);
   });
 
-  it('markdown-fenced JSON → 502 (this route requests raw JSON)', async () => {
+  // ASSERTION DELIBERATELY CHANGED (was: fenced JSON → 502).
+  //
+  // The old assertion encoded a design choice — "this route requests raw
+  // JSON, so a fence is a failure" — that was safe only while the model
+  // actually returned bare JSON. Verified against the live API on the
+  // Opus 5 migration: the model wraps its reply in ```json … ``` even when
+  // the system prompt forbids fences, so the old rule meant this route
+  // returned 502 on *every* real request. That is what the user hit as
+  // "Photo uploaded but analysis failed".
+  //
+  // A fence is a transport wrapper, not a contract violation: the JSON
+  // inside is still fully Zod-validated, so SEC-07 is untouched. The three
+  // tests below prove the fence cannot be used to smuggle anything — bad
+  // content inside a fence still 502s exactly as bare bad content does.
+  it('markdown-fenced JSON → 200 (fence stripped, contents still validated)', async () => {
     messageResponse = textResponse(
       '```json\n' + JSON.stringify(VALID_ANALYSIS) + '\n```'
     );
+    const res = await postAnalyze();
+    expect(res.status).toBe(200);
+    // The payload must be the real validated analysis, not a fabrication.
+    const body = await res.json();
+    expect(body.summary).toBe(VALID_ANALYSIS.summary);
+    expect(body.confidence).toBe(VALID_ANALYSIS.confidence);
+    // Human-in-the-loop: the route echoes the QSP's own status back and the
+    // model never gets to set it. Stripping the fence must not change that.
+    expect(body.status).toBe('needs-review');
+  });
+
+  it('a fenced reply cannot override the QSP-set compliance status', async () => {
+    // The core product invariant: AI output is a draft, never authority.
+    messageResponse = textResponse(
+      '```json\n' + JSON.stringify({ ...VALID_ANALYSIS, status: 'compliant' }) + '\n```'
+    );
+    const res = await postAnalyze();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('needs-review'); // the request's value, not 'compliant'
+  });
+
+  it('a fence cannot smuggle an out-of-range confidence → 502', async () => {
+    messageResponse = textResponse(
+      '```json\n' + JSON.stringify({ ...VALID_ANALYSIS, confidence: 900 }) + '\n```'
+    );
+    expect((await postAnalyze()).status).toBe(502);
+  });
+
+  it('a fence cannot smuggle an oversized summary → 502', async () => {
+    messageResponse = textResponse(
+      '```json\n' + JSON.stringify({ ...VALID_ANALYSIS, summary: 'x'.repeat(5000) }) + '\n```'
+    );
+    expect((await postAnalyze()).status).toBe(502);
+  });
+
+  it('a fence around non-JSON is still unreadable → 502', async () => {
+    messageResponse = textResponse('```json\nnot json at all\n```');
     expect((await postAnalyze()).status).toBe(502);
   });
 

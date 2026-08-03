@@ -70,7 +70,7 @@ A SWPPP PDF or a site photo is attacker-controlled content entering a model prom
 
 **Proof:** `tests/integration/ai-routes.test.ts` — prose preambles, truncated JSON, markdown fences, out-of-range confidence, and oversized injected strings all yield 502 with nothing stored. `tests/checkpoint-analyze-no-mock.test.ts` proves a vision failure persists nothing (it previously wrote a *fabricated* mock analysis indistinguishable from a real one). `tests/ai-output-validation.test.ts` covers the schemas directly. Anthropic is mocked at the module boundary — no test can spend money or reach the network.
 
-Two prompt-level decisions worth knowing: the extractor is forbidden from inventing GPS coordinates (it returns `null`, and the app rings unlocated checkpoints around the real project center), and the model is pinned to `claude-sonnet-4-20250514` rather than floating.
+Two prompt-level decisions worth knowing: the extractor is forbidden from inventing GPS coordinates (it returns `null`, and the app rings unlocated checkpoints around the real project center), and the model is pinned to `claude-opus-5` rather than floating, in one place (`src/lib/ai-model.ts`) rather than the six it used to be copied across.
 
 ## 6. Secret handling
 

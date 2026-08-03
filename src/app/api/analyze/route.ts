@@ -6,6 +6,7 @@ import { analyzeCheckpoint } from '@/lib/validations';
 import { bmpTextAnalysisOutput } from '@/lib/validations/ai-output';
 import Anthropic from '@anthropic-ai/sdk';
 import { log } from '@/lib/logger';
+import { AI_MAX_TOKENS, AI_MODEL, extractJsonBlock } from '@/lib/ai-model';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -23,8 +24,9 @@ export async function POST(request: NextRequest) {
     const { checkpointId, checkpointName, bmpCategory, status, description, cgpSection } = body;
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
+      model: AI_MODEL,
+      // Covers thinking + the JSON, not just the JSON — see src/lib/ai-model.ts.
+      max_tokens: AI_MAX_TOKENS.analysis,
       system: `You are a Qualified SWPPP Practitioner (QSP) reviewing a Best Management Practice (BMP) checkpoint at a California construction site under the 2022 Construction General Permit (Order 2022-0057-DWQ).
 
 Your output is written for inclusion in a regulator-submitted BMP Inspection Report. Match the tone real QSPs use on those reports:
@@ -70,7 +72,9 @@ Return the analysis as JSON.`,
     // untrusted; a bad shape halts loudly instead of reaching the client.
     let rawAnalysis: unknown;
     try {
-      rawAnalysis = JSON.parse(textContent.text);
+      // Strip a ```json fence first — Opus 5 emits one despite the prompt
+      // saying not to, which made this route 502 on every request.
+      rawAnalysis = JSON.parse(extractJsonBlock(textContent.text));
     } catch {
       log.error('[analyze] Claude returned non-JSON', { detail: textContent.text.slice(0, 300) });
       return NextResponse.json(

@@ -11,6 +11,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // index.js entirely and avoids the side-effect.
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import { log } from '@/lib/logger';
+import { AI_MAX_TOKENS, AI_MODEL, extractJsonBlock } from '@/lib/ai-model';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -111,8 +112,9 @@ export async function POST(request: NextRequest) {
 
     const claudeStart = Date.now();
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
+      model: AI_MODEL,
+      // Covers thinking + the JSON, not just the JSON — see src/lib/ai-model.ts.
+      max_tokens: AI_MAX_TOKENS.extraction,
       system: `You are an expert SWPPP (Storm Water Pollution Prevention Plan) document analyst for construction sites in California. You analyze uploaded SWPPP documents and extract all BMP (Best Management Practice) checkpoint information.
 
 Your task: Extract every BMP checkpoint mentioned in this SWPPP document and return structured JSON.
@@ -157,13 +159,11 @@ Respond ONLY with valid JSON (no markdown code fences, no commentary) matching t
 ${text}
 --- SWPPP DOCUMENT TEXT END ---`,
         },
-        // Prefill the assistant turn with `{` so Claude is forced to
-        // continue with valid JSON instead of any preamble or fences.
-        // We re-prepend the `{` to the response below before parsing.
-        {
-          role: 'assistant',
-          content: '{',
-        },
+        // NOTE: this turn used to be followed by an assistant prefill of `{`
+        // to force JSON. Assistant-turn prefills return a 400 on every
+        // 4.6-and-later model, so the constraint now lives in the system
+        // prompt and the user turn above (both say JSON only, no fences).
+        // The largest-JSON-object fallback below catches a wandering reply.
       ],
     });
 
@@ -176,9 +176,10 @@ ${text}
       throw new Error('No text response from Claude');
     }
 
-    // Re-attach the prefilled `{` and try to parse. Fall back to
-    // scanning for the largest JSON object if Claude wandered.
-    const responseText = '{' + textContent.text;
+    // No prefill to re-attach any more. Strip a ```json fence first (Opus 5
+    // emits one despite the prompt) so the fence is handled on the happy
+    // path rather than silently rescued by the fallback below.
+    const responseText = extractJsonBlock(textContent.text);
     let result: { siteInfo?: unknown; checkpoints?: unknown };
     try {
       result = JSON.parse(responseText);

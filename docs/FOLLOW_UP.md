@@ -47,7 +47,7 @@ Migrations are reviewed by Aryav before they land, so these are proposals rather
 
 - **In-memory rate limiter** (`src/lib/rate-limit.ts`) is per server process. Correct for the current single-box deployment; swap the store for Redis behind the same interface if the app goes multi-instance.
 - **Hand-maintained TS types parallel to Zod schemas** — `src/types/*` and `src/lib/validations/*` describe the same shapes twice, which is how DRF-01/02/03 happened. Infer from Zod where practical.
-- **Model pin** — everything is on `claude-sonnet-4-20250514`. Pinned (good), but worth a deliberate upgrade decision rather than drift.
+- **Model pin — RESOLVED.** Was `claude-sonnet-4-20250514`, copied into six files. The model was retired, so every AI feature returned `404 not_found_error` and the QSP saw "analysis failed — nothing was saved". Now `claude-opus-5`, declared once in `src/lib/ai-model.ts`, with `tests/model-pin.test.ts` failing the build on drift, on a reintroduced hardcode, on a 4.6+ breaking parameter, and on prompt limits crossing the Zod caps. The migration was not just the string — see that file's header for the three things that also break (assistant prefills 400, thinking-on-by-default eats `max_tokens`, sampling params 400).
 - **`smarts-automation/smarts-automation/`** — an accidental nested directory holding the live-session SMARTS recon HTML (SEC-12). Untracked. Needs a decision from Neal: scrub, encrypt, or keep sanitized copies for the Stage 5.6 replay tests.
 
 ## Deferred from Stage 4 — needs a design decision, not a patch
@@ -74,7 +74,7 @@ Migrations are reviewed by Aryav before they land, so these are proposals rather
 
 **exceljs → archiver / glob / minimatch / brace-expansion (high).** `npm audit` offers exactly one fix: downgrade `exceljs` from 4.4 to **3.4.0**, a major downgrade that would break the SMARTS export path (`src/lib/smarts/excel-export.ts`). The advisory is a DoS via unbounded brace expansion — reachable only by feeding hostile input to the archiver, and the only workbooks this code writes are ones it generates itself from validated sample data. Accepted risk; revisit when exceljs ships a patched archiver.
 
-**@anthropic-ai/sdk (moderate).** Fix requires a major bump. Worth doing as a deliberate upgrade with the model-pin review (`claude-sonnet-4-20250514` is a year old), not as an audit-driven force-fix.
+**@anthropic-ai/sdk (moderate).** Fix requires a major bump. The model-pin upgrade to `claude-opus-5` is done and the installed SDK handles it, so this is now independent of that work — still a deliberate upgrade, not an audit-driven force-fix.
 
 Re-check with `npm audit --omit=dev` — dev-only advisories are noise for a deployed image, since dev dependencies are not in the runtime layer.
 

@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-export const VISION_MODEL = "claude-sonnet-4-20250514";
+/**
+ * Must stay identical to AI_MODEL in ../../../src/lib/ai-model.ts.
+ * The bot is a separate package with its own tsconfig, so it cannot import
+ * `@/lib` across the process boundary — tests/model-pin.test.ts in the root
+ * package reads this file and fails the build if the two ever disagree.
+ */
+export const VISION_MODEL = "claude-opus-5";
 
 export interface LlmRequest {
   systemPrompt: string;
@@ -32,7 +38,9 @@ export async function requestLlmText(req: LlmRequest): Promise<string> {
 
   const message = await client.messages.create({
     model: VISION_MODEL,
-    max_tokens: req.maxTokens ?? 1024,
+    // Thinking is on by default from Opus 5 onward and max_tokens caps
+    // thinking + text together, so 1024 truncated mid-answer.
+    max_tokens: req.maxTokens ?? 8192,
     system: req.systemPrompt,
     messages: [{ role: "user", content: userBlocks }],
   });

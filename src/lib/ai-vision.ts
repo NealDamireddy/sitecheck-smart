@@ -12,8 +12,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { CheckpointStatus } from '@/types/checkpoint';
 import { bmpVisionAnalysisOutput } from '@/lib/validations/ai-output';
+import { AI_MAX_TOKENS, AI_MODEL, extractJsonBlock } from '@/lib/ai-model';
 
-const VISION_MODEL = 'claude-sonnet-4-20250514';
+const VISION_MODEL = AI_MODEL;
 const MOCK_MODEL = 'mock-deterministic';
 
 const anthropic = process.env.ANTHROPIC_API_KEY
@@ -52,11 +53,18 @@ Always respond with valid JSON matching this exact structure:
   "status": "compliant" | "deficient" | "needs-review",
   "confidence": <number 0-100>,
   "details": ["observation 1", "observation 2", "observation 3"],
-  "cgpReference": "Relevant CGP 2022 section reference and explanation",
+  "cgpReference": "CGP 2022 § XV.A (SE-10)",
   "recommendations": ["recommendation 1", "recommendation 2"]
 }
 
-Be specific and technical. Reference actual CGP 2022 sections. Ground every observation in what is visible in the photo.`;
+Be specific and technical. Reference actual CGP 2022 sections. Ground every observation in what is visible in the photo.
+
+Length limits — the response is rejected outright if any field exceeds them, so stay well inside:
+- "cgpReference" is a CITATION ONLY, under 200 characters. Section number and BMP code, no explanation, no prose. Put any reasoning in "summary" or "details" instead.
+- "summary" under 1000 characters.
+- each "details" and "recommendations" entry under 500 characters; at most 6 entries each.
+
+Keep every field terse and factual. This text goes into a regulator-submitted report, not a discussion.`;
 
 /**
  * Analyze a single BMP photo with Claude vision. Throws on failure so the
@@ -81,7 +89,8 @@ Provide a detailed compliance analysis as JSON.`;
 
   const message = await anthropic.messages.create({
     model: VISION_MODEL,
-    max_tokens: 1024,
+    // Covers thinking + the JSON, not just the JSON — see src/lib/ai-model.ts.
+    max_tokens: AI_MAX_TOKENS.analysis,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -135,16 +144,8 @@ Provide a detailed compliance analysis as JSON.`;
   };
 }
 
-/**
- * Strip markdown code fences from Claude responses (Claude sometimes wraps
- * JSON in ```json ... ```).
- */
-function extractJsonBlock(text: string): string {
-  const trimmed = text.trim();
-  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) return fenceMatch[1].trim();
-  return trimmed;
-}
+/* extractJsonBlock now lives in src/lib/ai-model.ts so /api/analyze shares
+ * one implementation instead of growing a second, divergent copy. */
 
 /**
  * Deterministic seeded mock used when ANTHROPIC_API_KEY is missing. Outputs

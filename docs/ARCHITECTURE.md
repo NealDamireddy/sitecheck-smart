@@ -89,7 +89,7 @@ These are product invariants, not preferences.
 | Service | Where | Notes |
 |---|---|---|
 | Supabase | throughout | Postgres + Auth + Storage + PostgREST. The deep coupling; see DEPLOYMENT §5. |
-| Anthropic | `lib/ai-vision.ts`, `api/analyze`, `api/scan-swppp`, bot vision layer | Pinned to `claude-sonnet-4-20250514`. Rate-limited per user. |
+| Anthropic | `lib/ai-vision.ts`, `api/analyze`, `api/scan-swppp`, bot vision layer | Pinned to `claude-opus-5` in `src/lib/ai-model.ts` (the bot keeps a copy; a test fails the build if they drift). Rate-limited per user. |
 | NOAA | `lib/weather-api.ts`, `lib/qpe/observed.ts`, `lib/smarts/noaa.ts` | Requires a `NOAA_USER_AGENT` with contact info. |
 | Mapbox | client | `NEXT_PUBLIC_MAPBOX_TOKEN` — public by design; restrict by URL. |
 | SMARTS portal | bot only | JSF/Mojarra + PrimeFaces. Selectors and vision coordinates are calibrated to a pinned Chromium. |
