@@ -40,6 +40,13 @@ export const ROUTES: RouteSpec[] = [
   { file: 'api/checkpoints/[id]/analyze/route.ts', path: '/api/checkpoints/[id]/analyze', verbs: ['POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/checkpoints/[id]/photo/route.ts', path: '/api/checkpoints/[id]/photo', verbs: ['POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/checkpoints/bulk/route.ts', path: '/api/checkpoints/bulk', verbs: ['POST'], scope: 'qsp', auth: 'user' },
+  // SWPPP ingestion (swppp-service). POST proxies to the Python pipeline with
+  // the caller's JWT; the reads go straight to Postgres under RLS so document
+  // status and draft review survive the service being down.
+  { file: 'api/projects/[projectId]/swppp/route.ts', path: '/api/projects/[projectId]/swppp', verbs: ['GET', 'POST'], scope: 'qsp', auth: 'user' },
+  { file: 'api/projects/[projectId]/swppp/[documentId]/route.ts', path: '/api/projects/[projectId]/swppp/[documentId]', verbs: ['GET', 'DELETE'], scope: 'qsp', auth: 'user' },
+  // The human-in-the-loop gate: drafts become checkpoints only here.
+  { file: 'api/projects/[projectId]/swppp/[documentId]/promote/route.ts', path: '/api/projects/[projectId]/swppp/[documentId]/promote', verbs: ['POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/inspections/route.ts', path: '/api/inspections', verbs: ['GET', 'POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/inspections/[id]/route.ts', path: '/api/inspections/[id]', verbs: ['GET', 'PATCH'], scope: 'qsp', auth: 'user' },
   { file: 'api/inspections/[id]/submit/route.ts', path: '/api/inspections/[id]/submit', verbs: ['POST'], scope: 'qsp', auth: 'user' },

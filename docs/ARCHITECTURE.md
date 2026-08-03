@@ -20,9 +20,10 @@ Next.js 16 (App Router, React 19, TS strict)      ← one deployable
 └── supabase/migrations 15 files → 32 tables
                                                    ← process boundary
 smarts-automation/      Playwright + Claude Vision bot
+swppp-service/          FastAPI + layout-aware PDF extraction (Python)
 ```
 
-Two runtimes, deliberately. The bot drives a real browser for minutes at a time and cannot run in a serverless function; see `docs/DEPLOYMENT.md`.
+Three runtimes, deliberately. The bot drives a real browser for minutes at a time and cannot run in a serverless function; see `docs/DEPLOYMENT.md`.
 
 ## 3. Data model
 
@@ -56,7 +57,11 @@ Child tables scope via their parent (`samples` by denormalized `project_id`; `wa
 
 ## 5. Request flows worth knowing
 
-**SWPPP → checkpoints.** Upload PDF → `pdf-parse` extracts text server-side (never send the binary to Claude; real SWPPPs blow past the API's page limits) → Claude returns JSON → validated by `swpppExtractionOutput` → checkpoints created. Coordinates come back `null` when the document doesn't state them; the app rings unlocated checkpoints around the project center for the QSP to place. The model is forbidden from inventing positions.
+**SWPPP → checkpoints.** Two paths, deliberately.
+
+*Bootstrap (`/swppp`, pre-project).* Upload PDF → `pdf-parse` extracts text server-side (never send the binary to Claude; real SWPPPs blow past the API's page limits) → Claude returns JSON → validated by `swpppExtractionOutput` → checkpoints created. Coordinates come back `null` when the document doesn't state them; the app rings unlocated checkpoints around the project center for the QSP to place. The model is forbidden from inventing positions.
+
+*Project-scoped (`/projects/[id]/swppp`).* Upload → Next.js proxies to `swppp-service/` with the caller's JWT → `pymupdf`/`marker` converts to Markdown **with tables intact** (the accuracy ceiling `pdf-parse` cannot clear) → Claude strict tool use, retried while the result is missing BMP codes the source contains → rows land in `bmp_checkpoint_drafts`, never `checkpoints`. A QSP promotes drafts explicitly; position comes from the project centre, never the model. The service holds only the anon key plus the caller's JWT, so its writes are RLS-scoped exactly like the web app's.
 
 **Photo → analysis.** Client downscales to 2048px (a raw phone photo exceeds the 5 MiB route cap) → uploaded to Supabase Storage → Claude Vision → validated by `bmpVisionAnalysisOutput` → persisted to `ai_analyses`. A real vision failure returns 502 and persists nothing; only a keyless demo deployment gets the deterministic mock.
 
