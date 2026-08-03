@@ -35,6 +35,8 @@ export const ROUTES: RouteSpec[] = [
   // ── QSP compliance core ─────────────────────────────────────────────
   { file: 'api/projects/route.ts', path: '/api/projects', verbs: ['GET', 'POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/projects/[projectId]/route.ts', path: '/api/projects/[projectId]', verbs: ['PATCH'], scope: 'qsp', auth: 'user' },
+  { file: 'api/projects/[projectId]/cgp-forecast/route.ts', path: '/api/projects/[projectId]/cgp-forecast', verbs: ['GET'], scope: 'qsp', auth: 'user' },
+  { file: 'api/projects/[projectId]/cgp-forecast/capture/route.ts', path: '/api/projects/[projectId]/cgp-forecast/capture', verbs: ['POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/checkpoints/route.ts', path: '/api/checkpoints', verbs: ['GET', 'POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/checkpoints/[id]/route.ts', path: '/api/checkpoints/[id]', verbs: ['GET', 'PUT', 'DELETE'], scope: 'qsp', auth: 'user' },
   { file: 'api/checkpoints/[id]/analyze/route.ts', path: '/api/checkpoints/[id]/analyze', verbs: ['POST'], scope: 'qsp', auth: 'user' },

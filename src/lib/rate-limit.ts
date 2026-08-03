@@ -88,3 +88,4 @@ export function rateLimitOrNull(
 export const analyzeLimiter = new FixedWindowLimiter({ limit: 20, windowMs: 60_000 });
 export const swpppScanLimiter = new FixedWindowLimiter({ limit: 5, windowMs: 10 * 60_000 });
 export const smartsSyncLimiter = new FixedWindowLimiter({ limit: 3, windowMs: 5 * 60_000 });
+export const forecastCaptureLimiter = new FixedWindowLimiter({ limit: 12, windowMs: 60_000 });

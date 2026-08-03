@@ -32,6 +32,7 @@ import {
 } from '@/stores/smarts-events-store';
 import { useSamplesStore } from '@/stores/samples-store';
 import { useProjectStore } from '@/stores/project-store';
+import { OfficialForecastEvidence } from '@/components/weather/official-forecast-evidence';
 import { cn } from '@/lib/utils';
 import type { SmartsEvent, SmartsEventStatus } from '@/types';
 
@@ -209,6 +210,8 @@ export default function EventsIndexPage({
         </div>
 
         <div className="flex-1 space-y-6 p-4">
+          <OfficialForecastEvidence projectId={projectId} />
+
           {/* New-event form, expanded inline below the header. */}
           {showForm && (
             <form
