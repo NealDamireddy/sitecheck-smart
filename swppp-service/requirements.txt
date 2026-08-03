@@ -1,0 +1,20 @@
+# Core service
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6
+python-multipart>=0.0.12       # required for UploadFile
+
+# Claude + Supabase (anon key + caller JWT -> RLS applies)
+anthropic>=0.40
+supabase>=2.10
+
+# Vector store
+qdrant-client>=1.12
+fastembed>=0.4                 # local embeddings; no customer data egress
+# openai>=1.55                 # only if embedding_provider="openai"
+
+# Layout-aware PDF -> Markdown (the reason this service exists).
+# Heavy (marker pulls torch); installed separately so tests run without them.
+# marker-pdf>=1.0
+# unstructured[pdf]>=0.16

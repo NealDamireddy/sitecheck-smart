@@ -155,3 +155,10 @@ vite.config.ts.timestamp-*
 # Playwright saved auth sessions (contain live tokens)
 e2e/.auth/
 .env.local.bak
+
+# swppp-service (Python)
+swppp-service/.venv/
+swppp-service/__pycache__/
+swppp-service/**/__pycache__/
+swppp-service/.env
+swppp-service/.pytest_cache/
