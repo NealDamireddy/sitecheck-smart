@@ -98,7 +98,7 @@ async def process_swppp_document(
             "bmp_code": item.bmp_code,
             "title": item.title,
             "required_locations": item.required_locations,
-            "inspection_frequency": item.inspection_frequency.value,
+            "inspection_frequency": [f.value for f in item.inspection_frequency],
             "maintenance_threshold": item.maintenance_threshold,
             "is_active": True,
         }
@@ -130,7 +130,7 @@ async def process_swppp_document(
         document_id,
         "completed",
         extracted_wdid=extracted.site_wdid,
-        extracted_risk_level=extracted.risk_level.value,
+        extracted_risk_level=extracted.risk_level.value if extracted.risk_level else None,
         extracted_qsp_name=extracted.qsp_name,
         bmp_count=len(rows),
         indexed_chunks=indexed,

@@ -83,7 +83,7 @@ def test_every_category_is_writable_to_the_checkpoints_table():
             bmp_category=category,
             bmp_code="EC-1",
             title="Fiber Rolls",
-            inspection_frequency="Weekly",
+            inspection_frequency=["Weekly"],
             maintenance_threshold="Replace when damaged",
         )
         assert item.to_db_bmp_type() == category.value
@@ -95,7 +95,7 @@ def test_a_free_string_category_is_rejected():
             bmp_category="Erosion Control",  # the document's wording, not ours
             bmp_code="EC-1",
             title="Fiber Rolls",
-            inspection_frequency="Weekly",
+            inspection_frequency=["Weekly"],
             maintenance_threshold="Replace when damaged",
         )
 
@@ -110,7 +110,7 @@ def test_oversized_strings_are_rejected():
             bmp_category=BmpCategory.EROSION_CONTROL,
             bmp_code="EC-1",
             title="x" * 500,  # cap is 200
-            inspection_frequency="Weekly",
+            inspection_frequency=["Weekly"],
             maintenance_threshold="ok",
         )
 
@@ -128,7 +128,7 @@ def test_locations_default_to_empty_not_invented():
         bmp_category=BmpCategory.SEDIMENT_CONTROL,
         bmp_code="SE-1",
         title="Silt Fence",
-        inspection_frequency="Weekly",
+        inspection_frequency=["Weekly"],
         maintenance_threshold="Repair at 1/3 height",
     )
     assert item.required_locations == []
@@ -213,7 +213,7 @@ def test_caps_are_still_enforced_after_stripping():
             bmp_category=BmpCategory.EROSION_CONTROL,
             bmp_code="EC-1",
             title="x" * 500,
-            inspection_frequency="Weekly",
+            inspection_frequency=["Weekly"],
             maintenance_threshold="ok",
         )
 

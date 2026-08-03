@@ -25,7 +25,7 @@ CREATE TABLE swppp_documents (
   -- model) never requires re-uploading or re-converting the PDF.
   raw_markdown  TEXT,
   page_count    INTEGER,
-  pdf_backend   TEXT CHECK (pdf_backend IN ('marker', 'unstructured')),
+  pdf_backend   TEXT CHECK (pdf_backend IN ('pymupdf', 'marker', 'unstructured')),
 
   status        TEXT NOT NULL DEFAULT 'processing'
                 CHECK (status IN ('processing', 'completed', 'failed')),
@@ -73,10 +73,12 @@ CREATE TABLE bmp_checkpoint_drafts (
 
   -- CGP data the current checkpoints table has no home for.
   required_locations    JSONB NOT NULL DEFAULT '[]'::jsonb,
-  inspection_frequency  TEXT NOT NULL CHECK (inspection_frequency IN (
-                          'Weekly','Pre-Storm','During-Storm','Post-Storm',
-                          'Quarterly','Other'
-                        )),
+  -- A JSONB array, not a single value: SWPPP tables routinely list several
+  -- triggers for one BMP ("Weekly, Pre-Storm, Post-Storm"). Storing one would
+  -- silently drop required inspections from the compliance schedule.
+  inspection_frequency  JSONB NOT NULL DEFAULT '[]'::jsonb,
+  CONSTRAINT inspection_frequency_is_array
+    CHECK (jsonb_typeof(inspection_frequency) = 'array'),
   maintenance_threshold TEXT NOT NULL,
 
   -- Review workflow. promoted_checkpoint_id links a draft to the real

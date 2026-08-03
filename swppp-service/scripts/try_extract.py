@@ -134,7 +134,7 @@ async def main() -> int:
     print(f"   {GREEN}ok{RESET}  {len(result.checkpoints)} BMPs extracted")
     print(f"\n{BOLD}Document{RESET}")
     print(f"   WDID       {result.site_wdid or DIM + 'not stated' + RESET}")
-    print(f"   Risk level {result.risk_level.value}")
+    print(f"   Risk level {result.risk_level.value if result.risk_level else DIM + 'not stated' + RESET}")
     print(f"   QSP        {result.qsp_name or DIM + 'not stated' + RESET}")
 
     if result.checkpoints:
@@ -142,12 +142,21 @@ async def main() -> int:
         for bmp in result.checkpoints[:15]:
             print(f"\n   {BOLD}{bmp.bmp_code}{RESET}  {bmp.title}")
             print(f"      category   {bmp.bmp_category.value}")
-            print(f"      frequency  {bmp.inspection_frequency.value}")
+            freqs = ", ".join(f.value for f in bmp.inspection_frequency)
+            print(f"      frequency  {freqs or DIM + 'none stated' + RESET}")
             print(f"      threshold  {bmp.maintenance_threshold[:90]}")
             locations = ", ".join(bmp.required_locations[:3]) or DIM + "none stated" + RESET
             print(f"      locations  {locations}")
         if len(result.checkpoints) > 15:
             print(f"\n   {DIM}… and {len(result.checkpoints) - 15} more{RESET}")
+
+    # Extracting zero BMPs from a SWPPP is a failure, not a success. The
+    # earlier version printed "Pipeline works" over a 0-BMP result.
+    if not result.checkpoints:
+        print(f"\n{RED}{BOLD}No BMPs extracted.{RESET} Conversion worked, so this is")
+        print(f"{DIM}an extraction problem, not a PDF problem. Re-run to check whether")
+        print(f"it is intermittent, and inspect the Markdown with --save-md.{RESET}\n")
+        return 1
 
     print(f"\n{GREEN}{BOLD}Pipeline works on this document.{RESET}")
     print(f"{DIM}Conversion and extraction are the parts worth confirming; the rest")

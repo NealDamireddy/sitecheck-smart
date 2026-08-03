@@ -22,6 +22,7 @@ Differences from the draft, all of them load-bearing:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from anthropic import AsyncAnthropic
@@ -41,9 +42,19 @@ The text you receive is Markdown converted from a PDF, so BMP schedules appear \
 as Markdown tables. Read the tables carefully — a single table row is usually \
 one BMP with its code, locations, frequency and maintenance trigger.
 
+Before recording BMPs, read the document header for the WDID, risk level and \
+QSP name. These are usually stated as plain labelled lines near the top, e.g. \
+"Risk Level: Level 2" — copy what is printed rather than inferring it from the \
+project's size or type.
+
 Rules that matter more than completeness:
 - Record only what the document states. If a field is not stated, use null or \
 an empty list. Never infer a location, a frequency, or a threshold.
+- Record EVERY row of every BMP schedule table. A table with ten rows is ten \
+BMPs; do not summarise, group or stop early.
+- A cell listing several inspection triggers ("Weekly, Pre-Storm, Post-Storm") \
+is several entries in inspection_frequency, not one. Dropping one silently \
+removes a required inspection from the compliance schedule.
 - This output becomes a legal compliance record. An invented requirement is \
 worse than a missing one.
 - Quote maintenance thresholds in the document's own terms.
@@ -109,10 +120,74 @@ class ExtractionError(RuntimeError):
     """Extraction did not produce a usable result. Never silently swallowed."""
 
 
+#: A BMP code like EC-1, SE-10, WM-4, TC-1, NS-3 — the CGP's own numbering.
+#: Its presence in the source means the document does describe BMPs, so an
+#: empty extraction is a failure rather than an honest "this SWPPP has none".
+_BMP_CODE = re.compile(r"\b(EC|SE|TC|WE|WM|NS)-\d{1,2}\b")
+
+
+def bmp_codes_in_source(markdown: str) -> set[str]:
+    """Every BMP code the document itself mentions — the completeness target."""
+    return {m.group(0).upper() for m in _BMP_CODE.finditer(markdown)}
+
+
+MAX_ATTEMPTS = 3
+
+
 async def extract_swppp(
     markdown: str, *, settings: Settings, client: AsyncAnthropic | None = None
 ) -> SWPPPExtractionResponse:
+    """
+    Extract, retrying while the result is demonstrably incomplete.
+
+    Measured over 8 runs on byte-identical input: six returned all 10 BMPs,
+    one returned 1, and one returned 0. A partial result is the dangerous
+    one — an empty extraction looks broken, but storing 1 of 10 BMPs looks
+    like a successfully ingested SWPPP whose compliance schedule silently
+    omits nine required inspections. Same class of harm as AI-02.
+
+    So completeness is checked against the document rather than trusted: every
+    BMP code appearing in the source must appear in the result. At roughly 75%
+    per attempt, three attempts put this near 98%, and the usual case still
+    costs exactly one call.
+    """
     client = client or AsyncAnthropic(api_key=settings.anthropic_api_key)
+    expected = bmp_codes_in_source(markdown)
+
+    best: SWPPPExtractionResponse | None = None
+    best_missing: set[str] = set()
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        result = await _extract_once(markdown, settings=settings, client=client)
+        missing = expected - {c.bmp_code.upper() for c in result.checkpoints}
+
+        if best is None or len(result.checkpoints) > len(best.checkpoints):
+            best, best_missing = result, missing
+
+        if not missing:
+            if attempt > 1:
+                logger.info("extraction complete on attempt %d", attempt)
+            return result
+
+        logger.warning(
+            "attempt %d/%d incomplete: %d/%d BMPs, missing %s",
+            attempt, MAX_ATTEMPTS, len(result.checkpoints), len(expected),
+            ", ".join(sorted(missing)),
+        )
+
+    # Never store a partial result as though it were complete.
+    raise ExtractionError(
+        f"Incomplete after {MAX_ATTEMPTS} attempts: found "
+        f"{len(best.checkpoints) if best else 0} of {len(expected)} BMPs, "
+        f"missing {', '.join(sorted(best_missing))}. Nothing was saved. "
+        "Inspect the converted Markdown (--save-md); if the BMP table did not "
+        "survive conversion, try PDF_BACKEND=marker."
+    )
+
+
+async def _extract_once(
+    markdown: str, *, settings: Settings, client: AsyncAnthropic
+) -> SWPPPExtractionResponse:
 
     response = await client.messages.create(
         model=settings.anthropic_model,
@@ -173,7 +248,10 @@ async def extract_swppp(
         "swppp extracted",
         extra={
             "bmp_count": len(result.checkpoints),
-            "risk_level": result.risk_level.value,
+            # Optional since the quote-then-parse change: a document that never
+            # states a risk level yields None, and `.value` on it crashed the
+            # whole extraction from inside a log line.
+            "risk_level": result.risk_level.value if result.risk_level else None,
             "input_tokens": response.usage.input_tokens,
             "output_tokens": response.usage.output_tokens,
         },
