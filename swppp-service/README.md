@@ -66,8 +66,9 @@ The PDF backends are heavy (`marker` pulls torch) and are commented out of
 ```
 
 Apply `supabase/migrations/016_swppp_ingestion.sql` first — it creates
-`swppp_documents` and `bmp_checkpoint_drafts` with their RLS policies. **It is
-unapplied pending review.**
+`swppp_documents` and `bmp_checkpoint_drafts` with their RLS policies.
+**Applied to the throwaway test project only; unapplied everywhere else,
+pending review.**
 
 ## Run locally
 
@@ -128,7 +129,7 @@ For the whole thing in one command, without a server:
 .venv/bin/python -m pytest tests/ -q
 ```
 
-35 tests, no network and no API keys required. They cover the properties that
+63 tests, no network and no API keys required. They cover the properties that
 must not regress:
 
 - every data route refuses an unauthenticated request (behavioral, via
@@ -139,7 +140,31 @@ must not regress:
 - `bmp_category` matches the `checkpoints.bmp_type` CHECK constraint in
   migration 001 (DRF-01 drift guard)
 - oversized and unknown fields in model output are rejected (SEC-07)
-- strict tool schema hardens nested `$defs`, not just the top level
+- strict tool schema hardens nested `$defs`, not just the top level, and every
+  property is `required` (a permissive schema under strict mode made it *easier*
+  for the model to return nothing)
+- an incomplete extraction is retried and then raised, never stored partially
+- the vector store is a singleton (a per-request one gives in-memory Qdrant its
+  own private database, so search silently returns nothing)
+
+## What has actually been executed
+
+Not inferred — run against real Supabase, real Anthropic and in-memory Qdrant
+(`scripts/e2e_upload.py`, and the same path over HTTP against a live server):
+
+| | |
+|---|---|
+| unauthenticated upload | 401 |
+| upload → terminal status | `completed`, `bmp_count: 10`, ~15s |
+| draft rows readable by owner | 10 |
+| SE-10 inspection triggers | `['Weekly','Pre-Storm','Post-Storm']` — all three kept |
+| search | 4 source chunks, answered with the document's own threshold text |
+| user B: read / search / upload | 404 / 404 / 404 |
+| user A control | 200 |
+
+That last pair is the point: tenant isolation is proven by a real second user
+being refused by real RLS policies, not by a test asserting a dependency is
+declared. Migration 016's policies were unproven when written; they are not now.
 
 ## What this does NOT do
 
@@ -156,6 +181,10 @@ must not regress:
   leaves a document at `processing` with no retry. Fine for one box; needs a
   real queue before horizontal scaling — same class as the web app's CLD-02
   in-process rate limiter.
-- No integration test against live Supabase + Qdrant yet; the suite is unit
-  and structural. The RLS policies in migration 016 are unproven until it runs
-  against a real database, exactly as TST-02 was for the web app.
+- Qdrant in-memory is **not durable and not shared**: the index dies with the
+  process and each `--workers` process gets its own. Set `QDRANT_URL` before
+  this leaves a dev machine. Bounded failure — the BMPs are in Postgres, so
+  losing the index costs a re-index, never compliance data.
+- Proven only against `fixtures/sample_swppp.pdf`, which is clean synthetic
+  output. A real SWPPP has merged cells, scanned pages and tables split across
+  page breaks; that is where `pymupdf` may need replacing with `marker`.
