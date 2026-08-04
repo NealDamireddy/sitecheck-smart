@@ -162,3 +162,6 @@ swppp-service/__pycache__/
 swppp-service/**/__pycache__/
 swppp-service/.env
 swppp-service/.pytest_cache/
+
+# Local database safety exports (may contain production records)
+backups/
