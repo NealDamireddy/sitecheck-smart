@@ -155,7 +155,12 @@ export function InspectionPicker() {
   };
 
   return (
-    <div className="rounded-xl border border-amber-500/25 bg-surface p-5 shadow-lg shadow-amber-500/5">
+    // @container: the visit grid below sizes itself against THIS card, not the
+    // viewport. The dashboard renders this card inside a one-third-width column,
+    // so viewport breakpoints promoted it to three columns in ~300px of space
+    // and the labels overflowed. Container queries make the card correct at
+    // every window size instead of only the ones we happened to test.
+    <div className="@container rounded-xl border border-amber-500/25 bg-surface p-5 shadow-lg shadow-amber-500/5">
       <div className="flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400">
           <ClipboardList className="h-4 w-4" />
@@ -173,7 +178,7 @@ export function InspectionPicker() {
       {/* Direct, tappable visit-type cards — no dropdown hunting. */}
       <fieldset
         disabled={starting}
-        className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        className="mt-4 grid grid-cols-1 gap-2 @sm:grid-cols-2 @lg:grid-cols-3"
       >
         {OPTIONS.map((o) => {
           const Icon = o.icon;
@@ -185,7 +190,10 @@ export function InspectionPicker() {
               onClick={() => setVisit(o.value)}
               aria-pressed={active}
               className={cn(
-                'flex items-start gap-3 rounded-lg border p-3 text-left transition-all',
+                // min-w-0: a grid item defaults to min-width:auto and refuses to
+                // shrink below its longest word, which is how "precipitation"
+                // pushed past the card border.
+                'flex min-w-0 items-start gap-3 rounded-lg border p-3 text-left transition-all',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50',
                 active
                   ? 'border-amber-500/70 bg-amber-500/10 ring-1 ring-amber-500/40'
@@ -201,13 +209,16 @@ export function InspectionPicker() {
               <span className="min-w-0">
                 <span
                   className={cn(
-                    'block text-sm font-semibold',
+                    // break-words is the backstop: even if some future layout
+                    // squeezes this card, the label wraps inside its border
+                    // rather than spilling over it.
+                    'block break-words text-sm font-semibold',
                     active ? 'text-foreground' : 'text-foreground/90'
                   )}
                 >
                   {o.label}
                 </span>
-                <span className="block text-[11px] leading-snug text-muted-foreground">
+                <span className="block break-words text-[11px] leading-snug text-muted-foreground">
                   {o.hint}
                 </span>
               </span>

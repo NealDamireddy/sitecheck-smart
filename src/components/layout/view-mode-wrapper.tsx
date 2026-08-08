@@ -74,7 +74,11 @@ export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
             className="flex min-h-screen"
           >
             <Sidebar />
-            <div className="flex flex-1 flex-col sm:pl-16">
+            {/* min-w-0: as a flex item this column defaults to min-width:auto,
+                so it refused to shrink below the widest thing inside it (the
+                forecast chart) and pushed the whole page into horizontal
+                scroll at narrow widths. */}
+            <div className="flex min-w-0 flex-1 flex-col sm:pl-16">
               <TopBar />
               {/* Sticky qualifying-rain reminder shown above every page. */}
               <RainEventBanner />
