@@ -49,9 +49,11 @@ dates. Live form reconnaissance remains paused until the human-managed
 - Lab-analysis requirements for MDL, RL, and attachment metadata
 - Side effects of Perform Completion Check
 
-## Database verification gap
+## Database verification gap — CLOSED 2026-08-08
 
-Migration files and application code are available locally, but the active
-Supabase schema has not yet been queried directly in this run. Live migration,
-constraint, policy, and table status must be verified read-only before writing
-new migrations.
+The active Supabase schema has now been queried directly. All 27 pre-existing
+migration files were confirmed SHA-256 byte-identical to the checksums recorded
+in the target project's `_migrations` table, and live table, policy, and grant
+state was verified read-only before migration `028` was written.
+
+See `SUPABASE-ADVISOR-POSTURE.md` for the resulting advisor posture.
