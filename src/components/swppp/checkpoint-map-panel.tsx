@@ -70,7 +70,7 @@ export function CheckpointMapPanel({ selectedCheckpointId, onSelect, extractedCh
   return (
     <div className="flex h-full flex-col">
       {/* Header bar */}
-      <div className="border-b border-white/5 bg-[#141414] px-3 py-2">
+      <div className="border-b border-border bg-secondary/60 px-3 py-2">
         <div className="flex items-center gap-2">
           <MapPin className="h-3.5 w-3.5 text-amber-500" />
           <span className="text-xs font-medium text-foreground">
@@ -101,7 +101,7 @@ export function CheckpointMapPanel({ selectedCheckpointId, onSelect, extractedCh
           {useExtracted
             ? extractedCheckpoints.map((cp) => {
                 const isSelected = selectedCheckpointId === cp.id;
-                const color = BMP_CATEGORY_COLORS[cp.bmpType as keyof typeof BMP_CATEGORY_COLORS] || '#F59E0B';
+                const color = BMP_CATEGORY_COLORS[cp.bmpType as keyof typeof BMP_CATEGORY_COLORS] || '#215C78';
 
                 return (
                   <Marker
@@ -148,7 +148,7 @@ export function CheckpointMapPanel({ selectedCheckpointId, onSelect, extractedCh
 
                       {/* Tooltip for selected */}
                       {isSelected && (
-                        <div className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-[#1C1C1C] px-2 py-1 text-[10px] text-foreground shadow-lg border border-white/10 z-50">
+                        <div className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-popover px-2 py-1 text-[10px] text-foreground shadow-lg z-50">
                           {cp.id}: {cp.name}
                         </div>
                       )}
@@ -205,7 +205,7 @@ export function CheckpointMapPanel({ selectedCheckpointId, onSelect, extractedCh
 
                       {/* Tooltip for selected */}
                       {isSelected && (
-                        <div className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-[#1C1C1C] px-2 py-1 text-[10px] text-foreground shadow-lg border border-white/10 z-50">
+                        <div className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-popover px-2 py-1 text-[10px] text-foreground shadow-lg z-50">
                           {cp.id}: {cp.name}
                         </div>
                       )}

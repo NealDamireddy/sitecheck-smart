@@ -130,7 +130,7 @@ export function UploadZone() {
   };
 
   return (
-    <Card className="border-0 bg-[#141414] ring-1 ring-white/5">
+    <Card className="border border-border bg-card ring-0">
       <CardContent className="p-6">
         <input
           ref={inputRef}

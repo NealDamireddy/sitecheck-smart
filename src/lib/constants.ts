@@ -17,7 +17,7 @@ export const BMP_CATEGORY_LABELS: Record<BMPCategory, string> = {
 
 export const BMP_CATEGORY_COLORS: Record<BMPCategory, string> = {
   'erosion-control': '#3B82F6',
-  'sediment-control': '#F59E0B',
+  'sediment-control': '#215C78',
   'tracking-control': '#8B5CF6',
   'wind-erosion': '#06B6D4',
   'materials-management': '#EC4899',

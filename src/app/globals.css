@@ -47,24 +47,61 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* Custom industrial theme colors */
-  --color-amber-50: #FFFBEB;
-  --color-amber-100: #FEF3C7;
-  --color-amber-200: #FDE68A;
-  --color-amber-300: #FCD34D;
-  --color-amber-400: #FBBF24;
-  --color-amber-500: #F59E0B;
-  --color-amber-600: #D97706;
-  --color-amber-700: #B45309;
-  --color-amber-800: #92400E;
-  --color-amber-900: #78350F;
+  /* SiteCheck brand teal. Legacy amber utilities map here so the existing
+     product UI inherits the same restrained palette as the marketing site. */
+  --color-amber-50: #edf5f8;
+  --color-amber-100: #dcecf1;
+  --color-amber-200: #bad8e2;
+  --color-amber-300: #8bbdcd;
+  --color-amber-400: #5a9db3;
+  --color-amber-500: #215c78;
+  --color-amber-600: #1b4d66;
+  --color-amber-700: #173f55;
+  --color-amber-800: #143648;
+  --color-amber-900: #102c3c;
+  --color-amber-950: #091923;
 
-  /* Brightened navy-slate surfaces — lifted off pure black for a brighter,
-     higher-contrast feel while staying a dark theme. */
-  --color-surface: #1A2438;
-  --color-surface-elevated: #243150;
-  --color-surface-overlay: #2D3B5E;
-  --color-elevated: #243150;
+  /* Secondary feature colors collapse into the same blue-teal family. */
+  --color-blue-300: #8bbdcd;
+  --color-blue-400: #5a9db3;
+  --color-blue-500: #215c78;
+  --color-blue-600: #1b4d66;
+  --color-blue-700: #173f55;
+  --color-blue-800: #143648;
+  --color-blue-900: #102c3c;
+  --color-blue-950: #091923;
+  --color-cyan-300: #8bbdcd;
+  --color-cyan-400: #5a9db3;
+  --color-cyan-500: #215c78;
+  --color-cyan-600: #1b4d66;
+  --color-cyan-700: #173f55;
+  --color-cyan-800: #143648;
+  --color-cyan-900: #102c3c;
+  --color-violet-400: #5a9db3;
+  --color-violet-500: #215c78;
+  --color-purple-300: #8bbdcd;
+  --color-purple-400: #5a9db3;
+  --color-purple-500: #215c78;
+  --color-purple-600: #1b4d66;
+  --color-purple-700: #173f55;
+
+  /* Light application surfaces. */
+  --color-surface: #ffffff;
+  --color-surface-elevated: #e4ebef;
+  --color-surface-overlay: #d5e1e8;
+  --color-elevated: #e4ebef;
+
+  /* Older dark-slate utility usage is normalized for the light shell. */
+  --color-slate-950: #ffffff;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #e4ebef;
+  --color-slate-700: #c7d4dc;
+  --color-slate-600: #5f7481;
+  --color-slate-500: #5f7481;
+  --color-slate-400: #5f7481;
+  --color-slate-300: #4c6371;
+  --color-slate-200: #314b5b;
+  --color-slate-100: #1d3747;
 
   --color-status-compliant: #34D399;
   --color-status-warning: #FBBF24;
@@ -72,77 +109,40 @@
   --color-status-review: #A78BFA;
 }
 
-/* Always dark mode — brightened navy-slate industrial theme.
-   Surfaces are lifted off pure black, text contrast is raised, borders
-   are visible, and the amber accent is more vibrant. */
 :root {
-  --background: #0F1729;
-  --foreground: #F1F5FB;
-  --card: #1A2438;
-  --card-foreground: #F1F5FB;
-  --popover: #1F2B43;
-  --popover-foreground: #F1F5FB;
-  --primary: #FBBF24;
-  --primary-foreground: #0F1729;
-  --secondary: #243150;
-  --secondary-foreground: #C7D2E5;
-  --muted: #243150;
-  --muted-foreground: #9AABC9;
-  --accent: #2A3A5C;
-  --accent-foreground: #FBBF24;
-  --destructive: #F87171;
-  --border: #354563;
-  --input: #354563;
-  --ring: #FBBF24;
-  --chart-1: #FBBF24;
-  --chart-2: #34D399;
-  --chart-3: #60A5FA;
-  --chart-4: #A78BFA;
-  --chart-5: #F87171;
-  --radius: 0.5rem;
-  --sidebar: #131D31;
-  --sidebar-foreground: #9AABC9;
-  --sidebar-primary: #FBBF24;
-  --sidebar-primary-foreground: #0F1729;
-  --sidebar-accent: #243150;
-  --sidebar-accent-foreground: #F1F5FB;
-  --sidebar-border: #354563;
-  --sidebar-ring: #FBBF24;
-}
-
-/* No light mode - force dark always */
-.dark {
-  --background: #0F1729;
-  --foreground: #F1F5FB;
-  --card: #1A2438;
-  --card-foreground: #F1F5FB;
-  --popover: #1F2B43;
-  --popover-foreground: #F1F5FB;
-  --primary: #FBBF24;
-  --primary-foreground: #0F1729;
-  --secondary: #243150;
-  --secondary-foreground: #C7D2E5;
-  --muted: #243150;
-  --muted-foreground: #9AABC9;
-  --accent: #2A3A5C;
-  --accent-foreground: #FBBF24;
-  --destructive: #F87171;
-  --border: #354563;
-  --input: #354563;
-  --ring: #FBBF24;
-  --chart-1: #FBBF24;
-  --chart-2: #34D399;
-  --chart-3: #60A5FA;
-  --chart-4: #A78BFA;
-  --chart-5: #F87171;
-  --sidebar: #131D31;
-  --sidebar-foreground: #9AABC9;
-  --sidebar-primary: #FBBF24;
-  --sidebar-primary-foreground: #0F1729;
-  --sidebar-accent: #243150;
-  --sidebar-accent-foreground: #F1F5FB;
-  --sidebar-border: #354563;
-  --sidebar-ring: #FBBF24;
+  color-scheme: light;
+  --background: #edf2f5;
+  --foreground: #152a38;
+  --card: #ffffff;
+  --card-foreground: #152a38;
+  --popover: #ffffff;
+  --popover-foreground: #152a38;
+  --primary: #215c78;
+  --primary-foreground: #ffffff;
+  --secondary: #dce7ed;
+  --secondary-foreground: #1f3a4a;
+  --muted: #e3eaee;
+  --muted-foreground: #556c7a;
+  --accent: #dce9ef;
+  --accent-foreground: #173f55;
+  --destructive: #dc3f46;
+  --border: #c7d4dc;
+  --input: #b7c7d1;
+  --ring: #215c78;
+  --chart-1: #215c78;
+  --chart-2: #5a9db3;
+  --chart-3: #8bbdcd;
+  --chart-4: #4c6371;
+  --chart-5: #dc3f46;
+  --radius: 0.625rem;
+  --sidebar: #143447;
+  --sidebar-foreground: #bdd0da;
+  --sidebar-primary: #8bbdcd;
+  --sidebar-primary-foreground: #102c3c;
+  --sidebar-accent: #224e65;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #2b566b;
+  --sidebar-ring: #8bbdcd;
 }
 
 @layer base {
@@ -151,15 +151,16 @@
   }
   body {
     @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
   }
 }
 
-/* Industrial texture overlay */
-.texture-concrete {
-  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+::selection {
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  color: var(--primary);
 }
 
 /* Scrollbar styling */
@@ -169,50 +170,50 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0F1729;
+  background: #e3eaee;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #354563;
+  background: #9dafba;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475578;
+  background: #6e8592;
 }
 
-/* Mapbox overrides for dark theme */
+/* Mapbox controls match the light application shell. */
 .mapboxgl-popup-content {
-  background: #1A2438 !important;
-  color: #F1F5FB !important;
-  border: 1px solid #354563 !important;
+  background: #ffffff !important;
+  color: #152a38 !important;
+  border: 1px solid #c7d4dc !important;
   border-radius: 0.5rem !important;
   padding: 12px !important;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 12px 32px rgba(22, 44, 48, 0.12) !important;
 }
 
 .mapboxgl-popup-tip {
-  border-top-color: #1A2438 !important;
+  border-top-color: #ffffff !important;
 }
 
 .mapboxgl-ctrl-group {
-  background: #1A2438 !important;
-  border: 1px solid #354563 !important;
+  background: #ffffff !important;
+  border: 1px solid #c7d4dc !important;
 }
 
 .mapboxgl-ctrl-group button {
-  filter: invert(1);
+  filter: none;
 }
 
-/* Glow effect for amber elements */
+/* Brand focus glow. Class name is retained for compatibility. */
 .glow-amber {
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.22);
+  box-shadow: 0 0 20px rgba(33, 92, 120, 0.2);
 }
 
 /* Pulsing animation for alerts */
 @keyframes pulse-amber {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 rgba(33, 92, 120, 0); }
+  50% { opacity: 0.65; box-shadow: 0 0 18px rgba(33, 92, 120, 0.18); }
 }
 
 .animate-pulse-amber {
@@ -228,4 +229,3 @@
 .animate-pulse-red {
   animation: pulse-red 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-

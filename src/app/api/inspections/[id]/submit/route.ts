@@ -3,9 +3,9 @@
  *
  * POST /api/inspections/[id]/submit
  *
- * Flips status to `submitted`, freezes `submitted_at`, and logs an
- * activity event of type `inspection-submitted`. Optionally accepts
- * `{ reportId }` in the body to link the freshly-rendered PDF.
+ * Legacy compatibility endpoint. New inspections must be finalized by the
+ * atomic checklist endpoint first; this route may not bypass the required
+ * 22-question QSP checklist. Optionally accepts `{ reportId }`.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -28,6 +28,33 @@ export async function POST(request: NextRequest, context: RouteContext) {
     try { rawBody = await request.json(); } catch { /* empty body ok */ }
     const body = inspectionSubmit.parse(rawBody);
     const reportId = typeof body?.reportId === 'string' ? body.reportId : null;
+
+    const { data: existing, error: existingError } = await supabase
+      .from('inspections')
+      .select('id, status, submitted_at, report_id, checklist_template_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (existingError || !existing) {
+      return NextResponse.json({ error: 'Inspection not found' }, { status: 404 });
+    }
+
+    if (!existing.checklist_template_id) {
+      return NextResponse.json(
+        { error: 'Complete the CGP checklist before submitting this inspection.' },
+        { status: 409 }
+      );
+    }
+
+    if (existing.status === 'submitted') {
+      return NextResponse.json({
+        ok: true,
+        id,
+        status: 'submitted',
+        submittedAt: existing.submitted_at,
+        reportId: existing.report_id ?? null,
+      });
+    }
 
     const submittedAt = new Date().toISOString();
 

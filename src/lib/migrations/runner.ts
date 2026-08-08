@@ -92,6 +92,60 @@ const PROBES: Record<string, string> = {
      ) AS exists`,
   '008_auth_rls.sql':
     `SELECT to_regclass('public.organizations') IS NOT NULL AS exists`,
+  '011_checkpoint_qsp_photos.sql':
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='checkpoints' AND column_name='qsp_photo_url'
+     ) AS exists`,
+  '012_signup_org_provisioning.sql':
+    `SELECT EXISTS (
+       SELECT 1 FROM pg_trigger
+       WHERE tgname='on_auth_user_created' AND NOT tgisinternal
+     ) AS exists`,
+  '013_qsp_profiles.sql':
+    `SELECT to_regclass('public.qsp_profiles') IS NOT NULL AS exists`,
+  '014_smarts_credentials.sql':
+    `SELECT to_regclass('public.smarts_credentials') IS NOT NULL AS exists`,
+  '015_smarts_runs.sql':
+    `SELECT to_regclass('public.smarts_runs') IS NOT NULL AS exists`,
+  '016_swppp_ingestion.sql':
+    `SELECT to_regclass('public.swppp_documents') IS NOT NULL
+         AND to_regclass('public.bmp_checkpoint_drafts') IS NOT NULL AS exists`,
+  '017_cgp_forecast_evidence.sql':
+    `SELECT to_regclass('public.cgp_forecast_snapshots') IS NOT NULL
+         AND to_regclass('public.cgp_forecast_intervals') IS NOT NULL AS exists`,
+  '018_inspection_checklist_history.sql':
+    `SELECT to_regclass('public.inspection_checklist_results') IS NOT NULL AS exists`,
+  '019_atomic_checklist_submission.sql':
+    `SELECT to_regprocedure('public.submit_inspection_checklist(text,jsonb,jsonb)') IS NOT NULL AS exists`,
+  '021_site_record_hierarchy.sql':
+    `SELECT to_regclass('public.site_records') IS NOT NULL AS exists`,
+  '022_create_site_record.sql':
+    `SELECT to_regprocedure(
+       'public.create_site_record_with_detail(text,text,text,text,timestamptz,timestamptz,jsonb,jsonb)'
+     ) IS NOT NULL AS exists`,
+  '023_site_record_read_model_storage.sql':
+    `SELECT to_regclass('public.site_record_directory') IS NOT NULL AS exists`,
+  '024_harden_site_record_rpc_acl.sql':
+    `SELECT NOT has_function_privilege(
+       'anon',
+       'public.create_site_record_with_detail(text,text,text,text,timestamptz,timestamptz,jsonb,jsonb)',
+       'EXECUTE'
+     ) AS exists`,
+  '025_phase4_foreign_key_indexes.sql':
+    `SELECT to_regclass('public.idx_site_records_assignment_fk') IS NOT NULL AS exists`,
+  '026_sync_field_record_workflow_status.sql':
+    `SELECT EXISTS (
+       SELECT 1 FROM pg_trigger
+       WHERE tgname='sync_inspection_site_record_status' AND NOT tgisinternal
+     ) AND EXISTS (
+       SELECT 1 FROM pg_trigger
+       WHERE tgname='sync_smarts_record_on_event' AND NOT tgisinternal
+     ) AS exists`,
+  '027_fix_smarts_workflow_trigger.sql':
+    `SELECT pg_get_functiondef(
+       'public.sync_smarts_site_record_status()'::regprocedure
+     ) LIKE '%IF TG_TABLE_NAME = ''smarts_report_records'' THEN%' AS exists`,
 };
 
 async function probeExists(client: Client, filename: string): Promise<boolean> {

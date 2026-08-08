@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
       .select(
         `
         *,
-        parameter_results (*)
+        parameter_results!parameter_results_sample_id_fkey (*)
       `
       )
       .eq('smarts_event_id', smartsEventId)

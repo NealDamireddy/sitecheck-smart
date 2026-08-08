@@ -110,13 +110,13 @@ export function OnboardingOverlay() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-[#0A0A0A]"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-background"
       role="dialog"
       aria-modal="true"
       aria-label="SiteCheck Onboarding"
     >
       {/* Subtle radial glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(245,158,11,0.05)_0%,_transparent_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(14,124,134,0.08)_0%,_transparent_70%)]" />
 
       {/* Skip button — positioned in overlay, outside content container */}
       {!isLastStep && (
@@ -171,7 +171,7 @@ export function OnboardingOverlay() {
                   className={cn(
                     'relative flex items-center gap-3 rounded-full px-6 py-3 text-sm font-medium transition-colors',
                     viewMode === 'website'
-                      ? 'text-black'
+                      ? 'text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
@@ -188,7 +188,7 @@ export function OnboardingOverlay() {
                     <div
                       className={cn(
                         'text-xs',
-                        viewMode === 'website' ? 'text-black/70' : 'text-muted-foreground'
+                        viewMode === 'website' ? 'text-primary-foreground/75' : 'text-muted-foreground'
                       )}
                     >
                       Desktop sidebar
@@ -200,7 +200,7 @@ export function OnboardingOverlay() {
                   className={cn(
                     'relative flex items-center gap-3 rounded-full px-6 py-3 text-sm font-medium transition-colors',
                     viewMode === 'app'
-                      ? 'text-black'
+                      ? 'text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
@@ -217,7 +217,7 @@ export function OnboardingOverlay() {
                     <div
                       className={cn(
                         'text-xs',
-                        viewMode === 'app' ? 'text-black/70' : 'text-muted-foreground'
+                        viewMode === 'app' ? 'text-primary-foreground/75' : 'text-muted-foreground'
                       )}
                     >
                       Mobile panel
@@ -283,7 +283,7 @@ export function OnboardingOverlay() {
           </button>
           <button
             onClick={handleNext}
-            className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-amber-400"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
             {isLastStep ? 'Enter Dashboard' : 'Next'}
             {!isLastStep && <ChevronRight className="h-4 w-4" />}

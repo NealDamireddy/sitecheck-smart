@@ -8,6 +8,44 @@ export interface InspectionFinding {
   notes: string;
 }
 
+export interface InspectionChecklistResult {
+  id: number;
+  inspectionId: string;
+  checklistVersion: string;
+  checklistItemId: string;
+  categoryNumber: number;
+  categoryTitle: string;
+  itemNumber: number;
+  prompt: string;
+  answer: 'yes' | 'no';
+  answerSource: 'qsp-unflagged-attestation' | 'qsp-exception';
+  exceptionDescription?: string;
+  recommendation?: string;
+  identifiedAt?: string;
+  repairStartDueAt?: string;
+  actionImplementedAt?: string;
+  checkpointIdSnapshot?: string;
+  locationSnapshot?: string;
+  photoUrls: string[];
+  recordedAt: string;
+}
+
+export interface InspectionChecklistDeficiency {
+  id: string;
+  inspectionId: string;
+  checklistResultId?: number;
+  checkpointId?: string;
+  detectedAt: string;
+  description: string;
+  recommendation: string;
+  repairStartDueAt: string;
+  repairStartedAt?: string;
+  repairCompletedAt?: string;
+  verifiedAt?: string;
+  actionImplementedAt?: string;
+  status: 'open' | 'in-progress' | 'resolved';
+}
+
 /**
  * Block 5 — what kicked off this inspection.
  * `manual` is the legacy default for inspections created before Block 5.
@@ -78,4 +116,35 @@ export interface Inspection {
   missionIds?: string[];
   /** Server-computed updated_at (mirrors the new column). */
   updatedAt?: string;
+
+  // Versioned CGP checklist history (Phase 2/3)
+  checklistVersion?: string;
+  checklistObservedAt?: string;
+  unflaggedItemsConfirmed?: boolean;
+  unflaggedItemsConfirmedAt?: string;
+  checklistAttestedByName?: string;
+  checklistCompliantCount?: number;
+  checklistDeficientCount?: number;
+  siteNameSnapshot?: string;
+  wdidSnapshot?: string;
+  riskLevelSnapshot?: 1 | 2 | 3;
+  constructionStageSnapshot?: string;
+  photosTaken?: boolean;
+  checklistSubmissionSha256?: string;
+  inspectorTitleSnapshot?: 'QSP';
+  qspLicenseNumberSnapshot?: string;
+  qspCompanySnapshot?: string;
+  qpeStart?: string;
+  qpeEnd?: string;
+  qpeDurationHours?: number;
+  rainGaugeInches?: number;
+  observationPrecipitation?: boolean;
+  observationDiscolorations?: boolean;
+  observationOdors?: boolean;
+  observationTurbidity?: boolean;
+  observationSheen?: boolean;
+  observationFloatingMaterial?: boolean;
+  observationSuspendedMaterial?: boolean;
+  observationComments?: string;
+  exemptionDocumentation?: string;
 }

@@ -30,11 +30,11 @@ export function ConfidenceIndicator({ processingStep, checkpointCount, error }: 
   const progress = useMemo(() => config.progress, [config.progress]);
 
   return (
-    <Card className="border-0 bg-[#141414] ring-1 ring-white/5">
+    <Card className="border border-border bg-card ring-0">
       <CardContent>
         <div className="space-y-4">
           {/* Progress bar */}
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/5">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
             <motion.div
               className="absolute inset-y-0 left-0 rounded-full"
               style={{
@@ -42,7 +42,7 @@ export function ConfidenceIndicator({ processingStep, checkpointCount, error }: 
                   ? 'linear-gradient(90deg, #22C55E, #16A34A)'
                   : isError
                     ? 'linear-gradient(90deg, #EF4444, #DC2626)'
-                    : 'linear-gradient(90deg, #F59E0B, #D97706)',
+                    : 'linear-gradient(90deg, #5A9DB3, #215C78)',
               }}
               initial={{ width: '0%' }}
               animate={{ width: `${progress}%` }}
@@ -50,7 +50,7 @@ export function ConfidenceIndicator({ processingStep, checkpointCount, error }: 
             />
             {!isComplete && !isError && (
               <motion.div
-                className="absolute inset-y-0 left-0 rounded-full bg-white/20"
+                className="absolute inset-y-0 left-0 rounded-full bg-primary/20"
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.6, ease: 'easeOut' }}
                 style={{ filter: 'blur(4px)' }}

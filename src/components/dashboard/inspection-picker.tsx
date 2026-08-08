@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
@@ -24,11 +24,13 @@ import {
 /**
  * Entry point shown at the top of the dashboard. The QSP picks the type
  * of visit they're about to perform; the picker creates a draft
- * inspection record (POST /api/inspections), stores it in the active-
+ * inspection record, stores it in the active-
  * inspection store, and routes to the appropriate capture flow:
  *
- *   weekly / monthly / pre-storm / post-storm → /checkpoints?inspectionId=...
- *     (BMP walkthrough — banner shows reviewed-count and Generate Report)
+ *   weekly / monthly → POST /api/site-records → /inspections/{id}
+ *     (the Phase 4 company → inspector → site hierarchy)
+ *   pre-storm / post-storm → /inspections/{id}
+ *     (exception-based 22-question CGP checklist)
  *   during-storm → /projects/{currentProjectId}/events
  *     (SMARTS event capture — sample collection for qualifying storms;
  *      not a checkpoint walkthrough, so no inspection draft is created)
@@ -66,9 +68,18 @@ export function InspectionPicker() {
   const [visit, setVisit] = useState<ActiveVisit>('weekly');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const selected = OPTIONS.find((o) => o.value === visit) ?? OPTIONS[0];
-  const inspectionInProgress = !!activeInspectionId && activeVisit !== 'during-storm';
+  // The active-inspection store restores from localStorage in the browser.
+  // Hide persisted-only UI until after mount so the server and first client
+  // render stay identical and React can hydrate the dashboard safely.
+  const inspectionInProgress =
+    hasMounted && !!activeInspectionId && activeVisit !== 'during-storm';
 
   const start = async () => {
     if (!currentProjectId) {
@@ -76,7 +87,7 @@ export function InspectionPicker() {
       return;
     }
     if (visit === 'during-storm') {
-      router.push(`/projects/${currentProjectId}/events`);
+      router.push('/records');
       return;
     }
 
@@ -84,31 +95,59 @@ export function InspectionPicker() {
     setError(null);
     try {
       const mapping = VISIT_TO_INSPECTION_TYPE[visit];
-      const res = await fetch('/api/inspections', {
+      const usesFieldRecord = visit === 'weekly' || visit === 'monthly';
+      const now = new Date().toISOString();
+      const endpoint = usesFieldRecord ? '/api/site-records' : '/api/inspections';
+      const requestBody = usesFieldRecord
+        ? {
+            projectId: currentProjectId,
+            recordType:
+              visit === 'weekly' ? 'weekly_inspection' : 'monthly_inspection',
+            idempotencyKey: `dashboard:${currentProjectId}:${visit}:${Date.now()}`,
+            title: visit === 'weekly' ? 'Weekly inspection' : 'Monthly inspection',
+            observedFrom: now,
+            detail: {
+              inspectionDate: now,
+              inspectionType: mapping.type,
+              weatherTemperature: 0,
+              weatherCondition: 'not recorded',
+              weatherWindSpeedMph: 0,
+              weatherHumidity: 0,
+              overallCompliance: 0,
+            },
+            source: {
+              sourceType: 'form',
+              schemaVersion: 'sitecheck-dashboard-v1',
+              rawPayload: { visit, startedAt: now },
+            },
+          }
+        : {
+            projectId: currentProjectId,
+            date: now,
+            type: mapping.type,
+            trigger: mapping.trigger,
+            status: 'in-progress',
+          };
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: currentProjectId,
-          date: new Date().toISOString(),
-          type: mapping.type,
-          trigger: mapping.trigger,
-          status: 'in-progress',
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      const inspection = await res.json();
-      if (!inspection?.id) {
+      const created = await res.json();
+      const inspectionId = usesFieldRecord ? created?.detailId : created?.id;
+      if (!inspectionId) {
         throw new Error('Inspection created but no id returned');
       }
       startActive({
-        inspectionId: inspection.id,
+        inspectionId,
         projectId: currentProjectId,
         visit,
       });
-      router.push(`/checkpoints?inspectionId=${inspection.id}`);
+      router.push(`/inspections/${inspectionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start inspection');
       setStarting(false);
@@ -186,7 +225,7 @@ export function InspectionPicker() {
 
       <Button
         onClick={start}
-        disabled={!currentProjectId || starting}
+        disabled={!hasMounted || !currentProjectId || starting}
         size="lg"
         className="mt-4 h-12 w-full text-base font-semibold"
       >
@@ -202,7 +241,7 @@ export function InspectionPicker() {
         )}
       </Button>
 
-      {!currentProjectId && (
+      {(!hasMounted || !currentProjectId) && (
         <p className="mt-2 text-center text-[11px] text-muted-foreground">
           Select a project from the top bar to begin.
         </p>

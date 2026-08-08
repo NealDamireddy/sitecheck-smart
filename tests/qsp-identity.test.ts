@@ -153,18 +153,33 @@ describe('report identity precedence (ACC-02 regression)', () => {
   });
 });
 
-// Guard against the resolver being silently dropped from either route.
+// The legacy report editor still resolves current identity, while immutable
+// inspection PDFs must use the QSP snapshot captured at submission.
 describe('call sites', () => {
-  it('report generator and PDF route both resolve identity', async () => {
+  it('report generator resolves identity but inspection PDF never reads it live', async () => {
     const { readFileSync } = await import('node:fs');
-    for (const file of [
+    const legacyGenerator = readFileSync(
       'src/app/api/reports/generate/route.ts',
+      'utf8'
+    );
+    expect(legacyGenerator).toContain('resolveQspIdentity');
+    expect(legacyGenerator).not.toContain('${project.qsp_license_number}');
+
+    const inspectionPdf = readFileSync(
       'src/app/api/inspections/[id]/pdf/route.ts',
-    ]) {
-      const src = readFileSync(file, 'utf8');
-      expect(src).toContain('resolveQspIdentity');
-      // The stale project copy must no longer feed the practitioner block.
-      expect(src).not.toContain('${project.qsp_license_number}');
-    }
+      'utf8'
+    );
+    expect(inspectionPdf).toContain('buildInspectionReportContract');
+    expect(inspectionPdf).not.toContain('resolveQspIdentity');
+    expect(inspectionPdf).not.toContain("from('projects')");
+    expect(inspectionPdf).not.toContain("from('checkpoints')");
+
+    const reportPdf = readFileSync(
+      'src/app/api/reports/[id]/pdf/route.ts',
+      'utf8'
+    );
+    expect(reportPdf).toContain('buildInspectionReportContract');
+    expect(reportPdf).not.toContain('PdfReportSection');
+    expect(reportPdf).not.toContain("from('projects')");
   });
 });

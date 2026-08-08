@@ -179,7 +179,7 @@ export function SiteOverviewMap() {
               offset={12}
               maxWidth="260px"
             >
-              <div className="bg-[#1C1C1C] text-foreground border border-border rounded-md p-3 -m-[10px] min-w-[220px]">
+              <div className="bg-card text-foreground border border-border rounded-md p-3 -m-[10px] min-w-[220px]">
                 <p className="font-mono text-xs text-muted-foreground">
                   {selectedCheckpoint.id}
                 </p>
@@ -216,7 +216,7 @@ export function SiteOverviewMap() {
         </Map>
 
         {/* Legend */}
-        <div className="absolute bottom-3 left-3 z-10 rounded-md border border-border bg-[#1C1C1C]/90 backdrop-blur-sm px-3 py-2">
+        <div className="absolute bottom-3 left-3 z-10 rounded-md border border-border bg-white/90 backdrop-blur-sm px-3 py-2">
           <div className="flex items-center gap-4 text-xs">
             {(Object.keys(STATUS_COLORS) as CheckpointStatus[]).map((status) => (
               <div key={status} className="flex items-center gap-1.5">

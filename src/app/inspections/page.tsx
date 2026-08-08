@@ -89,9 +89,28 @@ function dueByLabel(dueBy?: string): { text: string; tone: string } | null {
   };
 }
 
+function displayedCompliance(inspection: Inspection): number {
+  if (
+    inspection.checklistCompliantCount != null &&
+    inspection.checklistDeficientCount != null
+  ) {
+    const total =
+      inspection.checklistCompliantCount + inspection.checklistDeficientCount;
+    if (total > 0) {
+      return Math.round((inspection.checklistCompliantCount / total) * 100);
+    }
+  }
+  return (
+    inspection.qspOverallCompliance ??
+    inspection.aiOverallCompliance ??
+    inspection.overallCompliance ??
+    0
+  );
+}
+
 function InspectionRow({ inspection }: { inspection: Inspection }) {
   const due = dueByLabel(inspection.dueBy);
-  const compliance = inspection.qspOverallCompliance ?? inspection.aiOverallCompliance ?? inspection.overallCompliance;
+  const compliance = displayedCompliance(inspection);
   const isRainEvent = inspection.trigger === 'rain-event' || inspection.trigger === 'qpe' || inspection.trigger === 'post-storm';
   return (
     <Link
@@ -124,6 +143,27 @@ function InspectionRow({ inspection }: { inspection: Inspection }) {
               ? ` · ${inspection.missionIds.length} mission${inspection.missionIds.length === 1 ? '' : 's'}`
               : ''}
           </div>
+          {inspection.checklistCompliantCount != null &&
+            inspection.checklistDeficientCount != null && (
+              <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                <span className="text-emerald-300">
+                  {inspection.checklistCompliantCount}/
+                  {inspection.checklistCompliantCount +
+                    inspection.checklistDeficientCount}{' '}
+                  BMP items compliant
+                </span>
+                <span
+                  className={
+                    inspection.checklistDeficientCount > 0
+                      ? 'text-red-300'
+                      : 'text-emerald-300'
+                  }
+                >
+                  {inspection.checklistDeficientCount} exception
+                  {inspection.checklistDeficientCount === 1 ? '' : 's'}
+                </span>
+              </div>
+            )}
           {due && (
             <div className={cn('mt-1 flex items-center gap-1 text-xs font-medium', due.tone)}>
               <Clock className="h-3 w-3" />
@@ -133,7 +173,7 @@ function InspectionRow({ inspection }: { inspection: Inspection }) {
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="text-2xl font-bold text-slate-100">
-            {compliance ?? 0}
+            {compliance}
             <span className="text-base text-muted-foreground">%</span>
           </div>
           <div className="text-[10px] uppercase text-muted-foreground">Compliance</div>
@@ -172,7 +212,7 @@ export default function InspectionsPage() {
     for (const i of inspections) {
       const status = i.status ?? 'draft';
       if (out[status] !== undefined) out[status] += 1;
-      const c = i.qspOverallCompliance ?? i.aiOverallCompliance ?? i.overallCompliance ?? 0;
+      const c = displayedCompliance(i);
       if (c >= 80) out.compliant += 1;
       else out.attention += 1;
     }

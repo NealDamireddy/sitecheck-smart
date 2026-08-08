@@ -96,7 +96,7 @@ export function DemoTourOverlay() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             onClick={() => setCollapsed(false)}
-            className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-500/40 bg-[#0A0A0A]/95 px-4 py-2 text-xs font-medium text-amber-400 shadow-xl backdrop-blur-md transition-colors hover:bg-amber-500/10"
+            className="pointer-events-auto flex items-center gap-2 rounded-full border border-primary/30 bg-white/95 px-4 py-2 text-xs font-medium text-primary shadow-xl backdrop-blur-md transition-colors hover:bg-primary/10"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Resume tour ({currentStep + 1}/{demoTourSteps.length})
@@ -111,7 +111,7 @@ export function DemoTourOverlay() {
             role="dialog"
             aria-label="SiteCheck demo tour"
             className={cn(
-              'pointer-events-auto w-full max-w-[420px] rounded-xl border border-border bg-[#0A0A0A]/95 shadow-2xl backdrop-blur-md',
+              'pointer-events-auto w-full max-w-[420px] rounded-xl border border-border bg-white/95 shadow-2xl backdrop-blur-md',
               'flex flex-col overflow-hidden'
             )}
           >
@@ -219,7 +219,7 @@ export function DemoTourOverlay() {
                 </button>
                 <button
                   onClick={handleNext}
-                  className="flex items-center gap-1 rounded-md bg-amber-500 px-4 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-amber-400"
+                  className="flex items-center gap-1 rounded-md bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   {isLast ? 'Finish' : 'Next'}
                   {!isLast && <ChevronRight className="h-3.5 w-3.5" />}

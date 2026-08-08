@@ -86,6 +86,10 @@ function makeRecord(over: Partial<MonitoringRecord> = {}): MonitoringRecord {
     labName: "Acme Labs",
     qualifierCode: null,
     dischargePoint: "DP-1",
+    eventStartDate: "05/20/2026",
+    eventStartTime: "09:00",
+    eventEndDate: "05/21/2026",
+    eventEndTime: "09:00",
     ...over,
   };
 }
@@ -195,7 +199,10 @@ describe("runFill", () => {
 
     expect(mockedNavToProject).toHaveBeenCalledWith(
       session,
-      expect.objectContaining({ wdid: "WDID-001" }),
+      expect.objectContaining({
+        wdid: "WDID-001",
+        eventStartDate: "05/20/2026",
+      }),
     );
 
     // Event Information is now filled deterministically (handles its own tab
@@ -451,6 +458,7 @@ describe("runFill", () => {
     const passedKey = mockedNavToProject.mock.calls[0]?.[1];
     expect(passedKey).toEqual({
       wdid: "WDID-001",
+      eventStartDate: "05/27/2026",
       resume: {
         siteName: "Equus Ct",
         reportingPeriod: "05/27/2026 - 05/29/2026",
@@ -480,6 +488,10 @@ describe("runFill", () => {
     );
 
     const passedKey = mockedNavToProject.mock.calls[0]?.[1];
-    expect(passedKey).toEqual({ wdid: "WDID-001", resume: undefined });
+    expect(passedKey).toEqual({
+      wdid: "WDID-001",
+      eventStartDate: "05/27/2026",
+      resume: undefined,
+    });
   });
 });

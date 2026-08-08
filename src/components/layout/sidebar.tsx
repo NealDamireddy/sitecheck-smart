@@ -8,7 +8,7 @@ import {
   FileText,
   Plane,
   CheckCircle,
-  ClipboardCheck,
+  FileClock,
   FileBarChart,
   CloudRain,
   Droplets,
@@ -29,7 +29,7 @@ const baseNavItems = [
   { href: '/swppp', icon: FileText, label: 'SWPPP Intelligence' },
   { href: '/missions', icon: Plane, label: 'Drone Missions' },
   { href: '/checkpoints', icon: CheckCircle, label: 'Checkpoints' },
-  { href: '/inspections', icon: ClipboardCheck, label: 'Inspections' },
+  { href: '/records', icon: FileClock, label: 'Field Records' },
   // SMARTS entry is inserted here at render time — its href is
   // project-scoped (depends on useProjectStore.currentProjectId) so it
   // can't live in this static array.
@@ -69,7 +69,7 @@ export function Sidebar() {
   // Project-scoped SMARTS entry inserted between Inspections and Reports.
   // baseNavItems order after the Projects insert:
   //   0 Dashboard, 1 Projects, 2 SWPPP, 3 Missions, 4 Checkpoints,
-  //   5 Inspections, 6 Reports, 7 Weather
+  //   5 Field Records, 6 Reports, 7 Weather
   const itemsWithSmarts =
     mounted && currentProjectId
       ? [
@@ -100,11 +100,11 @@ export function Sidebar() {
       {/* Logo area */}
       <div className="flex h-14 items-center border-b border-border px-4">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-amber-500 font-heading text-sm font-bold text-black">
-            SC
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-primary shadow-sm">
+            <Droplets className="h-5 w-5" />
           </div>
-          <span className="whitespace-nowrap font-heading text-sm font-semibold tracking-wider text-amber-500 opacity-0 transition-opacity duration-300 group-hover/sidebar:opacity-100">
-            SITECHECK
+          <span className="whitespace-nowrap text-sm font-semibold tracking-tight text-white opacity-0 transition-opacity duration-300 group-hover/sidebar:opacity-100">
+            SiteCheck
           </span>
         </div>
       </div>
@@ -123,21 +123,21 @@ export function Sidebar() {
               className={cn(
                 'flex h-10 items-center gap-3 rounded-md px-3 text-sm transition-all duration-200',
                 isActive
-                  ? 'bg-amber-500/10 text-amber-500'
-                  : 'text-muted-foreground hover:bg-surface-elevated hover:text-foreground'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-white'
               )}
             >
               <Icon
                 className={cn(
                   'h-5 w-5 shrink-0',
-                  isActive ? 'text-amber-500' : ''
+                  isActive ? 'text-sidebar-primary' : ''
                 )}
               />
               <span className="whitespace-nowrap opacity-0 transition-opacity duration-300 group-hover/sidebar:opacity-100">
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute left-0 h-6 w-0.5 rounded-r bg-amber-500" />
+                <div className="absolute left-0 h-6 w-0.5 rounded-r bg-sidebar-primary" />
               )}
             </Link>
           );
@@ -149,7 +149,7 @@ export function Sidebar() {
         {/* Logout — visible by default (icon), label appears on hover */}
         <button
           onClick={handleLogout}
-          className="mb-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"
+          className="mb-1 flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-white"
           aria-label="Log out"
         >
           <LogOut className="h-5 w-5 shrink-0" />
@@ -161,12 +161,12 @@ export function Sidebar() {
         <div className="flex flex-col items-center gap-2 px-1 opacity-0 transition-opacity duration-300 group-hover/sidebar:opacity-100">
           <button
             onClick={() => useOnboardingStore.getState().resetOnboarding()}
-            className="flex items-center gap-1.5 text-[10px] text-muted-foreground transition-colors hover:text-amber-500"
+            className="flex items-center gap-1.5 text-[10px] text-sidebar-foreground transition-colors hover:text-white"
           >
             <RotateCcw className="h-3 w-3" />
             Restart Tour
           </button>
-          <p className="text-center text-[10px] text-muted-foreground">
+          <p className="text-center text-[10px] text-sidebar-foreground/70">
             v0.1.0 — Demo
           </p>
         </div>

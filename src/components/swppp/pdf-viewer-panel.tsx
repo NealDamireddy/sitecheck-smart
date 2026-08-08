@@ -411,7 +411,7 @@ export function PdfViewerPanel({
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex items-center justify-between border-b border-white/5 bg-[#141414] px-3 py-2">
+      <div className="flex items-center justify-between border-b border-border bg-secondary/60 px-3 py-2">
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -451,7 +451,7 @@ export function PdfViewerPanel({
       </div>
 
       {/* Document area */}
-      <div className="flex-1 overflow-auto bg-[#1C1C1C] p-6">
+      <div className="flex-1 overflow-auto bg-muted p-6">
         <div className="mx-auto max-w-[640px]">
           {/* Paper */}
           <div

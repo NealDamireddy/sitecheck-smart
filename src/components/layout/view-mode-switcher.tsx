@@ -10,13 +10,13 @@ export function ViewModeSwitcher() {
 
   return (
     <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2">
-      <div className="flex items-center gap-1 rounded-full border border-border bg-[#0A0A0A]/95 p-1 shadow-lg backdrop-blur-md">
+      <div className="flex items-center gap-1 rounded-full border border-border bg-white/95 p-1 shadow-lg backdrop-blur-md">
         <button
           onClick={() => setViewMode('website')}
           className={cn(
             'relative flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors',
             viewMode === 'website'
-              ? 'text-black'
+              ? 'text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'
           )}
         >
@@ -35,7 +35,7 @@ export function ViewModeSwitcher() {
           className={cn(
             'relative flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors',
             viewMode === 'app'
-              ? 'text-black'
+              ? 'text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'
           )}
         >

@@ -359,7 +359,7 @@ function NoFlyZoneForm({ projectId, onClose, onCreate }: NoFlyZoneFormProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg border border-border bg-[#1C1C1C] p-5 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-lg rounded-lg border border-border bg-card p-5 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-heading text-lg font-semibold tracking-wide">
@@ -380,7 +380,7 @@ function NoFlyZoneForm({ projectId, onClose, onCreate }: NoFlyZoneFormProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Lincoln Elementary 500 ft buffer"
-              className="mt-1 w-full rounded border border-border bg-[#0A0A0A] px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
             />
           </div>
 
@@ -391,7 +391,7 @@ function NoFlyZoneForm({ projectId, onClose, onCreate }: NoFlyZoneFormProps) {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as NoFlyZoneCategory)}
-              className="mt-1 w-full rounded border border-border bg-[#0A0A0A] px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
             >
               {CATEGORY_OPTIONS.map((c) => (
                 <option key={c} value={c}>
@@ -411,7 +411,7 @@ function NoFlyZoneForm({ projectId, onClose, onCreate }: NoFlyZoneFormProps) {
                 value={floorFeet}
                 onChange={(e) => setFloorFeet(e.target.value)}
                 placeholder="0"
-                className="mt-1 w-full rounded border border-border bg-[#0A0A0A] px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+                className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
               />
             </div>
             <div>
@@ -423,7 +423,7 @@ function NoFlyZoneForm({ projectId, onClose, onCreate }: NoFlyZoneFormProps) {
                 value={ceilingFeet}
                 onChange={(e) => setCeilingFeet(e.target.value)}
                 placeholder="∞"
-                className="mt-1 w-full rounded border border-border bg-[#0A0A0A] px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+                className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
               />
             </div>
           </div>
@@ -437,7 +437,7 @@ function NoFlyZoneForm({ projectId, onClose, onCreate }: NoFlyZoneFormProps) {
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="Why this area is restricted"
-              className="mt-1 w-full rounded border border-border bg-[#0A0A0A] px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
             />
           </div>
 
@@ -451,7 +451,7 @@ function NoFlyZoneForm({ projectId, onClose, onCreate }: NoFlyZoneFormProps) {
               onChange={(e) => setPolygonText(e.target.value)}
               rows={5}
               placeholder='[[-119.78, 36.78], [-119.77, 36.78], [-119.77, 36.79], [-119.78, 36.79]]'
-              className="mt-1 w-full rounded border border-border bg-[#0A0A0A] px-3 py-2 text-xs font-mono focus:border-amber-500 focus:outline-none"
+              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none"
             />
             <p className="mt-1 text-[10px] text-muted-foreground">
               Minimum 3 vertices. Ring is auto-closed if needed.

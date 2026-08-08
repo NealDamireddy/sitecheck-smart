@@ -287,7 +287,7 @@ export function CrossingForm({ crossing, projectId, segments, onClose }: Crossin
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="rounded-md border border-amber-500/40 bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 transition-colors disabled:opacity-50"
+              className="rounded-md border border-primary/40 bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {submitting ? 'Saving…' : crossing ? 'Save Changes' : 'Create Crossing'}
             </button>

@@ -117,9 +117,13 @@ Env vars beyond credentials:
   reporting year → Start New Report → Event Information form.
   - Step 4 waits for the **reporting-year `<select>` to appear** (NOT helper text,
     which only shows after a year is chosen — that was hanging step 4).
-  - Reporting year: `[id="noiReadyForm:selectedReportingYearId_input"]`, set value
-    `"2025"` (= "2025 - 2026"; NOT "2026" = future 2026-2027), dispatch `change`
-    → wait for panel `[id="noiReadyForm:newAdhocPanel"]` visible.
+  - Reporting year: `[id="noiReadyForm:selectedReportingYearId_input"]`; derive
+    its value from the event start date using the July-June reporting boundary,
+    dispatch `change`, then wait for panel
+    `[id="noiReadyForm:newAdhocPanel"]` visible. New events now target value
+    `"2026"` / **2026 - 2027**. The closed 2025-2026 period must not be retried.
+  - If SMARTS reports a missing Annual Report or an already-submitted Annual
+    Report, halt. Annual Report creation and editing are out of scope.
 - **Event Information** (`fillEventInformation`, `event-information.ts`):
   Event Type set to **"Precipitation Event"** via `setJsfSelectByText` (option
   value `5`), then date/time/precip, then "Save Event Information". Element ids

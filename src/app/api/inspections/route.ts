@@ -60,6 +60,35 @@ interface DbInspectionRow {
   report_id?: string | null;
   submitted_at?: string | null;
   updated_at?: string | null;
+  checklist_template_id?: string | null;
+  checklist_observed_at?: string | null;
+  unflagged_items_confirmed?: boolean | null;
+  unflagged_items_confirmed_at?: string | null;
+  checklist_attested_by_name?: string | null;
+  checklist_compliant_count?: number | null;
+  checklist_deficient_count?: number | null;
+  site_name_snapshot?: string | null;
+  wdid_snapshot?: string | null;
+  risk_level_snapshot?: number | null;
+  construction_stage_snapshot?: string | null;
+  photos_taken?: boolean | null;
+  checklist_submission_sha256?: string | null;
+  inspector_title_snapshot?: string | null;
+  qsp_license_number_snapshot?: string | null;
+  qsp_company_snapshot?: string | null;
+  qpe_start?: string | null;
+  qpe_end?: string | null;
+  qpe_duration_hours?: number | null;
+  rain_gauge_inches?: number | null;
+  obs_precipitation?: boolean | null;
+  obs_discolorations?: boolean | null;
+  obs_odors?: boolean | null;
+  obs_turbidity?: boolean | null;
+  obs_sheen?: boolean | null;
+  obs_floating_material?: boolean | null;
+  obs_suspended_material?: boolean | null;
+  observation_comments?: string | null;
+  exemption_documentation?: string | null;
 }
 
 function transformInspection(
@@ -92,6 +121,35 @@ function transformInspection(
     reportId: row.report_id ?? undefined,
     submittedAt: row.submitted_at ?? undefined,
     updatedAt: row.updated_at ?? undefined,
+    checklistVersion: row.checklist_template_id ?? undefined,
+    checklistObservedAt: row.checklist_observed_at ?? undefined,
+    unflaggedItemsConfirmed: row.unflagged_items_confirmed ?? false,
+    unflaggedItemsConfirmedAt: row.unflagged_items_confirmed_at ?? undefined,
+    checklistAttestedByName: row.checklist_attested_by_name ?? undefined,
+    checklistCompliantCount: row.checklist_compliant_count ?? undefined,
+    checklistDeficientCount: row.checklist_deficient_count ?? undefined,
+    siteNameSnapshot: row.site_name_snapshot ?? undefined,
+    wdidSnapshot: row.wdid_snapshot ?? undefined,
+    riskLevelSnapshot: row.risk_level_snapshot ?? undefined,
+    constructionStageSnapshot: row.construction_stage_snapshot ?? undefined,
+    photosTaken: row.photos_taken ?? undefined,
+    checklistSubmissionSha256: row.checklist_submission_sha256 ?? undefined,
+    inspectorTitleSnapshot: row.inspector_title_snapshot ?? undefined,
+    qspLicenseNumberSnapshot: row.qsp_license_number_snapshot ?? undefined,
+    qspCompanySnapshot: row.qsp_company_snapshot ?? undefined,
+    qpeStart: row.qpe_start ?? undefined,
+    qpeEnd: row.qpe_end ?? undefined,
+    qpeDurationHours: row.qpe_duration_hours ?? undefined,
+    rainGaugeInches: row.rain_gauge_inches ?? undefined,
+    observationPrecipitation: row.obs_precipitation ?? undefined,
+    observationDiscolorations: row.obs_discolorations ?? undefined,
+    observationOdors: row.obs_odors ?? undefined,
+    observationTurbidity: row.obs_turbidity ?? undefined,
+    observationSheen: row.obs_sheen ?? undefined,
+    observationFloatingMaterial: row.obs_floating_material ?? undefined,
+    observationSuspendedMaterial: row.obs_suspended_material ?? undefined,
+    observationComments: row.observation_comments ?? undefined,
+    exemptionDocumentation: row.exemption_documentation ?? undefined,
     missionIds,
   };
 }

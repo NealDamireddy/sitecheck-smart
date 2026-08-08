@@ -15,7 +15,7 @@
  *   - "Submit Inspection" button (disabled when already submitted)
  */
 
-import { useEffect, useMemo, useState, use } from 'react';
+import { useEffect, useMemo, use } from 'react';
 import Link from 'next/link';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import {
@@ -25,15 +25,16 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileDown,
-  Send,
   Clock,
   Loader2,
 } from 'lucide-react';
 import { PageTransition } from '@/components/shared/page-transition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { InspectionChecklistForm } from '@/components/inspections/inspection-checklist-form';
 import { useInspectionStore } from '@/stores/inspection-store';
 import { cn } from '@/lib/utils';
+import type { InspectionChecklistResult } from '@/types';
 
 interface AnalysisRow {
   id: string;
@@ -93,21 +94,11 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
   const detail = useInspectionStore((s) => s.detailById[id]);
   const fetchById = useInspectionStore((s) => s.fetchById);
   const patchInspection = useInspectionStore((s) => s.patchInspection);
-  const submitInspection = useInspectionStore((s) => s.submitInspection);
   const isLoading = useInspectionStore((s) => s.loadingDetails.has(id));
-
-  const [narrativeDraft, setNarrativeDraft] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchById(id);
   }, [id, fetchById]);
-
-  useEffect(() => {
-    if (detail?.inspection?.narrative != null) {
-      setNarrativeDraft(detail.inspection.narrative);
-    }
-  }, [detail?.inspection?.narrative]);
 
   const inspection = detail?.inspection ?? null;
   const aiAnalyses = useMemo(
@@ -124,6 +115,22 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     const review = aiAnalyses.filter((a) => a.status === 'needs-review').length;
     return { compliant, deficient, review, total: aiAnalyses.length };
   }, [aiAnalyses]);
+
+  const checklistCategories = useMemo(() => {
+    const categories = new Map<
+      number,
+      { title: string; items: InspectionChecklistResult[] }
+    >();
+    for (const item of detail?.checklistResults ?? []) {
+      const category = categories.get(item.categoryNumber) ?? {
+        title: item.categoryTitle,
+        items: [],
+      };
+      category.items.push(item);
+      categories.set(item.categoryNumber, category);
+    }
+    return [...categories.entries()].sort(([a], [b]) => a - b);
+  }, [detail?.checklistResults]);
 
   if (isLoading && !inspection) {
     return (
@@ -150,23 +157,18 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
   }
 
   const isSubmitted = inspection.status === 'submitted';
-  const compliance = inspection.qspOverallCompliance ?? inspection.aiOverallCompliance ?? inspection.overallCompliance ?? 0;
-
-  async function handleNarrativeBlur() {
-    if (!detail?.inspection) return;
-    if (narrativeDraft === (detail.inspection.narrative ?? '')) return;
-    await patchInspection(id, { narrative: narrativeDraft });
-  }
-
-  async function handleSubmit() {
-    if (isSubmitted) return;
-    setSubmitting(true);
-    try {
-      await submitInspection(id);
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const checklistTotal =
+    (inspection.checklistCompliantCount ?? 0) +
+    (inspection.checklistDeficientCount ?? 0);
+  const compliance =
+    checklistTotal > 0
+      ? Math.round(
+          ((inspection.checklistCompliantCount ?? 0) / checklistTotal) * 100
+        )
+      : inspection.qspOverallCompliance ??
+        inspection.aiOverallCompliance ??
+        inspection.overallCompliance ??
+        0;
 
   return (
     <PageTransition>
@@ -234,19 +236,20 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
                   <FileDown className="h-3.5 w-3.5" />
                   Download PDF
                 </a>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitted || submitting}
-                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
-                  size="sm"
-                >
-                  {submitting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  <span className="ml-1.5">{isSubmitted ? 'Submitted' : 'Submit'}</span>
-                </Button>
+                {!isSubmitted && checklistCategories.length === 0 && (
+                  <Button
+                    onClick={() =>
+                      document
+                        .getElementById('bmp-checklist')
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    size="sm"
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                    <span className="ml-1.5">Complete checklist</span>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -285,15 +288,144 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
             )}
           </div>
           <textarea
-            value={narrativeDraft}
-            onChange={(e) => setNarrativeDraft(e.target.value)}
-            onBlur={handleNarrativeBlur}
+            defaultValue={inspection.narrative ?? ''}
+            onBlur={(event) => {
+              if (event.target.value !== (inspection.narrative ?? '')) {
+                void patchInspection(id, { narrative: event.target.value });
+              }
+            }}
             placeholder="Add inspection notes, observations, weather context, or follow-up items..."
             disabled={isSubmitted}
             rows={4}
             className="mt-2 w-full rounded-md border border-slate-700 bg-slate-950/60 p-3 text-sm text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none disabled:opacity-60"
           />
         </div>
+
+        {/* Exception-based QSP field workflow. The atomic checklist endpoint
+            stores the complete 22-row history and submits the inspection. */}
+        {!isSubmitted && checklistCategories.length === 0 && (
+          <InspectionChecklistForm
+            inspectionId={id}
+            initialObservedAt={inspection.date}
+            onSubmitted={() => fetchById(id)}
+          />
+        )}
+
+        {isSubmitted && checklistCategories.length === 0 && (
+          <div className="rounded-lg border border-amber-800/70 bg-amber-950/20 p-4 text-sm text-amber-200">
+            <AlertTriangle className="mr-1.5 inline h-4 w-4" />
+            This legacy inspection was submitted before checklist history was
+            required. It remains available as a historical record.
+          </div>
+        )}
+
+        {/* Immutable checklist history */}
+        {checklistCategories.length > 0 && (
+          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase text-muted-foreground">
+                  Stored BMP Checklist
+                </div>
+                <div className="mt-1 text-sm text-slate-300">
+                  {inspection.siteNameSnapshot ?? 'Site'}
+                  {inspection.wdidSnapshot
+                    ? ` · WDID ${inspection.wdidSnapshot}`
+                    : ''}
+                  {inspection.constructionStageSnapshot
+                    ? ` · ${inspection.constructionStageSnapshot}`
+                    : ''}
+                </div>
+                {inspection.checklistAttestedByName && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Confirmed by {inspection.checklistAttestedByName}
+                    {inspection.unflaggedItemsConfirmedAt
+                      ? ` on ${format(
+                          new Date(inspection.unflaggedItemsConfirmedAt),
+                          'MMM d, yyyy h:mm a'
+                        )}`
+                      : ''}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Badge className="border border-emerald-700 bg-emerald-900/40 text-emerald-200">
+                  {inspection.checklistCompliantCount ?? 0} compliant
+                </Badge>
+                <Badge
+                  className={cn(
+                    'border',
+                    (inspection.checklistDeficientCount ?? 0) > 0
+                      ? 'border-red-700 bg-red-900/40 text-red-200'
+                      : 'border-emerald-700 bg-emerald-900/40 text-emerald-200'
+                  )}
+                >
+                  {inspection.checklistDeficientCount ?? 0} exceptions
+                </Badge>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {checklistCategories.map(([categoryNumber, category]) => (
+                <div
+                  key={categoryNumber}
+                  className="overflow-hidden rounded-md border border-slate-800"
+                >
+                  <div className="bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-200">
+                    {categoryNumber} - {category.title}
+                  </div>
+                  <div className="divide-y divide-slate-800">
+                    {category.items.map((item) => (
+                      <div
+                        key={item.checklistItemId}
+                        className="bg-slate-950/35 px-3 py-2.5"
+                      >
+                        <div className="flex items-start gap-3">
+                          <Badge
+                            className={cn(
+                              'mt-0.5 shrink-0 border text-[10px] uppercase',
+                              item.answer === 'yes'
+                                ? 'border-emerald-700 bg-emerald-900/40 text-emerald-200'
+                                : 'border-red-700 bg-red-900/40 text-red-200'
+                            )}
+                          >
+                            {item.answer}
+                          </Badge>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-slate-200">
+                              {item.itemNumber}. {item.prompt}
+                            </p>
+                            {item.answer === 'no' && (
+                              <div className="mt-2 rounded-md border border-red-900/60 bg-red-950/20 p-2 text-xs">
+                                <p className="text-red-200">
+                                  {item.exceptionDescription}
+                                </p>
+                                {item.recommendation && (
+                                  <p className="mt-1 text-slate-300">
+                                    Recommendation: {item.recommendation}
+                                  </p>
+                                )}
+                                {item.repairStartDueAt && (
+                                  <p className="mt-1 text-amber-300">
+                                    Repair must begin by{' '}
+                                    {format(
+                                      new Date(item.repairStartDueAt),
+                                      'MMM d, yyyy h:mm a'
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Linked missions */}
         {inspection.missionIds && inspection.missionIds.length > 0 && (
@@ -460,7 +592,10 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
-        {!aiSummary && qspReviews.length === 0 && correctiveActions.length === 0 && (
+        {!aiSummary &&
+          qspReviews.length === 0 &&
+          correctiveActions.length === 0 &&
+          checklistCategories.length === 0 && (
           <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/30 p-6 text-center text-sm text-muted-foreground">
             <AlertTriangle className="mx-auto mb-2 h-5 w-5 text-amber-400" />
             No Block 4 mission data, AI findings, or corrective actions linked yet.
@@ -472,4 +607,3 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     </PageTransition>
   );
 }
-

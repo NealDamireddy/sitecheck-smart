@@ -234,7 +234,9 @@ export async function POST(request: NextRequest) {
       if (latestEvent?.id) {
         const { data: sampleRows } = await supabase
           .from('samples')
-          .select('id, sample_datetime, qsp_name, monitoring_location_id, parameter_results(*)')
+          .select(
+            'id, sample_datetime, qsp_name, monitoring_location_id, parameter_results!parameter_results_sample_id_fkey(*)'
+          )
           .eq('smarts_event_id', latestEvent.id);
         storySamples = (sampleRows ?? []) as DbSampleRow[];
 

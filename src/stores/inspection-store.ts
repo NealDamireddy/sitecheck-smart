@@ -3,7 +3,8 @@
  *
  * Powers the new /inspections list + /inspections/[id] detail pages.
  * Reads from `/api/inspections` (Block 1 + Block 5 fields blended) and
- * supports the Block 5 patch / submit / link-mission actions.
+ * supports detail refresh, narrative patches, and mission links. Final QSP
+ * submission is handled by the exception-based checklist form.
  *
  * Convention reused from drone-store / corrective-actions-store / etc:
  * stable empty constants live outside React selectors so consumers don't
@@ -11,7 +12,11 @@
  */
 
 import { create } from 'zustand';
-import type { Inspection } from '@/types';
+import type {
+  Inspection,
+  InspectionChecklistDeficiency,
+  InspectionChecklistResult,
+} from '@/types';
 
 export const EMPTY_INSPECTION_LIST: Inspection[] = [];
 
@@ -21,6 +26,8 @@ interface InspectionDetail {
   aiAnalyses: unknown[];
   qspReviews: unknown[];
   correctiveActions: unknown[];
+  checklistResults: InspectionChecklistResult[];
+  deficiencies: InspectionChecklistDeficiency[];
 }
 
 interface InspectionStore {
@@ -36,7 +43,6 @@ interface InspectionStore {
     inspectionId: string,
     patch: Partial<Pick<Inspection, 'narrative' | 'inspector' | 'status' | 'dueBy' | 'reportId'>>
   ) => Promise<void>;
-  submitInspection: (inspectionId: string, reportId?: string | null) => Promise<void>;
   addMission: (inspectionId: string, missionId: string) => Promise<void>;
   removeMission: (inspectionId: string, missionId: string) => Promise<void>;
 }
@@ -90,6 +96,8 @@ export const useInspectionStore = create<InspectionStore>((set, get) => ({
             aiAnalyses: data.aiAnalyses ?? [],
             qspReviews: data.qspReviews ?? [],
             correctiveActions: data.correctiveActions ?? [],
+            checklistResults: data.checklistResults ?? [],
+            deficiencies: data.deficiencies ?? [],
           },
         },
       }));
@@ -111,20 +119,6 @@ export const useInspectionStore = create<InspectionStore>((set, get) => ({
       });
       if (!res.ok) throw new Error(`Failed to patch inspection (${res.status})`);
       // Refresh detail.
-      await get().fetchById(inspectionId);
-    } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Unknown error' });
-    }
-  },
-
-  submitInspection: async (inspectionId, reportId) => {
-    try {
-      const res = await fetch(`/api/inspections/${inspectionId}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reportId ? { reportId } : {}),
-      });
-      if (!res.ok) throw new Error(`Failed to submit inspection (${res.status})`);
       await get().fetchById(inspectionId);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Unknown error' });

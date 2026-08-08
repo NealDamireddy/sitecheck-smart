@@ -52,7 +52,7 @@ export const CROSSING_TYPE_LABELS: Record<CrossingType, string> = {
 
 export const CROSSING_TYPE_COLORS: Record<CrossingType, string> = {
   stream: '#0EA5E9',     // sky-500
-  road: '#F59E0B',       // amber-500
+  road: '#215C78',       // SiteCheck blue
   utility: '#A855F7',    // purple-500
   railroad: '#EF4444',   // red-500
   wetland: '#10B981',    // emerald-500

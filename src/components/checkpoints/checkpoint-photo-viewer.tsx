@@ -169,7 +169,7 @@ export function CheckpointPhotoViewer({
             className={cn(
               'flex items-center gap-1 px-2 py-1 text-[11px] transition-colors',
               view === 'drone'
-                ? 'bg-amber-500 text-black'
+                ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground',
               !droneUrl && 'opacity-50',
             )}
@@ -184,7 +184,7 @@ export function CheckpointPhotoViewer({
             className={cn(
               'flex items-center gap-1 px-2 py-1 text-[11px] transition-colors',
               view === 'qsp'
-                ? 'bg-amber-500 text-black'
+                ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground',
               !localQspUrl && 'opacity-50',
             )}

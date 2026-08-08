@@ -18,8 +18,32 @@ interface OnboardingStore extends OnboardingState {
 }
 
 function getPersistedState(): OnboardingState {
-  // Always start fresh on page load — onboarding shows every time
-  return { hasCompleted: false, currentStep: 0, completedVersion: 0 };
+  const fallback: OnboardingState = {
+    hasCompleted: false,
+    currentStep: 0,
+    completedVersion: 0,
+  };
+  if (typeof window === 'undefined') return fallback;
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return fallback;
+
+    const parsed = JSON.parse(raw) as Partial<OnboardingState>;
+    return {
+      hasCompleted: parsed.hasCompleted === true,
+      // A reload starts at the beginning only when onboarding is incomplete.
+      currentStep: 0,
+      completedVersion:
+        typeof parsed.completedVersion === 'number' &&
+        Number.isFinite(parsed.completedVersion) &&
+        parsed.completedVersion >= 0
+          ? parsed.completedVersion
+          : 0,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 function persist(state: Partial<OnboardingState>) {
@@ -30,7 +54,9 @@ function persist(state: Partial<OnboardingState>) {
       hasCompleted: state.hasCompleted ?? current.hasCompleted,
       completedVersion: state.completedVersion ?? current.completedVersion,
     }));
-  } catch { /* ignore */ }
+  } catch {
+    // localStorage unavailable — onboarding works for this page view only.
+  }
 }
 
 export const useOnboardingStore = create<OnboardingStore>((set) => {

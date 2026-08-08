@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 const STATUSES = ['forecast', 'active', 'ended', 'completed'] as const;
+// Inspector uploads must use the atomic site-record RPC; this legacy endpoint
+// remains limited to NOAA and deliberate demo simulations.
 const SOURCES = ['noaa', 'simulated'] as const;
 const SIMULATE_MODES = ['forecast', 'starting'] as const;
 

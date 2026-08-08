@@ -201,7 +201,7 @@ async function main(): Promise<void> {
       .select(
         `
         *,
-        parameter_results (*)
+        parameter_results!parameter_results_sample_id_fkey (*)
       `
       )
       .eq('smarts_event_id', TEST_EVENT_ID);
@@ -449,7 +449,7 @@ async function main(): Promise<void> {
         .select(
           `
           *,
-          parameter_results (*)
+          parameter_results!parameter_results_sample_id_fkey (*)
         `
         )
         .eq('id', createdSampleId)

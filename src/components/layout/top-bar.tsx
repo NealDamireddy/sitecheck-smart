@@ -57,7 +57,7 @@ export function TopBar() {
 
   return (
     <header className={cn(
-      'sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm',
+      'sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card/90 shadow-sm backdrop-blur-sm',
       isApp ? 'h-11 px-3' : 'h-14 px-3 sm:px-6'
     )}>
       {/* Project Switcher */}
@@ -213,7 +213,7 @@ export function TopBar() {
           isApp ? 'h-7 w-7' : 'h-9 w-9'
         )}>
           <Bell className={cn(isApp ? 'h-3.5 w-3.5' : 'h-4 w-4', 'text-muted-foreground')} />
-          <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-black">
+          <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
             3
           </span>
         </button>

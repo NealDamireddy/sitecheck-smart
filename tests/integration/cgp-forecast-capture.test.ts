@@ -39,6 +39,13 @@ function response(body: unknown, status = 200): Response {
 }
 
 function successfulNwsFetch(qpfHours = 6) {
+  // Keep the mocked forecast forward-looking. Hard-coded forecast dates make
+  // this integration test expire even though the normalizer is behaving
+  // correctly when it discards periods that ended before retrieval.
+  const firstQpfStart = Date.now() + 6 * 60 * 60 * 1000;
+  const validTime = (offsetHours: number, durationHours: number) =>
+    `${new Date(firstQpfStart + offsetHours * 60 * 60 * 1000).toISOString()}/PT${durationHours}H`;
+
   return vi
     .fn()
     .mockResolvedValueOnce(
@@ -51,17 +58,17 @@ function successfulNwsFetch(qpfHours = 6) {
     .mockResolvedValueOnce(
       response({
         properties: {
-          updateTime: '2026-08-03T18:00:00Z',
+          updateTime: new Date().toISOString(),
           probabilityOfPrecipitation: {
             uom: 'wmoUnit:percent',
             values: [
-              { validTime: '2026-08-04T00:00:00Z/PT24H', value: 60 },
+              { validTime: validTime(0, 24), value: 60 },
             ],
           },
           quantitativePrecipitation: {
             uom: 'wmoUnit:mm',
             values: [0, 1, 2, 3].map((index) => ({
-              validTime: `2026-08-04T${String(index * 6).padStart(2, '0')}:00:00Z/PT${qpfHours}H`,
+              validTime: validTime(index * 6, qpfHours),
               value: 3.175,
             })),
           },

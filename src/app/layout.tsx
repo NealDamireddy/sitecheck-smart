@@ -41,9 +41,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable} ${oswald.variable} dark`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${oswald.variable}`}
     >
-      <body className="min-h-screen bg-background text-foreground antialiased texture-concrete">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <ErrorBoundary>
           <RealtimeProvider>
             <ViewModeWrapper>{children}</ViewModeWrapper>

@@ -18,7 +18,7 @@
 
 export type SmartsEventStatus = 'forecast' | 'active' | 'ended' | 'completed';
 
-export type SmartsEventSource = 'noaa' | 'simulated';
+export type SmartsEventSource = 'noaa' | 'simulated' | 'inspector_upload';
 
 export interface SmartsEvent {
   id: string;

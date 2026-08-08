@@ -1,24 +1,19 @@
 /**
- * Block 6 — Render any persisted report row as a PDF.
- *
- * GET /api/reports/[id]/pdf
- *
- * Used by `<ExportControls />` on /reports — the report store knows the
- * `reportId` after `generateReport()` runs, so the client can hit this
- * route directly and stream the PDF straight to disk.
- *
- * Companion route: `/api/inspections/[id]/pdf` materializes a fresh
- * report on the fly when one doesn't yet exist for an inspection.
+ * Render a persisted report reference through its submitted inspection.
+ * Legacy report sections and current project state are intentionally ignored;
+ * a report without a submitted inspection fails closed.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { requireAuth } from '@/lib/auth';
-import { InspectionReportPdf } from '@/lib/pdf/inspection-pdf';
-import type {
-  PdfReportSection,
-  PdfProjectInfo,
-} from '@/lib/pdf/inspection-pdf';
+import {
+  buildInspectionReportContract,
+  InspectionReportDataError,
+  type InspectionReportChecklistResultRow,
+  type InspectionReportSnapshotRow,
+} from '@/lib/cgp/inspection-report-data';
+import { InspectionContractPdf } from '@/lib/pdf/inspection-contract-pdf';
 import { log } from '@/lib/logger';
 
 interface RouteContext {
@@ -26,76 +21,78 @@ interface RouteContext {
 }
 
 export async function GET(_request: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
   try {
-    const { id } = await context.params;
     const auth = await requireAuth();
     if (auth.error) return auth.error;
-    const { supabase } = auth;
 
-    // 1. Report
-    const { data: report, error: reportError } = await supabase
+    const { data: report, error: reportError } = await auth.supabase
       .from('reports')
-      .select('*')
+      .select('id, inspection_id')
       .eq('id', id)
       .single();
-
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
-
-    // 2. Project
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id, name, address, wdid, permit_number, qsp_name, qsp_license_number, qsp_company')
-      .eq('id', report.project_id)
-      .single();
-
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    if (!report.inspection_id) {
+      return NextResponse.json(
+        {
+          error: 'This report is not backed by a submitted inspection.',
+          code: 'REPORT_NOT_INSPECTION_BACKED',
+        },
+        { status: 422 }
+      );
     }
 
-    const sections = Array.isArray(report.sections)
-      ? (report.sections as PdfReportSection[])
-      : [];
+    const inspectionId = String(report.inspection_id);
+    const { data: inspection, error: inspectionError } = await auth.supabase
+      .from('inspections')
+      .select('*')
+      .eq('id', inspectionId)
+      .single();
+    if (inspectionError || !inspection) {
+      return NextResponse.json({ error: 'Inspection not found' }, { status: 404 });
+    }
 
-    const projectInfo: PdfProjectInfo = {
-      name: project.name as string,
-      address: (project.address as string) ?? null,
-      wdid: (project.wdid as string) ?? null,
-      permitNumber: (project.permit_number as string) ?? null,
-      qspName: (project.qsp_name as string) ?? null,
-      qspLicenseNumber: (project.qsp_license_number as string) ?? null,
-      qspCompany: (project.qsp_company as string) ?? null,
-    };
+    const { data: checklistResults, error: checklistError } = await auth.supabase
+      .from('inspection_checklist_results')
+      .select('*')
+      .eq('inspection_id', inspectionId)
+      .order('category_number', { ascending: true })
+      .order('item_number', { ascending: true });
+    if (checklistError) throw new Error('Checklist snapshot query failed');
 
-    const pdfBuffer = await renderToBuffer(
-      InspectionReportPdf({
-        reportId: report.id,
-        generatedAt: report.generated_date,
-        signedBy: report.signed_by,
-        signedDate: report.signed_date,
-        project: projectInfo,
-        sections,
-      })
-    );
-
-    const safeName = (project.name as string)
+    const contract = buildInspectionReportContract({
+      inspection: inspection as InspectionReportSnapshotRow,
+      checklistResults: (checklistResults ?? []) as InspectionReportChecklistResultRow[],
+    });
+    const pdfBuffer = await renderToBuffer(InspectionContractPdf({ contract }));
+    const safeSiteName = contract.part1.site.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 60);
-    const filename = `cgp-report-${safeName}-${id}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Cache-Control': 'no-store',
+        'Content-Disposition': `attachment; filename="sitecheck-inspection-${safeSiteName}-${inspectionId}.pdf"`,
+        'Cache-Control': 'private, no-store',
+        'X-SiteCheck-Contract-Version': contract.contractVersion,
+        'X-SiteCheck-Submission-SHA256': contract.sourceSubmissionSha256,
       },
     });
-  } catch (err) {
-    log.error('Report PDF error', { err });
+  } catch (error) {
+    if (error instanceof InspectionReportDataError) {
+      const status = error.code === 'INSPECTION_NOT_SUBMITTED' ? 409 : 422;
+      log.warn('Report PDF contract unavailable', { reportId: id, code: error.code });
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status }
+      );
+    }
+    log.error('Report PDF error', { reportId: id, error });
     return NextResponse.json({ error: 'Failed to render PDF' }, { status: 500 });
   }
 }

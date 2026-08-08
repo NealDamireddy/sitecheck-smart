@@ -3,6 +3,7 @@ export * from './checkpoint';
 export * from './drone';
 export * from './weather';
 export * from './inspection';
+export * from './site-record';
 export * from './corrective-action';
 export * from './activity';
 export * from './report';

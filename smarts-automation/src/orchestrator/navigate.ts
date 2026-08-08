@@ -16,6 +16,13 @@ export interface NavigateKey {
   /** Required for the new-report path (step 6 matches the row by WDID text). */
   wdid: string;
   /**
+   * Event start date in SMARTS wall-clock format (`MM/DD/YYYY`). The reporting
+   * year is derived from this value: July-December use the calendar year;
+   * January-June use the preceding year. A new report is never created when
+   * this date is missing or invalid.
+   */
+  eventStartDate?: string;
+  /**
    * Optional resume key — when present and a single matching draft exists in
    * the Ad Hoc Reports - Outstanding table, the bot opens that draft instead
    * of creating a new one. When ANY field is missing, the bot falls through to
@@ -45,15 +52,47 @@ const ARTIFACTS_DIR = resolve(HERE, "..", "..", "artifacts");
 export const SMARTS_HOME_URL =
   "https://smarts.waterboards.ca.gov/smarts/faces/SwSmartsMainMenuRd.xhtml";
 
-export const REPORTING_YEAR = "2025 - 2026";
-// The <option> value for the "2025 - 2026" reporting period is "2025" (NOT
-// "2026", the future period starting July 2026). We drive the select by value
-// because it is stable regardless of the display text's exact whitespace.
-export const REPORTING_YEAR_VALUE = "2025";
 export const REPORTING_YEAR_SELECT_ID = "noiReadyForm:selectedReportingYearId_input";
 // Selecting a year does not navigate; the JSF AJAX response injects this panel
 // into the existing page. Its appearance is our success signal for step 5.
 export const NEW_ADHOC_PANEL_ID = "noiReadyForm:newAdhocPanel";
+
+export const MISSING_ANNUAL_REPORT_MESSAGE = "No annual report found.";
+export const CLOSED_REPORTING_YEAR_MESSAGE =
+  "Cannot create Ad Hoc Report for already submitted Annual Report.";
+
+export interface ReportingYearOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Convert a SMARTS event date to the portal's July-June reporting-year option.
+ * Examples: 06/30/2026 -> 2025 - 2026; 07/01/2026 -> 2026 - 2027.
+ */
+export function reportingYearForEventDate(
+  eventStartDate: string,
+): ReportingYearOption | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(eventStartDate.trim());
+  if (!match) return null;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  const startYear = month >= 7 ? year : year - 1;
+  return {
+    value: String(startYear),
+    label: `${startYear} - ${startYear + 1}`,
+  };
+}
 
 export async function navigateToProject(
   session: SMARTSSession,
@@ -211,6 +250,18 @@ export async function navigateToProject(
     }
   }
 
+  const eventStartDate =
+    key.eventStartDate?.trim() ||
+    key.resume?.reportingPeriod.split(" - ")[0]?.trim() ||
+    "";
+  const reportingYear = reportingYearForEventDate(eventStartDate);
+  if (!reportingYear) {
+    return haltAt(
+      4,
+      `cannot derive a reporting year from event start date "${eventStartDate || "missing"}"; expected MM/DD/YYYY`,
+    );
+  }
+
   // Step 4: click "Start Ad Hoc Report". Success = the reporting-year dropdown
   // (noiReadyForm:selectedReportingYearId_input) appears. We wait on the select
   // itself, NOT on helper text like "Click the Start Report link..." — that text
@@ -239,14 +290,14 @@ export async function navigateToProject(
   // directly. The visible PrimeFaces widget is a decoy; the real control is a
   // hidden <select id="noiReadyForm:selectedReportingYearId_input">. Its id
   // contains a ":", so target it with an [id="..."] attribute selector (a "#"
-  // CSS selector would mis-parse the colon). Set value "2025" (= "2025 - 2026")
-  // and dispatch "change" to fire its onchange="mojarra.ab(...)" JSF AJAX.
+  // CSS selector would mis-parse the colon). Set the year derived from the
+  // event date and dispatch "change" to fire the JSF AJAX postback.
   // Selecting a year does NOT navigate; success is the AJAX-injected panel
   // noiReadyForm:newAdhocPanel becoming visible — wait on that, never on
   // navigation/networkidle.
   try {
     console.log(
-      `[nav] step 5: setting reporting year "${REPORTING_YEAR}" (value "${REPORTING_YEAR_VALUE}") via [id="${REPORTING_YEAR_SELECT_ID}"]`,
+      `[nav] step 5: setting reporting year "${reportingYear.label}" (value "${reportingYear.value}") via [id="${REPORTING_YEAR_SELECT_ID}"]`,
     );
     // The select is already attached (step 4 waited for it). INLINE ANONYMOUS
     // ARROW ONLY (a named function would get tsx/esbuild's __name wrapper, which
@@ -260,7 +311,7 @@ export async function navigateToProject(
       const sel = node as HTMLSelectElement;
       sel.value = value;
       sel.dispatchEvent(new Event("change", { bubbles: true }));
-    }, REPORTING_YEAR_VALUE);
+    }, reportingYear.value);
     await trace(page, 5, "reporting year change dispatched");
 
     await page
@@ -276,7 +327,7 @@ export async function navigateToProject(
     await trace(page, 5, "reporting year selection failed");
     return haltAt(
       5,
-      `could not select reporting year "${REPORTING_YEAR}" (value "${REPORTING_YEAR_VALUE}") via [id="${REPORTING_YEAR_SELECT_ID}"] / panel [id="${NEW_ADHOC_PANEL_ID}"] did not appear (${reasonOf(e)})`,
+      `could not select reporting year "${reportingYear.label}" (value "${reportingYear.value}") via [id="${REPORTING_YEAR_SELECT_ID}"] / panel [id="${NEW_ADHOC_PANEL_ID}"] did not appear (${reasonOf(e)})`,
     );
   }
 
@@ -304,13 +355,45 @@ export async function navigateToProject(
     );
   }
 
-  // Step 7 (final): confirm arrival on the report form via the sidebar text.
-  // Any "navigating away" confirm() is auto-accepted by the dialog handler.
+  // Step 7 (final): confirm arrival on the report form, or stop on one of the
+  // two observed Annual Report prerequisite states. Annual Reports are outside
+  // this bot's scope; neither blocker may trigger a retry or Annual Report click.
   try {
-    await page
-      .getByText("Event Information", { exact: false })
-      .first()
-      .waitFor({ state: "visible", timeout: NAV_TIMEOUT_MS });
+    const arrival = await waitForFirstVisible(
+      [
+        {
+          name: "event-information",
+          locator: page.getByText("Event Information", { exact: false }).first(),
+        },
+        {
+          name: "missing-annual-report",
+          locator: page
+            .getByText(MISSING_ANNUAL_REPORT_MESSAGE, { exact: false })
+            .first(),
+        },
+        {
+          name: "closed-reporting-year",
+          locator: page
+            .getByText(CLOSED_REPORTING_YEAR_MESSAGE, { exact: false })
+            .first(),
+        },
+      ],
+      NAV_TIMEOUT_MS,
+    );
+    if (arrival === "missing-annual-report") {
+      await trace(page, 7, "missing Annual Report prerequisite");
+      return haltAt(
+        7,
+        `SMARTS cannot create the ${reportingYear.label} Ad Hoc report because no Annual Report exists. Annual Reports are out of scope; create the prerequisite manually, then re-run.`,
+      );
+    }
+    if (arrival === "closed-reporting-year") {
+      await trace(page, 7, "reporting year already submitted / closed");
+      return haltAt(
+        7,
+        `SMARTS rejected the ${reportingYear.label} Ad Hoc report because that Annual Report is already submitted. Do not retry this reporting year; use the reporting year derived from the event date.`,
+      );
+    }
     await trace(page, 7, "report form loaded (Event Information visible)");
     await logLocation(page);
   } catch (e) {
@@ -371,6 +454,18 @@ async function waitForAnyVisible(
   // as an unhandled rejection once Promise.any settles on the first success.
   for (const w of waits) void w.catch(() => undefined);
   await Promise.any(waits);
+}
+
+async function waitForFirstVisible(
+  entries: Array<{ name: string; locator: Locator }>,
+  timeoutMs: number,
+): Promise<string> {
+  const waits = entries.map(async ({ name, locator }) => {
+    await locator.waitFor({ state: "visible", timeout: timeoutMs });
+    return name;
+  });
+  for (const wait of waits) void wait.catch(() => undefined);
+  return Promise.any(waits);
 }
 
 export async function navigateToTab(

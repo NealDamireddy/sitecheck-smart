@@ -5,9 +5,11 @@ vi.mock("../src/orchestrator/find-existing-draft.js", () => ({
 }));
 
 import {
+  CLOSED_REPORTING_YEAR_MESSAGE,
+  MISSING_ANNUAL_REPORT_MESSAGE,
   navigateToProject,
+  reportingYearForEventDate,
   SMARTS_HOME_URL,
-  REPORTING_YEAR,
 } from "../src/orchestrator/navigate.js";
 import { findExistingDraft } from "../src/orchestrator/find-existing-draft.js";
 import type { SMARTSSession } from "../src/auth/types.js";
@@ -15,6 +17,7 @@ import type { SMARTSSession } from "../src/auth/types.js";
 const mockedFindDraft = vi.mocked(findExistingDraft);
 
 const WDID = "2 01C402404";
+const NAV_KEY = { wdid: WDID, eventStartDate: "08/03/2026" };
 const RESUME_KEY = {
   siteName: "Equus Ct",
   reportingPeriod: "05/27/2026 - 05/29/2026",
@@ -161,9 +164,26 @@ const YEAR_SELECT_LABEL =
 const NEW_ADHOC_PANEL_LABEL = 'sel:[id="noiReadyForm:newAdhocPanel"]';
 
 describe("navigateToProject", () => {
+  it("derives the July-June reporting year from the event date", () => {
+    expect(reportingYearForEventDate("06/30/2026")).toEqual({
+      value: "2025",
+      label: "2025 - 2026",
+    });
+    expect(reportingYearForEventDate("07/01/2026")).toEqual({
+      value: "2026",
+      label: "2026 - 2027",
+    });
+    expect(reportingYearForEventDate("08/03/2026")).toEqual({
+      value: "2026",
+      label: "2026 - 2027",
+    });
+    expect(reportingYearForEventDate("02/30/2026")).toBeNull();
+    expect(reportingYearForEventDate("2026-08-03")).toBeNull();
+  });
+
   it("happy path: ... -> Start Ad Hoc Report -> select year -> Start New Report (WDID row) -> Event Information", async () => {
     const h = buildSession();
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("navigated");
     if (result.status !== "navigated") return;
     expect(result.mode).toBe("new");
@@ -188,9 +208,12 @@ describe("navigateToProject", () => {
 
   it("sets the reporting year by driving the hidden native <select> by id, not widget clicks", async () => {
     const h = buildSession();
-    await navigateToProject(h.session, { wdid: WDID });
+    await navigateToProject(h.session, NAV_KEY);
 
-    expect(REPORTING_YEAR).toBe("2025 - 2026");
+    expect(reportingYearForEventDate(NAV_KEY.eventStartDate)).toEqual({
+      value: "2026",
+      label: "2026 - 2027",
+    });
     const selectors = h.ctl.locatorCalls.map((c) => c[0]);
     // Hidden <select> targeted by an [id="..."] attribute selector (the id has a
     // colon, so "#" cannot be used) and driven via locator.evaluate.
@@ -207,7 +230,7 @@ describe("navigateToProject", () => {
 
   it("uses the WDID to locate the report row (WDID row matching is re-enabled)", async () => {
     const h = buildSession();
-    await navigateToProject(h.session, { wdid: WDID });
+    await navigateToProject(h.session, NAV_KEY);
 
     const texts = h.ctl.getByTextCalls.map((c) => c[0]);
     expect(texts).toContain(WDID);
@@ -216,7 +239,7 @@ describe("navigateToProject", () => {
 
   it("scopes the File Reports click to the nav menubar, not the body tile", async () => {
     const h = buildSession();
-    await navigateToProject(h.session, { wdid: WDID });
+    await navigateToProject(h.session, NAV_KEY);
 
     const selectors = h.ctl.locatorCalls.map((c) => c[0]);
     expect(selectors).toContain(".smarts-main-menubar");
@@ -231,7 +254,7 @@ describe("navigateToProject", () => {
 
   it("registers a dialog handler that auto-accepts JSF confirm popups", async () => {
     const h = buildSession();
-    await navigateToProject(h.session, { wdid: WDID });
+    await navigateToProject(h.session, NAV_KEY);
 
     expect(h.on).toHaveBeenCalledWith("dialog", expect.any(Function));
     expect(h.ctl.dialogHandler).toBeTypeOf("function");
@@ -243,7 +266,7 @@ describe("navigateToProject", () => {
 
   it("never uses waitForURL (element-presence waits only)", async () => {
     const h = buildSession();
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("navigated");
     if (result.status !== "navigated") return;
     expect(result.mode).toBe("new");
@@ -251,7 +274,7 @@ describe("navigateToProject", () => {
 
   it("step 1 halt: nav File Reports never becomes visible", async () => {
     const h = buildSession({ failWaitFor: new Set([NAV_FILE_REPORTS_LABEL]) });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("halted");
     if (result.status !== "halted") return;
     expect(result.reason).toMatch(/^Navigation failed at step 1:/);
@@ -262,7 +285,7 @@ describe("navigateToProject", () => {
     const h = buildSession({
       failWaitFor: new Set(["text:Ad Hoc Monitoring Reports"]),
     });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("halted");
     if (result.status !== "halted") return;
     expect(result.reason).toMatch(/^Navigation failed at step 2:/);
@@ -275,7 +298,7 @@ describe("navigateToProject", () => {
         "text:Start Ad Hoc Report",
       ]),
     });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("halted");
     if (result.status !== "halted") return;
     expect(result.reason).toMatch(/^Navigation failed at step 3:/);
@@ -285,7 +308,7 @@ describe("navigateToProject", () => {
     const h = buildSession({
       failWaitFor: new Set(["text:Ad Hoc Reports - Outstanding"]),
     });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("navigated");
     if (result.status !== "navigated") return;
     expect(result.mode).toBe("new");
@@ -293,7 +316,7 @@ describe("navigateToProject", () => {
 
   it("step 4 halt: reporting-year dropdown never appears after Start Ad Hoc Report", async () => {
     const h = buildSession({ failWaitFor: new Set([YEAR_SELECT_LABEL]) });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("halted");
     if (result.status !== "halted") return;
     expect(result.reason).toMatch(/^Navigation failed at step 4:/);
@@ -302,17 +325,17 @@ describe("navigateToProject", () => {
 
   it("step 5 halt: newAdhocPanel never injected after selecting the year", async () => {
     const h = buildSession({ failWaitFor: new Set([NEW_ADHOC_PANEL_LABEL]) });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("halted");
     if (result.status !== "halted") return;
     expect(result.reason).toMatch(/^Navigation failed at step 5:/);
-    expect(result.reason).toContain("2025 - 2026");
+    expect(result.reason).toContain("2026 - 2027");
     expect(result.reason).toContain("newAdhocPanel");
   });
 
   it("step 6 halt: WDID row / Start New Report link not found", async () => {
     const h = buildSession({ failWaitFor: new Set(["sel:tr"]) });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("halted");
     if (result.status !== "halted") return;
     expect(result.reason).toMatch(/^Navigation failed at step 6:/);
@@ -322,13 +345,66 @@ describe("navigateToProject", () => {
 
   it("step 7 halt: Event Information sidebar never appears on the form", async () => {
     const h = buildSession({
-      failWaitFor: new Set(["text:Event Information"]),
+      failWaitFor: new Set([
+        "text:Event Information",
+        `text:${MISSING_ANNUAL_REPORT_MESSAGE}`,
+        `text:${CLOSED_REPORTING_YEAR_MESSAGE}`,
+      ]),
     });
-    const result = await navigateToProject(h.session, { wdid: WDID });
+    const result = await navigateToProject(h.session, NAV_KEY);
     expect(result.status).toBe("halted");
     if (result.status !== "halted") return;
     expect(result.reason).toMatch(/^Navigation failed at step 7:/);
     expect(result.reason).toContain("Event Information");
+  });
+
+  it("halts without touching Annual Reports when SMARTS reports the prerequisite is missing", async () => {
+    const h = buildSession({
+      failWaitFor: new Set(["text:Event Information"]),
+    });
+    const result = await navigateToProject(h.session, {
+      wdid: WDID,
+      eventStartDate: "08/03/2026",
+    });
+    expect(result.status).toBe("halted");
+    if (result.status !== "halted") return;
+    expect(result.reason).toContain("2026 - 2027");
+    expect(result.reason).toContain("no Annual Report exists");
+    expect(result.reason).toContain("out of scope");
+    expect(h.ctl.events).not.toContain("click:text:Create Annual Report");
+  });
+
+  it("halts without retrying when SMARTS reports the reporting year is already submitted", async () => {
+    const h = buildSession({
+      failWaitFor: new Set([
+        "text:Event Information",
+        `text:${MISSING_ANNUAL_REPORT_MESSAGE}`,
+      ]),
+    });
+    const result = await navigateToProject(h.session, {
+      wdid: WDID,
+      eventStartDate: "05/27/2026",
+    });
+    expect(result.status).toBe("halted");
+    if (result.status !== "halted") return;
+    expect(result.reason).toContain("2025 - 2026");
+    expect(result.reason).toContain("already submitted");
+    expect(result.reason).toContain("Do not retry");
+    expect(
+      h.ctl.events.filter((event) => event === "click:text:Start New Report"),
+    ).toHaveLength(1);
+  });
+
+  it("halts before opening the reporting-year form when the event start date is invalid", async () => {
+    const h = buildSession();
+    const result = await navigateToProject(h.session, {
+      wdid: WDID,
+      eventStartDate: "2026-08-03",
+    });
+    expect(result.status).toBe("halted");
+    if (result.status !== "halted") return;
+    expect(result.reason).toContain("cannot derive a reporting year");
+    expect(h.ctl.events).not.toContain("click:text:Start Ad Hoc Report");
   });
 
   it("rejects empty WDID without performing any navigation", async () => {
@@ -444,7 +520,7 @@ describe("navigateToProject", () => {
 
   it("without a resume key: never calls findExistingDraft (legacy create-new path)", async () => {
     const h = buildSession();
-    await navigateToProject(h.session, { wdid: WDID });
+    await navigateToProject(h.session, NAV_KEY);
     expect(mockedFindDraft).not.toHaveBeenCalled();
   });
 });

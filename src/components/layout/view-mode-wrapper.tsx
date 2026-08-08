@@ -25,6 +25,7 @@ interface ViewModeWrapperProps {
 const CHROMELESS_ROUTES = ['/login', '/signup'];
 
 export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
+  const mounted = useMounted();
   const { viewMode } = useViewModeStore();
   const { hasCompleted, completedVersion } = useOnboardingStore();
   const demoTourActive = useDemoTourStore((s) => s.active);
@@ -44,7 +45,9 @@ export function ViewModeWrapper({ children }: ViewModeWrapperProps) {
   // session is active — VCs get the demo tour instead, and we never want
   // the welcome screen to flash on the way to /dashboard.
   const onboardingActive =
-    !inDemo && (!hasCompleted || completedVersion < ONBOARDING_VERSION);
+    mounted &&
+    !inDemo &&
+    (!hasCompleted || completedVersion < ONBOARDING_VERSION);
 
   // Login/signup get no app chrome — a logged-out visitor shouldn't see a
   // project switcher, notification bell, or account link behind the form.
@@ -165,11 +168,11 @@ function MobileBottomNav() {
             className={cn(
               'flex flex-col items-center gap-0.5 rounded-md px-2 py-1 text-[10px] transition-colors',
               isActive
-                ? 'text-amber-500'
-                : 'text-muted-foreground'
+                ? 'text-white'
+                : 'text-sidebar-foreground'
             )}
           >
-            <Icon className={cn('h-5 w-5', isActive ? 'text-amber-500' : '')} />
+            <Icon className={cn('h-5 w-5', isActive ? 'text-sidebar-primary' : '')} />
             <span>{item.label}</span>
           </Link>
         );

@@ -9,6 +9,7 @@
 export * from './checkpoint';
 export * from './mission';
 export * from './inspection';
+export * from './inspection-checklist';
 export * from './deficiency';
 export * from './corrective-action';
 export * from './geofence';
@@ -26,3 +27,4 @@ export * from './monitoring-location';
 export * from './sample';
 export * from './parameter-result';
 export * from './qsp-profile';
+export * from './site-record';

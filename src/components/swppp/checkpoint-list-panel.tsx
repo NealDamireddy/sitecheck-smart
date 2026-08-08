@@ -52,7 +52,7 @@ export function CheckpointListPanel({ selectedCheckpointId, onSelect, extractedC
   return (
     <div className="flex h-full flex-col">
       {/* Search bar */}
-      <div className="border-b border-white/5 bg-[#141414] p-3">
+      <div className="border-b border-border bg-secondary/60 p-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input

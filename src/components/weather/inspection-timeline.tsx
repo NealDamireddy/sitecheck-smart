@@ -109,7 +109,7 @@ export function InspectionTimeline() {
                     className={`relative z-10 flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 transition-all ${colors.border} ${
                       isLatest
                         ? `${colors.dot} ring-4 ring-amber-500/20`
-                        : `bg-[#0A0A0A]`
+                        : `bg-background`
                     } ${isHovered ? 'scale-125' : ''}`}
                   >
                     {isLatest && (
@@ -148,12 +148,12 @@ export function InspectionTimeline() {
 
                   {/* Tooltip on hover */}
                   {isHovered && (
-                    <div className="absolute top-full mt-16 z-20 w-48 rounded-lg border border-[#2A2A2A] bg-[#1C1C1C] p-3 shadow-xl">
+                    <div className="absolute top-full mt-16 z-20 w-48 rounded-lg border border-border bg-popover p-3 shadow-xl">
                       <p className="text-xs font-medium text-foreground">{inspection.id}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">
                         {format(new Date(inspection.date), 'MMM d, yyyy h:mm a')}
                       </p>
-                      <div className="mt-2 space-y-1 border-t border-[#2A2A2A] pt-2">
+                      <div className="mt-2 space-y-1 border-t border-border pt-2">
                         <div className="flex justify-between text-[11px]">
                           <span className="text-muted-foreground">Inspector</span>
                           <span className="text-foreground">{inspection.inspector.split(',')[0]}</span>
@@ -185,7 +185,7 @@ export function InspectionTimeline() {
         </ScrollArea>
 
         {/* Legend */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[#2A2A2A] pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border pt-3">
           {(Object.keys(typeColors) as InspectionType[]).map((type) => (
             <div key={type} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <span className={`h-2.5 w-2.5 rounded-full ${typeColors[type].dot}`} />

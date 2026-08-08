@@ -44,6 +44,35 @@ interface DbInspectionRow {
   report_id?: string | null;
   submitted_at?: string | null;
   updated_at?: string | null;
+  checklist_template_id?: string | null;
+  checklist_observed_at?: string | null;
+  unflagged_items_confirmed?: boolean | null;
+  unflagged_items_confirmed_at?: string | null;
+  checklist_attested_by_name?: string | null;
+  checklist_compliant_count?: number | null;
+  checklist_deficient_count?: number | null;
+  site_name_snapshot?: string | null;
+  wdid_snapshot?: string | null;
+  risk_level_snapshot?: number | null;
+  construction_stage_snapshot?: string | null;
+  photos_taken?: boolean | null;
+  checklist_submission_sha256?: string | null;
+  inspector_title_snapshot?: string | null;
+  qsp_license_number_snapshot?: string | null;
+  qsp_company_snapshot?: string | null;
+  qpe_start?: string | null;
+  qpe_end?: string | null;
+  qpe_duration_hours?: number | null;
+  rain_gauge_inches?: number | null;
+  obs_precipitation?: boolean | null;
+  obs_discolorations?: boolean | null;
+  obs_odors?: boolean | null;
+  obs_turbidity?: boolean | null;
+  obs_sheen?: boolean | null;
+  obs_floating_material?: boolean | null;
+  obs_suspended_material?: boolean | null;
+  observation_comments?: string | null;
+  exemption_documentation?: string | null;
 }
 
 const VALID_STATUSES = new Set(['draft', 'in-progress', 'submitted', 'archived']);
@@ -74,7 +103,78 @@ function transformInspection(row: DbInspectionRow, missionIds: string[] = []) {
     reportId: row.report_id ?? undefined,
     submittedAt: row.submitted_at ?? undefined,
     updatedAt: row.updated_at ?? undefined,
+    checklistVersion: row.checklist_template_id ?? undefined,
+    checklistObservedAt: row.checklist_observed_at ?? undefined,
+    unflaggedItemsConfirmed: row.unflagged_items_confirmed ?? false,
+    unflaggedItemsConfirmedAt: row.unflagged_items_confirmed_at ?? undefined,
+    checklistAttestedByName: row.checklist_attested_by_name ?? undefined,
+    checklistCompliantCount: row.checklist_compliant_count ?? undefined,
+    checklistDeficientCount: row.checklist_deficient_count ?? undefined,
+    siteNameSnapshot: row.site_name_snapshot ?? undefined,
+    wdidSnapshot: row.wdid_snapshot ?? undefined,
+    riskLevelSnapshot: row.risk_level_snapshot ?? undefined,
+    constructionStageSnapshot: row.construction_stage_snapshot ?? undefined,
+    photosTaken: row.photos_taken ?? undefined,
+    checklistSubmissionSha256: row.checklist_submission_sha256 ?? undefined,
+    inspectorTitleSnapshot: row.inspector_title_snapshot ?? undefined,
+    qspLicenseNumberSnapshot: row.qsp_license_number_snapshot ?? undefined,
+    qspCompanySnapshot: row.qsp_company_snapshot ?? undefined,
+    qpeStart: row.qpe_start ?? undefined,
+    qpeEnd: row.qpe_end ?? undefined,
+    qpeDurationHours: row.qpe_duration_hours ?? undefined,
+    rainGaugeInches: row.rain_gauge_inches ?? undefined,
+    observationPrecipitation: row.obs_precipitation ?? undefined,
+    observationDiscolorations: row.obs_discolorations ?? undefined,
+    observationOdors: row.obs_odors ?? undefined,
+    observationTurbidity: row.obs_turbidity ?? undefined,
+    observationSheen: row.obs_sheen ?? undefined,
+    observationFloatingMaterial: row.obs_floating_material ?? undefined,
+    observationSuspendedMaterial: row.obs_suspended_material ?? undefined,
+    observationComments: row.observation_comments ?? undefined,
+    exemptionDocumentation: row.exemption_documentation ?? undefined,
     missionIds,
+  };
+}
+
+function transformChecklistResult(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    inspectionId: row.inspection_id,
+    checklistVersion: row.checklist_template_id,
+    checklistItemId: row.checklist_item_id,
+    categoryNumber: row.category_number,
+    categoryTitle: row.category_title,
+    itemNumber: row.item_number,
+    prompt: row.prompt,
+    answer: row.answer,
+    answerSource: row.answer_source,
+    exceptionDescription: row.exception_description ?? undefined,
+    recommendation: row.recommendation ?? undefined,
+    identifiedAt: row.identified_at ?? undefined,
+    repairStartDueAt: row.repair_start_due_at ?? undefined,
+    actionImplementedAt: row.action_implemented_at ?? undefined,
+    checkpointIdSnapshot: row.checkpoint_id_snapshot ?? undefined,
+    locationSnapshot: row.location_snapshot ?? undefined,
+    photoUrls: row.photo_urls ?? [],
+    recordedAt: row.recorded_at,
+  };
+}
+
+function transformChecklistDeficiency(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    inspectionId: row.inspection_id,
+    checklistResultId: row.inspection_checklist_result_id ?? undefined,
+    checkpointId: row.checkpoint_id ?? undefined,
+    detectedAt: row.detected_date,
+    description: row.description,
+    recommendation: row.recommendation ?? row.corrective_action,
+    repairStartDueAt: row.repair_start_due_at ?? row.deadline,
+    repairStartedAt: row.repair_started_at ?? undefined,
+    repairCompletedAt: row.repair_completed_at ?? undefined,
+    verifiedAt: row.verified_at ?? undefined,
+    actionImplementedAt: row.action_implemented_at ?? undefined,
+    status: row.status,
   };
 }
 
@@ -235,12 +335,35 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       .order('created_at', { ascending: false });
     const correctiveActions = (actionRows ?? []).map(transformCorrectiveAction);
 
+    // Immutable Part 2/3 history. These rows are inspection-scoped and retain
+    // copied prompts/details even when the current project or checklist changes.
+    const { data: checklistRows, error: checklistError } = await supabase
+      .from('inspection_checklist_results')
+      .select('*')
+      .eq('inspection_id', id)
+      .order('category_number', { ascending: true })
+      .order('item_number', { ascending: true });
+    if (checklistError) {
+      throw new Error('Failed to fetch checklist history');
+    }
+
+    const { data: deficiencyRows, error: deficiencyError } = await supabase
+      .from('deficiencies')
+      .select('*')
+      .eq('inspection_id', id)
+      .order('detected_date', { ascending: true });
+    if (deficiencyError) {
+      throw new Error('Failed to fetch inspection deficiencies');
+    }
+
     return NextResponse.json({
       ...transformInspection(inspection as DbInspectionRow, missionIds),
       findings: (findings ?? []).map(transformFinding),
       aiAnalyses: analyses,
       qspReviews: reviews,
       correctiveActions,
+      checklistResults: (checklistRows ?? []).map(transformChecklistResult),
+      deficiencies: (deficiencyRows ?? []).map(transformChecklistDeficiency),
     });
   } catch (error: unknown) {
     log.error('Inspection GET error', { error });

@@ -472,7 +472,7 @@ function NewProjectWizard() {
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                   isActive
-                    ? 'bg-amber-500 text-black'
+                    ? 'bg-primary text-primary-foreground'
                     : isComplete
                       ? 'bg-amber-500/30 text-amber-300'
                       : 'bg-elevated text-muted-foreground'
@@ -805,7 +805,7 @@ function NewProjectWizard() {
             type="button"
             onClick={handleNext}
             disabled={!canProceed()}
-            className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500 px-4 py-2 text-xs font-semibold text-black hover:bg-amber-400 disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
           >
             Next
             <ChevronRight className="h-4 w-4" />
@@ -815,7 +815,7 @@ function NewProjectWizard() {
             type="button"
             onClick={handleSubmit}
             disabled={submitting || !name.trim()}
-            className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500 px-4 py-2 text-xs font-semibold text-black hover:bg-amber-400 disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
           >
             {submitting ? 'Creating…' : 'Create Project'}
           </button>

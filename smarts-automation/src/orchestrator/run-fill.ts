@@ -109,6 +109,7 @@ export async function runFill(
   try {
     const navResult = await navigateToProject(session, {
       wdid,
+      eventStartDate: records[0]!.eventStartDate,
       resume: buildResumeKey(records[0]!, options),
     });
     if (navResult.status === "halted") {

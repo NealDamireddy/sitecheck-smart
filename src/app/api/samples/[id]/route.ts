@@ -111,7 +111,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       .select(
         `
         *,
-        parameter_results (*)
+        parameter_results!parameter_results_sample_id_fkey (*)
       `
       )
       .eq('id', id)
@@ -173,7 +173,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .select(
         `
         *,
-        parameter_results (*)
+        parameter_results!parameter_results_sample_id_fkey (*)
       `
       )
       .single();

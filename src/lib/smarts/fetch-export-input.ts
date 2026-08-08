@@ -178,7 +178,7 @@ export async function fetchSmartsExportInput(
   // Samples + nested parameter_results
   const { data: samplesData } = await supabase
     .from('samples')
-    .select(`*, parameter_results (*)`)
+    .select(`*, parameter_results!parameter_results_sample_id_fkey (*)`)
     .eq('smarts_event_id', eventId);
   const samples = ((samplesData ?? []) as unknown as DbSampleRow[]).map(
     transformSample

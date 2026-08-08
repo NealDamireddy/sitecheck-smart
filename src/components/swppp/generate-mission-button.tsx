@@ -87,7 +87,7 @@ export function GenerateMissionButton() {
   }
 
   return (
-    <Card className="border-0 bg-[#141414] ring-1 ring-white/5">
+    <Card className="border border-border bg-card ring-0">
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

@@ -239,13 +239,13 @@ export function MissionMap({
         <GeofenceLayer geofence={geofence} />
         <NoFlyZonesLayer zones={noFlyZones} />
 
-        {/* Full planned flight path - dashed amber */}
+        {/* Full planned flight path - dashed brand teal */}
         <Source id="planned-path" type="geojson" data={plannedPathGeoJSON}>
           <Layer
             id="planned-path-line"
             type="line"
             paint={{
-              'line-color': '#F59E0B',
+              'line-color': '#215C78',
               'line-width': 2,
               'line-opacity': 0.3,
               'line-dasharray': [4, 4],
@@ -253,7 +253,7 @@ export function MissionMap({
           />
         </Source>
 
-        {/* Completed flight path - solid amber (planned-path slice driven
+        {/* Completed flight path - solid brand teal (planned-path slice driven
             by playbackProgress, kept for back-compat with missions that have
             no persisted actual track yet) */}
         <Source id="completed-path" type="geojson" data={completedPathGeoJSON}>
@@ -261,7 +261,7 @@ export function MissionMap({
             id="completed-path-line"
             type="line"
             paint={{
-              'line-color': '#F59E0B',
+              'line-color': '#215C78',
               'line-width': 2.5,
               'line-opacity': hasActualTrack ? 0.25 : 0.8,
             }}
@@ -374,7 +374,7 @@ export function MissionMap({
                 style={{
                   width: 28,
                   height: 28,
-                  backgroundColor: 'rgba(245, 158, 11, 0.3)',
+                  backgroundColor: 'rgba(33, 92, 120, 0.3)',
                 }}
               />
               {/* Drone body */}
@@ -383,11 +383,11 @@ export function MissionMap({
                 style={{
                   width: 20,
                   height: 20,
-                  backgroundColor: '#F59E0B',
-                  boxShadow: '0 0 12px rgba(245, 158, 11, 0.5)',
+                  backgroundColor: '#215C78',
+                  boxShadow: '0 0 12px rgba(33, 92, 120, 0.45)',
                 }}
               >
-                <span className="text-[8px] font-bold text-black leading-none">
+                <span className="text-[8px] font-bold text-primary-foreground leading-none">
                   &#9650;
                 </span>
               </div>

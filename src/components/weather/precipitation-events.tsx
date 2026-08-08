@@ -62,7 +62,7 @@ export function PrecipitationEvents() {
               className={`rounded-lg border p-4 ${
                 event.totalPrecipitation >= 0.5
                   ? 'border-amber-500/30 bg-amber-500/5'
-                  : 'border-[#2A2A2A] bg-[#1C1C1C]'
+                  : 'border-border bg-card'
               }`}
             >
               <div className="flex items-start justify-between">
@@ -83,7 +83,7 @@ export function PrecipitationEvents() {
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between border-t border-[#2A2A2A] pt-3">
+              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
                 <div className="flex items-center gap-2">
                   {event.inspectionTriggered ? (
                     <>
