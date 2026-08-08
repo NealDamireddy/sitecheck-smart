@@ -46,15 +46,11 @@ export function Sidebar() {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    // Clear the persisted project pointer so the next user doesn't land
-    // on whatever site this one had selected.
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('sitecheck-current-project');
-      } catch {
-        // ignore
-      }
-    }
+    // Clear the persisted project pointer AND the in-memory store so the
+    // next user doesn't land on whatever site this one had selected. The
+    // key was inlined here before, which meant it could drift from the one
+    // project-store actually reads.
+    useProjectStore.getState().resetSession();
     router.push('/login');
     router.refresh();
   };

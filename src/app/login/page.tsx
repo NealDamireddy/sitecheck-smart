@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { startDemoSession } from '@/lib/demo/start-demo';
+import { useProjectStore } from '@/stores/project-store';
 
 function LoginForm() {
   const router = useRouter();
@@ -42,6 +43,11 @@ function LoginForm() {
         setError(authError.message);
         return;
       }
+
+      // A different account may have been signed in on this browser. The
+      // site pointer lives in localStorage and the store lives in module
+      // scope, so both survive the sign-in unless explicitly reset.
+      useProjectStore.getState().resetSession();
 
       router.push(redirect);
       router.refresh();

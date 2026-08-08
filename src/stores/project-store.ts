@@ -26,6 +26,22 @@ function getPersistedProjectId(): string {
   }
 }
 
+/**
+ * Drop the persisted site pointer. The key is not scoped to a user, so it
+ * must be cleared at every auth boundary — sign-in and sign-up as well as
+ * sign-out. Clearing only on sign-out leaves the pointer behind whenever a
+ * session ends any other way (expiry, a second account created in the same
+ * browser), and the next account lands on the previous one's site.
+ */
+export function clearPersistedProjectId(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // localStorage unavailable
+  }
+}
+
 interface ProjectStore {
   projects: Project[];
   currentProjectId: string;
@@ -36,6 +52,12 @@ interface ProjectStore {
   currentProject: () => Project | undefined;
   setCurrentProject: (id: string) => void;
   fetchProjects: () => Promise<void>;
+  /**
+   * Wipe both persisted and in-memory site state. The store lives in module
+   * scope and survives client-side navigation, so clearing localStorage alone
+   * is not enough — a stale currentProjectId would still be held in memory.
+   */
+  resetSession: () => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -48,6 +70,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   currentProject: () => {
     const { projects, currentProjectId } = get();
     return projects.find((p) => p.id === currentProjectId);
+  },
+
+  resetSession: () => {
+    clearPersistedProjectId();
+    set({
+      projects: [],
+      currentProjectId: '',
+      loading: false,
+      loaded: false,
+      error: null,
+    });
   },
 
   setCurrentProject: (id: string) => {

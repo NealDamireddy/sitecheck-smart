@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { projectCreate } from '@/lib/validations';
-import { project as riversideProject } from '@/data/project';
-import { linearProject } from '@/data/linear-project';
 import type { ProjectSegment } from '@/types/project';
 import { log } from '@/lib/logger';
 
@@ -108,11 +106,17 @@ export async function GET() {
       return NextResponse.json(projects);
     }
 
-    // Fall back to static data if DB is empty
-    return NextResponse.json([riversideProject, linearProject]);
-  } catch {
-    // Fall back to static data on error
-    return NextResponse.json([riversideProject, linearProject]);
+    // An account with no sites has no sites. Returning bundled demo projects
+    // here handed every new signup a fake Fresno site owned by nobody, and
+    // made a genuine empty state indistinguishable from seeded data. The
+    // client stores deliberately keep their static fallbacks behind
+    // isDemoSession() for exactly this reason; this route must match.
+    return NextResponse.json([]);
+  } catch (err) {
+    // Never answer a failed query with fabricated projects — that turns an
+    // outage into silently wrong data the user cannot tell apart from real.
+    log.error('Failed to fetch projects', { err });
+    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
   }
 }
 

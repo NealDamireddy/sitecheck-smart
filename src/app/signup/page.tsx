@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { startDemoSession } from '@/lib/demo/start-demo';
+import { useProjectStore } from '@/stores/project-store';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -43,6 +44,11 @@ export default function SignupPage() {
         setError(authError.message);
         return;
       }
+
+      // A brand-new account must start empty. Without this, a site pointer
+      // left in localStorage by a previous account on this browser carries
+      // straight into the new one's dashboard.
+      useProjectStore.getState().resetSession();
 
       // If email confirmation is enabled, show success message
       // Otherwise, redirect to dashboard
