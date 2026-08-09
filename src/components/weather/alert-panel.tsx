@@ -9,16 +9,24 @@ import { useWeatherStore } from '@/stores/weather-store';
 import type { WeatherDay } from '@/types/weather';
 import { deficiencies as staticDeficiencies } from '@/data/deficiencies';
 import { isDemoSession } from '@/lib/demo/start-demo';
+import { useProjectStore } from '@/stores/project-store';
 
 interface Alert {
   id: string;
-  type: 'storm' | 'deficiency' | 'inspection';
+  type: 'storm' | 'deficiency' | 'inspection' | 'precipitation';
   severity: 'high' | 'medium' | 'low';
   title: string;
   description: string;
   icon: React.ElementType;
   actionHref: string;
   actionLabel: string;
+}
+
+interface PrecipitationStatus {
+  needsCorroboration: boolean;
+  corroborationReason: string | null;
+  totalInches: number | null;
+  decidedBy: string | null;
 }
 
 interface Deficiency {
@@ -29,8 +37,29 @@ interface Deficiency {
   cgpViolation: string;
 }
 
-function getAlerts(forecast: WeatherDay[], deficiencies: Deficiency[]): Alert[] {
+function getAlerts(
+  forecast: WeatherDay[],
+  deficiencies: Deficiency[],
+  precipitation: PrecipitationStatus | null
+): Alert[] {
   const alerts: Alert[] = [];
+
+  // Unverified rainfall. Ranked above the forecast alert because a forecast is
+  // anticipation, while this is a statement about rain that already fell and
+  // may already have triggered an inspection deadline. The old behaviour was
+  // to trust a dead gauge's 0.00" silently; this is that silence made visible.
+  if (precipitation?.needsCorroboration && precipitation.corroborationReason) {
+    alerts.push({
+      id: 'alert-precip-unverified',
+      type: 'precipitation',
+      severity: 'high',
+      title: 'Rainfall not verified',
+      description: precipitation.corroborationReason,
+      icon: CloudRain,
+      actionHref: '/weather',
+      actionLabel: 'Enter gauge reading',
+    });
+  }
 
   // Upcoming QPE alert
   const qpeDay = forecast.find((d) => d.isQPE);
@@ -109,6 +138,8 @@ export function AlertPanel() {
   const forecast = useWeatherStore((s) => s.forecast);
   const fetchWeather = useWeatherStore((s) => s.fetchWeather);
   const [deficiencies, setDeficiencies] = useState<Deficiency[]>([]);
+  const [precipitation, setPrecipitation] = useState<PrecipitationStatus | null>(null);
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
 
   useEffect(() => {
     if (forecast.length === 0) fetchWeather();
@@ -126,7 +157,29 @@ export function AlertPanel() {
       });
   }, [forecast.length, fetchWeather]);
 
-  const alerts = getAlerts(forecast, deficiencies);
+  useEffect(() => {
+    if (!currentProjectId) return;
+    let cancelled = false;
+    fetch(`/api/projects/${encodeURIComponent(currentProjectId)}/precipitation`)
+      .then(async (res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setPrecipitation(data ?? null);
+      })
+      // A verification check that cannot run must not blank the panel — the
+      // other alerts on it are still true.
+      .catch(() => {
+        if (!cancelled) setPrecipitation(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProjectId]);
+
+  const alerts = getAlerts(
+    forecast,
+    deficiencies,
+    currentProjectId ? precipitation : null
+  );
 
   return (
     <Card className="border-border bg-surface">
