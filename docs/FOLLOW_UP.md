@@ -104,3 +104,117 @@ ALTER TABLE checkpoints ADD CONSTRAINT checkpoints_bmp_type_check
 Then move those five values from `LINEAR_BMP_TYPES` into `DB_BMP_TYPES` in `src/lib/cgp/bmp-types.ts`; `tests/schema-drift.test.ts` will fail until you do, which is the point. Deliberately not added as a migration file — `npm run db:migrate` would apply it unreviewed, and this is only needed when the linear product goes live.
 
 **DRF-02 remains the one substantive open item.** The inspection-type enum doesn't match CGP's four types, so the required-parts mapping (Weekly → I/II/III/VII, Pre-Storm → +IV, During → +V, Post-Storm → +VI) cannot be enforced in code. Part 7 now generates for every type, so reports are no longer missing a universally-required section; what remains is Parts IV/V/VI keyed to a corrected type model. Needs a CHECK-constraint migration plus changes through validations, the generator and the UI — a reviewed change of its own, not a drive-by.
+
+---
+
+## Found 2026-08-08 during the first real end-to-end run on production
+
+The first time a genuinely new account went through signup → create site → start
+inspection. Everything below was found by walking that path, not by reading code.
+
+### Blocking — a new customer cannot record an inspection at all
+
+**PROV-01 — nothing in the product creates an inspector profile or a project
+assignment.** `create_site_record_with_detail` gates record creation on an active
+`inspector_profiles` row plus an active `project_inspector_assignments` row.
+Verified 2026-08-08: no INSERT to either table exists anywhere — not in `src/`,
+`scripts/`, `supabase/migrations/`, or `e2e/`. Migration `021` creates both tables
+and never populates them. The only working account (`neal@sitecheck.demo`) was
+provisioned by hand.
+
+- *Consequence:* a new user signs up, creates a site, presses "Start weekly visit"
+  and gets "an inspector is not assigned to this site". Dead end, no way out
+  through the UI.
+- *Status:* being addressed in a spun-off session. Closely related to ACC-03 above
+  — both are the same missing membership/role plumbing.
+- *Do not* fix by relaxing the hierarchy checks in the RPC. The gate is correct;
+  the provisioning is what's missing.
+
+### Wrong data shown to the user
+
+**GEO-01 — the project wizard fabricates Fresno coordinates.**
+`src/app/projects/new/page.tsx:265` falls back to `{ lat: 36.78, lng: -119.42 }`
+when there is no centerline and no prefill — the bundled demo project's centre.
+A Pleasanton site created 2026-08-08 was stored with Fresno's coordinates.
+
+- *Consequence:* NOAA is asked about the wrong place, so the dashboard shows
+  another city's weather as if it were the site's. On a QPE-driven product this
+  is not cosmetic — rain-event triggers key off this location.
+- *Note the irony:* `src/lib/weather-api.ts` was deliberately hardened against
+  exactly this ("silent Fresno fallback ... served Fresno's weather as if it were
+  the site's" is listed there as a fixed defect) and now refuses to guess. The
+  wizard reintroduces the guess one layer up.
+- *Fix shape:* geocode the address already collected (a Mapbox token is present),
+  let the user confirm the pin, and fail loudly with no location rather than
+  substituting a default. A zip code alone is enough for weather but too coarse
+  for the site map and drainage areas.
+
+### Usability defects that make failures unreadable
+
+**MON-01 — a new monitoring location starts invalid and cannot be saved.**
+`addLocation()` in `src/components/projects/monitoring-locations-builder.tsx:47`
+seeds `drainageArea: ''`, but `monitoringLocationCreate` requires
+`min(1, 'drainageArea is required')`. Any row where the user does not notice the
+field fails with a 400 at project-create time.
+
+**MON-02 — Zod errors render as `[object Object]`.**
+`src/app/api/monitoring-locations/route.ts:151` returns `{ error: err.issues }`
+(an array); `src/app/projects/new/page.tsx:343` interpolates it into a template
+string. The user sees `[object Object]` instead of "drainageArea is required".
+This is what made MON-01 undiagnosable from the UI.
+
+**MON-03 — a failed location leaves a duplicate project behind.** The wizard
+deliberately does not roll the project back when a location POST fails
+(`projects/new/page.tsx:318-321`, a documented choice). Retrying therefore creates
+a second project. Two identical "Equus Ct" projects were produced this way on
+2026-08-08. Either roll back, or resume into the existing project on retry.
+
+### Platform limit, previously documented, now hit in production
+
+**UPL-01 — SWPPP scan returns HTTP 413 above ~4.5 MB.** No size guard in
+`src/app/api/scan-swppp/route.ts`; the 413 comes from Vercel's serverless
+request-body cap. The UI advertises 30 MB. Already recorded in the commit
+"feat(swppp): accept PDF uploads up to 30MB": Vercel's ~4.5 MB body limit and
+Anthropic's ~32 MB base64 ceiling both sit below the advertised number.
+
+- *Fix shape:* upload direct to Supabase Storage from the browser, then have the
+  server read from storage. Raising a constant will not help.
+- *Interim:* the UI should state the real limit instead of 30 MB.
+
+### Unverified — seen but not diagnosed
+
+**OBS-01 — repeated HTTP 400s on dashboard reads.** Vercel runtime logs for
+2026-08-08 show 19 × 400 across `GET /api/deficiencies`, `/api/checkpoints`,
+`/api/dashboard/metrics` and `/api/activity`, alongside the monitoring-location
+failures. Most likely a missing/blank `projectId` query param while the store is
+still resolving, but this was not traced. Worth reproducing before assuming it is
+benign.
+
+### Environment and account state
+
+- **Production is missing `SMARTS_CREDENTIALS_KEY`, `SWPPP_SERVICE_URL`, and
+  `ADMIN_MIGRATION_TOKEN`.** Saving per-inspector SMARTS logins and SWPPP
+  ingestion will fail until they are set.
+- **`OPENWEATHERMAP_API_KE`** (missing trailing `Y`) is set in Vercel. Harmless —
+  no code reads OpenWeatherMap any more, NOAA replaced it — but it shows an entry
+  that was never verified.
+- **The stored `SUPABASE_DB_URL` no longer authenticates.** As of 2026-08-08 the
+  value in `.env.development.local` and `.env.local` fails with "password
+  authentication failed"; the database password appears to have been rotated
+  during the Vercel setup. `npm run db:migrate` and the admin scripts are broken
+  locally until it is updated. Check whether Vercel's copy is stale too.
+- **Attachment upload/download is still unverified end to end.**
+  `site_record_uploads` has 0 rows; the flow has never completed once.
+- **Leaked-password protection cannot be enabled** — a Supabase Pro feature and
+  the org is on free. See `docs/smarts-recon/SUPABASE-ADVISOR-POSTURE.md`.
+
+### Latent, not currently broken
+
+**LAY-01 — viewport breakpoints inside narrower containers.** The visit picker was
+fixed with container queries (commit `c3c3984`). `checkpoint-grid.tsx`,
+`telemetry-panel.tsx`, `mission-card.tsx`, `mission-scope-selector.tsx` and
+`mission-deviation-panel.tsx` use `sm:`/`lg:` multi-column grids too, but all
+render full-width today, so none is currently wrong. Converting them to
+`@container` would be strictly more robust, but the thresholds need retuning per
+component — a naive swap makes some of them switch to 4 columns *earlier* on small
+screens, which is worse. Do it deliberately, not as a sweep.
