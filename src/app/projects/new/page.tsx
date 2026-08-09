@@ -17,6 +17,7 @@ import { useProjectStore } from '@/stores/project-store';
 import { useCheckpointStore } from '@/stores/checkpoint-store';
 import type { ProjectType, ProjectSegment, Project } from '@/types/project';
 import { readErrorMessage } from '@/lib/api-error';
+import type { LocationSource } from '@/lib/geocode';
 
 /** sessionStorage keys used by /swppp to hand off extracted SWPPP data. */
 const SWPPP_PREFILL_KEY = 'sitecheck-swppp-prefill';
@@ -77,6 +78,13 @@ function NewProjectWizard() {
   // Basic info
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  // Resolved site coordinates. Deliberately starts null: a site with no
+  // location must block rather than inherit someone else's. See GEO-01.
+  const [siteCoords, setSiteCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationSource, setLocationSource] = useState<LocationSource>('unknown');
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeNote, setGeocodeNote] = useState<string | null>(null);
+  const [showManualCoords, setShowManualCoords] = useState(false);
   const [permitNumber, setPermitNumber] = useState('');
   const [wdid, setWdid] = useState('');
   const [riskLevel, setRiskLevel] = useState<1 | 2 | 3>(2);
@@ -241,11 +249,63 @@ function NewProjectWizard() {
     if (currentStep > 0) setCurrentStep(currentStep - 1);
   };
 
+  const lookUpAddress = async () => {
+    if (!address.trim()) {
+      setGeocodeNote('Enter an address first.');
+      return;
+    }
+    setGeocoding(true);
+    setGeocodeNote(null);
+    try {
+      const res = await fetch(`/api/geocode?address=${encodeURIComponent(address.trim())}`);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSiteCoords(null);
+        setLocationSource('unknown');
+        setShowManualCoords(true);
+        setGeocodeNote(readErrorMessage(body, 'Address lookup failed.'));
+        return;
+      }
+      setSiteCoords({ lat: body.lat, lng: body.lng });
+      setLocationSource('geocoded');
+      setShowManualCoords(false);
+      // Street-level means the road centroid, not the parcel. Good enough for
+      // weather (NOAA's grid is ~2.5 km) but the QSP should know before
+      // accepting it as the site position.
+      setGeocodeNote(
+        body.precision === 'street'
+          ? `Matched to the street only: ${body.matchedAddress}. Adjust manually if the site sits well off the road.`
+          : `Matched: ${body.matchedAddress}`
+      );
+    } catch {
+      setSiteCoords(null);
+      setLocationSource('unknown');
+      setShowManualCoords(true);
+      setGeocodeNote('Address lookup failed. Enter coordinates manually.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   const handleSubmit = async () => {
     // Check the monitoring locations before anything is written. The wizard
     // deliberately does not roll the project back when a location POST fails,
     // so letting an invalid row through leaves a half-built project behind and
     // produces a duplicate on the next attempt.
+    // GEO-01: never invent a location. Weather, QPE detection and the
+    // rain-event triggers all key off these coordinates, so a wrong value is
+    // silently wrong compliance data rather than a cosmetic defect.
+    const resolvedCoords =
+      centerline.length > 0
+        ? { lat: centerline[0][1], lng: centerline[0][0] }
+        : siteCoords ?? prefillCenter ?? null;
+    if (!resolvedCoords) {
+      setError(
+        'This site has no location yet. Use "Find coordinates" on the address, or enter latitude and longitude manually.'
+      );
+      return;
+    }
+
     const locationProblems = findIncompleteLocations(monitoringLocations);
     if (locationProblems.length > 0) {
       setError(
@@ -276,12 +336,7 @@ function NewProjectWizard() {
         startDate: new Date().toISOString().slice(0, 10),
         estimatedCompletion: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
         acreage,
-        coordinates:
-          centerline.length > 0
-            ? { lng: centerline[0][0], lat: centerline[0][1] }
-            : prefillCenter
-              ? { lat: prefillCenter.lat, lng: prefillCenter.lng }
-              : { lat: 36.78, lng: -119.42 },
+        coordinates: resolvedCoords,
         bounds:
           centerline.length > 0
             ? [
@@ -295,8 +350,11 @@ function NewProjectWizard() {
                 ],
               ]
             : [
-                [36.78, -119.42],
-                [36.79, -119.41],
+                // A tight box around the resolved site centre. Previously this
+                // was a hardcoded Fresno box, which put every bounded site's
+                // map extent in the wrong county.
+                [resolvedCoords.lat - 0.005, resolvedCoords.lng - 0.005],
+                [resolvedCoords.lat + 0.005, resolvedCoords.lng + 0.005],
               ],
         projectType,
       };
@@ -382,10 +440,10 @@ function NewProjectWizard() {
       // Unlocated checkpoints are placed on a tight ring around the
       // project's real center so the QSP can drag each one to its true
       // spot on the site map.
-      const projectCenter =
-        centerline.length > 0
-          ? { lat: centerline[0][1], lng: centerline[0][0] }
-          : prefillCenter ?? { lat: 36.78, lng: -119.42 };
+      // Anchored to the site's real centre. This used to fall back to the
+      // demo project's Fresno coordinates, scattering a site's unlocated
+      // checkpoints 200 miles from the site.
+      const projectCenter = resolvedCoords;
       const placeholderCoord = (index: number) => {
         const angle = index * 2.4; // golden-angle spread, no overlaps
         const radius = 0.0006 + 0.00012 * index; // ~65m ring, growing
@@ -542,12 +600,89 @@ function NewProjectWizard() {
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
                   Address / location
                 </label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full rounded border border-border bg-elevated px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      // The old coordinates belong to the old address.
+                      setSiteCoords(null);
+                      setLocationSource('unknown');
+                      setGeocodeNote(null);
+                    }}
+                    className="w-full rounded border border-border bg-elevated px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={lookUpAddress}
+                    disabled={geocoding || !address.trim()}
+                    className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-40"
+                  >
+                    {geocoding ? 'Looking…' : 'Find coordinates'}
+                  </button>
+                </div>
+
+                {/* Weather, QPE detection and the rain-event triggers all key
+                    off these coordinates, so the site cannot be saved without
+                    them and the resolved position is shown for confirmation. */}
+                {siteCoords ? (
+                  <p className="mt-1 text-[11px] text-emerald-400">
+                    Location set — {siteCoords.lat.toFixed(5)}, {siteCoords.lng.toFixed(5)}
+                    {locationSource === 'manual' ? ' (entered manually)' : ''}
+                    {geocodeNote ? ` · ${geocodeNote}` : ''}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-amber-400">
+                    {geocodeNote ??
+                      'No location yet — find coordinates so weather and rain-event tracking use this site.'}
+                  </p>
+                )}
+
+                {showManualCoords && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                        Latitude
+                      </label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={siteCoords?.lat ?? ''}
+                        onChange={(e) => {
+                          const lat = Number(e.target.value);
+                          setLocationSource('manual');
+                          setSiteCoords((prev) =>
+                            Number.isFinite(lat)
+                              ? { lat, lng: prev?.lng ?? 0 }
+                              : null
+                          );
+                        }}
+                        className="w-full rounded border border-border bg-elevated px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                        Longitude
+                      </label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={siteCoords?.lng ?? ''}
+                        onChange={(e) => {
+                          const lng = Number(e.target.value);
+                          setLocationSource('manual');
+                          setSiteCoords((prev) =>
+                            Number.isFinite(lng)
+                              ? { lat: prev?.lat ?? 0, lng }
+                              : null
+                          );
+                        }}
+                        className="w-full rounded border border-border bg-elevated px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">CGP Permit Number</label>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchCurrentWeather } from '@/lib/weather-api';
+import { fetchTomorrowCurrent } from '@/lib/weather/tomorrow';
 import { resolveProjectId, resolveProjectCoords } from '@/lib/project-context';
 import { log } from '@/lib/logger';
 
@@ -51,9 +52,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch fresh data from OpenWeatherMap at the project's location
+    // Fetch fresh data at the project's real location.
+    //
+    // Tomorrow.io first when configured: it answers at the exact coordinates
+    // rather than the nearest NOAA gridpoint, which matters for a site-level
+    // display. It returns null — never throws — when unconfigured or
+    // unavailable, so NOAA remains the fallback and the only hard dependency.
+    //
+    // Display only. The QPE determination stays on NOAA observations
+    // (src/lib/qpe/observed.ts); see the note at the top of
+    // src/lib/weather/tomorrow.ts for why.
     const coords = await resolveProjectCoords(supabase, projectId);
-    const weatherData = await fetchCurrentWeather(coords);
+    const weatherData =
+      (await fetchTomorrowCurrent(coords)) ?? (await fetchCurrentWeather(coords));
 
     // Upsert into cache
     const { data: upserted, error: upsertError } = await supabase

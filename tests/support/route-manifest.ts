@@ -81,6 +81,8 @@ export const ROUTES: RouteSpec[] = [
   { file: 'api/smarts/sync/[jobId]/route.ts', path: '/api/smarts/sync/[jobId]', verbs: ['GET'], scope: 'qsp', auth: 'user' },
   { file: 'api/smarts/sync/[jobId]/screenshot/route.ts', path: '/api/smarts/sync/[jobId]/screenshot', verbs: ['GET'], scope: 'qsp', auth: 'user' },
   { file: 'api/qsp-profile/route.ts', path: '/api/qsp-profile', verbs: ['GET', 'PUT'], scope: 'qsp', auth: 'user' },
+  // Authenticated so it is not an open outbound proxy for anonymous callers.
+  { file: 'api/geocode/route.ts', path: '/api/geocode', verbs: ['GET'], scope: 'qsp', auth: 'user' },
   { file: 'api/scan-swppp/route.ts', path: '/api/scan-swppp', verbs: ['POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/analyze/route.ts', path: '/api/analyze', verbs: ['POST'], scope: 'qsp', auth: 'user' },
   { file: 'api/activity/route.ts', path: '/api/activity', verbs: ['GET', 'POST'], scope: 'qsp', auth: 'user' },
