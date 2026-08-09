@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { fetchCurrentWeather } from '@/lib/weather-api';
+import { fetchOpenMeteoCurrent } from '@/lib/weather/open-meteo';
 import { fetchTomorrowCurrent } from '@/lib/weather/tomorrow';
 import { resolveProjectId, resolveProjectCoords } from '@/lib/project-context';
 import { log } from '@/lib/logger';
@@ -63,8 +64,22 @@ export async function GET(request: NextRequest) {
     // (src/lib/qpe/observed.ts); see the note at the top of
     // src/lib/weather/tomorrow.ts for why.
     const coords = await resolveProjectCoords(supabase, projectId);
+
+    // Display sources, in order. Each returns null rather than throwing, so
+    // the chain degrades instead of breaking:
+    //
+    //   Tomorrow.io  — only if TOMORROW_API_KEY is set; opt-in, minute-level.
+    //   Open-Meteo   — default. No key, native imperial units, exact
+    //                  coordinates, and pinnable to NOAA models.
+    //   NOAA         — the floor. Also the only source allowed to decide that
+    //                  coordinates are missing, which it does explicitly.
+    //
+    // None of these feed the QPE determination; that stays on NOAA station
+    // observations in src/lib/qpe/observed.ts.
     const weatherData =
-      (await fetchTomorrowCurrent(coords)) ?? (await fetchCurrentWeather(coords));
+      (await fetchTomorrowCurrent(coords)) ??
+      (await fetchOpenMeteoCurrent(coords)) ??
+      (await fetchCurrentWeather(coords));
 
     // Upsert into cache
     const { data: upserted, error: upsertError } = await supabase
