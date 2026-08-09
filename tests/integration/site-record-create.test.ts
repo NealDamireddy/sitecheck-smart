@@ -228,7 +228,10 @@ describe('POST /api/site-records', () => {
     const response = await POST(request());
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
+      // `code` is our own stable identifier, not Postgres detail — the
+      // client uses it to offer the right remedy.
       error: 'Site record storage is not available',
+      code: 'migration_required',
     });
   });
 
@@ -239,6 +242,7 @@ describe('POST /api/site-records', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       error: 'Failed to create site record',
+      code: 'persistence_failed',
     });
   });
 });

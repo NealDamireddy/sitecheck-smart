@@ -112,23 +112,31 @@ Then move those five values from `LINEAR_BMP_TYPES` into `DB_BMP_TYPES` in `src/
 The first time a genuinely new account went through signup → create site → start
 inspection. Everything below was found by walking that path, not by reading code.
 
-### Blocking — a new customer cannot record an inspection at all
+### Corrected — an earlier finding in this section was wrong
 
-**PROV-01 — nothing in the product creates an inspector profile or a project
-assignment.** `create_site_record_with_detail` gates record creation on an active
-`inspector_profiles` row plus an active `project_inspector_assignments` row.
-Verified 2026-08-08: no INSERT to either table exists anywhere — not in `src/`,
-`scripts/`, `supabase/migrations/`, or `e2e/`. Migration `021` creates both tables
-and never populates them. The only working account (`neal@sitecheck.demo`) was
-provisioned by hand.
+**PROV-01 — CORRECTED 2026-08-08. The original claim here was wrong.**
 
-- *Consequence:* a new user signs up, creates a site, presses "Start weekly visit"
-  and gets "an inspector is not assigned to this site". Dead end, no way out
-  through the UI.
-- *Status:* being addressed in a spun-off session. Closely related to ACC-03 above
-  — both are the same missing membership/role plumbing.
-- *Do not* fix by relaxing the hierarchy checks in the RPC. The gate is correct;
-  the provisioning is what's missing.
+This entry first said the product could not create an inspector profile or a
+project assignment at all. That is false. `POST /api/inspector-workspace`
+upserts both (`route.ts` lines 262 and 296), `PATCH` upserts assignments, and
+`src/app/records/page.tsx` exposes an **"Activate workspace"** action plus an
+`AssignmentManager` for anyone with a managing role.
+
+The false conclusion came from a grep that looked for `insert|upsert` on the
+same line as the table name. The calls are chained, so `.upsert(` sits on the
+line *after* `.from('inspector_profiles')` and nothing matched. A single-line
+grep was treated as proof of absence.
+
+**The real defect is discoverability, and it is fixed.** Pressing "Start weekly
+visit" without an assignment returned "The inspector is not assigned to this
+site" — accurate, and a dead end. Finding the remedy meant knowing to visit
+Field Records and press "Activate workspace". `/api/site-records` now returns a
+machine-readable `code` beside the message, and the dashboard picker renders a
+link straight to the fix for `assignment_required` and `profile_required`.
+
+- *Lesson worth keeping:* the gap was found by a person using the product, not
+  by reading the code, and the code-reading produced a confident wrong answer.
+  Prefer walking the flow before declaring a feature missing.
 
 ### Wrong data shown to the user
 

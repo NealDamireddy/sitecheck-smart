@@ -26,6 +26,7 @@ import type {
   DischargePointType,
 } from '@/types';
 import { log } from '@/lib/logger';
+import { formatZodIssues } from '@/lib/api-error';
 
 interface DbMonitoringLocationRow {
   id: string;
@@ -148,7 +149,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (err: unknown) {
     if (err instanceof ZodError) {
-      return NextResponse.json({ error: err.issues }, { status: 400 });
+      return NextResponse.json(
+        { error: formatZodIssues(err.issues), details: err.issues },
+        { status: 400 }
+      );
     }
     log.error('Monitoring locations POST error', { err });
     // SEC-09: never echo internal error text to the client.

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowRight,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { readErrorMessage } from '@/lib/api-error';
 import { useProjectStore } from '@/stores/project-store';
 import {
   useActiveInspectionStore,
@@ -59,6 +61,25 @@ const VISIT_TO_INSPECTION_TYPE: Record<
   'post-storm': { type: 'post-storm', trigger: 'post-storm' },
 };
 
+/**
+ * Failures the inspector can resolve themselves, and where to do it.
+ *
+ * "The inspector is not assigned to this site" is accurate but a dead end —
+ * on 2026-08-08 it took a manual hunt to discover that the fix is the
+ * "Activate workspace" action on Field Records. The message now carries the
+ * user there instead of describing the problem and stopping.
+ */
+const ERROR_REMEDIES: Record<string, { href: string; label: string }> = {
+  assignment_required: {
+    href: '/records',
+    label: 'Activate your workspace on Field Records',
+  },
+  profile_required: {
+    href: '/records',
+    label: 'Set up your inspector profile on Field Records',
+  },
+};
+
 export function InspectionPicker() {
   const router = useRouter();
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
@@ -68,6 +89,7 @@ export function InspectionPicker() {
   const [visit, setVisit] = useState<ActiveVisit>('weekly');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remedy, setRemedy] = useState<{ href: string; label: string } | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -93,6 +115,7 @@ export function InspectionPicker() {
 
     setStarting(true);
     setError(null);
+    setRemedy(null);
     try {
       const mapping = VISIT_TO_INSPECTION_TYPE[visit];
       const usesFieldRecord = visit === 'weekly' || visit === 'monthly';
@@ -135,7 +158,11 @@ export function InspectionPicker() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `HTTP ${res.status}`);
+        const failure = new Error(
+          readErrorMessage(body, `HTTP ${res.status}`)
+        ) as Error & { code?: string };
+        failure.code = (body as { code?: string })?.code;
+        throw failure;
       }
       const created = await res.json();
       const inspectionId = usesFieldRecord ? created?.detailId : created?.id;
@@ -149,6 +176,8 @@ export function InspectionPicker() {
       });
       router.push(`/inspections/${inspectionId}`);
     } catch (err) {
+      const code = (err as { code?: string } | null)?.code;
+      setRemedy(code ? ERROR_REMEDIES[code] ?? null : null);
       setError(err instanceof Error ? err.message : 'Failed to start inspection');
       setStarting(false);
     }
@@ -262,6 +291,14 @@ export function InspectionPicker() {
         <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="mr-1 inline h-3 w-3" />
           {error}
+          {remedy && (
+            <Link
+              href={remedy.href}
+              className="mt-1.5 block font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              {remedy.label} →
+            </Link>
+          )}
         </div>
       )}
     </div>

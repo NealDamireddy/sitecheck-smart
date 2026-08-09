@@ -9,12 +9,14 @@ import { GeoJsonUpload } from '@/components/projects/geojson-upload';
 import { SegmentBuilder } from '@/components/projects/segment-builder';
 import {
   MonitoringLocationsBuilder,
+  findIncompleteLocations,
   type MonitoringLocationDraft,
 } from '@/components/projects/monitoring-locations-builder';
 import { centerlineLengthFeet, formatLinearLength } from '@/lib/format';
 import { useProjectStore } from '@/stores/project-store';
 import { useCheckpointStore } from '@/stores/checkpoint-store';
 import type { ProjectType, ProjectSegment, Project } from '@/types/project';
+import { readErrorMessage } from '@/lib/api-error';
 
 /** sessionStorage keys used by /swppp to hand off extracted SWPPP data. */
 const SWPPP_PREFILL_KEY = 'sitecheck-swppp-prefill';
@@ -240,6 +242,18 @@ function NewProjectWizard() {
   };
 
   const handleSubmit = async () => {
+    // Check the monitoring locations before anything is written. The wizard
+    // deliberately does not roll the project back when a location POST fails,
+    // so letting an invalid row through leaves a half-built project behind and
+    // produces a duplicate on the next attempt.
+    const locationProblems = findIncompleteLocations(monitoringLocations);
+    if (locationProblems.length > 0) {
+      setError(
+        `Finish these monitoring locations first — ${locationProblems.join('; ')}`
+      );
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -312,7 +326,7 @@ function NewProjectWizard() {
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `Failed to create project: ${res.status}`);
+        throw new Error(readErrorMessage(errBody, `Failed to create project: ${res.status}`));
       }
 
       // Chain monitoring-location creates. We intentionally do NOT roll the
@@ -340,7 +354,7 @@ function NewProjectWizard() {
         if (!locRes.ok) {
           const errBody = await locRes.json().catch(() => ({}));
           locationErrors.push(
-            `${loc.name}: ${errBody.error || `HTTP ${locRes.status}`}`,
+            `${loc.name}: ${readErrorMessage(errBody, `HTTP ${locRes.status}`)}`,
           );
         }
       }
@@ -416,7 +430,7 @@ function NewProjectWizard() {
         if (!cpRes.ok) {
           const errBody = await cpRes.json().catch(() => ({}));
           checkpointErrors.push(
-            `${cp.id}: ${errBody.error || `HTTP ${cpRes.status}`}`,
+            `${cp.id}: ${readErrorMessage(errBody, `HTTP ${cpRes.status}`)}`,
           );
         }
       }

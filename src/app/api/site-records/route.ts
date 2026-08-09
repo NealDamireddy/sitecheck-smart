@@ -112,8 +112,12 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof SiteRecordCreateError) {
       const response = ERROR_RESPONSES[error.code];
+      // Return the code alongside the prose. Several of these failures have a
+      // specific remedy the user can perform themselves (activating their
+      // workspace, setting up a profile) but the message alone leaves them
+      // guessing where to go — which is exactly what happened on 2026-08-08.
       return NextResponse.json(
-        { error: response.message },
+        { error: response.message, code: error.code },
         { status: response.status }
       );
     }

@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { projectCreate } from '@/lib/validations';
 import type { ProjectSegment } from '@/types/project';
 import { log } from '@/lib/logger';
+import { formatZodIssues } from '@/lib/api-error';
 
 function transformSegment(row: Record<string, unknown>): ProjectSegment {
   return {
@@ -245,7 +246,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(insertedProject, { status: 201 });
   } catch (err) {
     if (err instanceof ZodError) {
-      return NextResponse.json({ error: err.issues }, { status: 400 });
+      return NextResponse.json(
+        { error: formatZodIssues(err.issues), details: err.issues },
+        { status: 400 }
+      );
     }
     // SEC-09: never echo internal error text to the client.
     log.error('Failed to create project', { err });

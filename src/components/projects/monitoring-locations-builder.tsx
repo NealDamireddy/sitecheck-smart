@@ -31,6 +31,40 @@ interface Props {
   centerLng?: number;
 }
 
+/**
+ * Report rows that the API will reject, naming each one.
+ *
+ * A new row is seeded with an empty `drainageArea` so the QSP fills in the
+ * site-specific value, but the API requires it. Before this check, an untouched
+ * row was only caught server-side — after the project had already been created,
+ * and reported as an unreadable 400. Catching it here keeps the failure in the
+ * form, next to the field that caused it.
+ */
+export function findIncompleteLocations(
+  locations: MonitoringLocationDraft[]
+): string[] {
+  const problems: string[] = [];
+  locations.forEach((loc, idx) => {
+    const label = loc.name?.trim() || `Location ${idx + 1}`;
+    if (!loc.name?.trim()) {
+      problems.push(`Location ${idx + 1}: name is required`);
+    } else if (loc.name.trim().length > 25) {
+      // SMARTS rejects longer names at the portal, so reject them at entry.
+      problems.push(`${label}: name must be 25 characters or fewer`);
+    }
+    if (!loc.drainageArea?.trim()) {
+      problems.push(`${label}: drainage area is required`);
+    }
+  });
+  return problems;
+}
+
+/** Shared styling for a required field left blank. */
+const FIELD_BASE =
+  'w-full rounded border bg-surface px-2 py-1.5 text-sm focus:outline-none';
+const FIELD_OK = 'border-border focus:border-amber-500/50';
+const FIELD_MISSING = 'border-red-500/60 focus:border-red-500';
+
 export function MonitoringLocationsBuilder({
   locations,
   onChange,
@@ -129,9 +163,15 @@ export function MonitoringLocationsBuilder({
                     type="text"
                     value={loc.drainageArea}
                     placeholder='e.g. "DA-1, 4.2 ac"'
+                    aria-invalid={!loc.drainageArea.trim()}
                     onChange={(e) => updateLocation(idx, { drainageArea: e.target.value })}
-                    className="w-full rounded border border-border bg-surface px-2 py-1.5 text-sm focus:border-amber-500/50 focus:outline-none"
+                    className={`${FIELD_BASE} ${loc.drainageArea.trim() ? FIELD_OK : FIELD_MISSING}`}
                   />
+                  {!loc.drainageArea.trim() && (
+                    <p className="mt-1 text-[10px] text-red-400">
+                      Required — the site cannot be saved until this is filled in.
+                    </p>
+                  )}
                 </div>
 
                 <div className="col-span-2">
